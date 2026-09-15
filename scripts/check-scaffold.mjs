@@ -61,7 +61,11 @@ assert.deepEqual(config.upstream, {
 assert.equal(config.automationEnabled, false);
 assert.equal(config.integrationsImplemented, false);
 assert.deepEqual(config.codeReviewProviders, ["Devin", "Codex"]);
-assert.deepEqual(config.oracle, { enabled: false, intendedCaller: "Jun", implemented: false });
+assert.deepEqual(config.oracle, {
+  enabled: false,
+  intendedCaller: "installation-authorized-user",
+  implemented: false,
+});
 assert.deepEqual(
   config.allowedScripts,
   Object.fromEntries(allowed.map((name) => [name, upstream.scripts[name]])),

@@ -13,7 +13,7 @@
   "codeReviewProviders": ["Devin", "Codex"],
   "oracle": {
     "enabled": false,
-    "intendedCaller": "Jun",
+    "intendedCaller": "installation-authorized-user",
     "implemented": false
   },
   "allowedScripts": {
