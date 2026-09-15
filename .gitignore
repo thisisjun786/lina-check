@@ -18,3 +18,13 @@ records/
 results/
 test-results/
 triage-dashboard-dev*.log
+
+# Local LINA Check tooling and private runtime data
+.codexclaw/
+.omo/
+.lina-check-state/
+.env.*
+!.env.example
+!.env.*.example
+*.sqlite
+*.sqlite-*

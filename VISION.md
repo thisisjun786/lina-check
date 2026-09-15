@@ -1,33 +1,9 @@
-# VISION
+# LINA Check는 다음 할 일을 안내한다
 
-## What ClawSweeper is
+ClawSweeper를 베이스로 저장소의 이슈와 PR을 관리한다. 기여자와 코딩 에이전트가 빠진 증거, 해결되지 않은 조건, 다음 진행 사항을 알 수 있게 하는 것이 목표다.
 
-An autonomous maintainer for openclaw repositories. It reviews, closes, consolidates, and reports on issues and PRs so human maintainers spend attention only where judgment genuinely requires them.
+코드 리뷰는 Devin과 Codex가 맡는다. LINA Check는 이 결과와 CI·기여 정책을 읽어 관리 판단과 안내를 만든다. ClawSweeper의 기존 모델 기반 관리 구조를 활용하며, 새로운 코드 리뷰 엔진을 만드는 것은 목표가 아니다.
 
-## Who it serves
+Oracle은 Jun이 필요할 때 수동으로 호출하는 선택 기능으로 연결한다. 외부 기여자의 댓글만으로 실행되는 경로는 만들지 않는다. 초기 자동 수정·닫기·머지·레이블 변경은 활성화하지 않는다.
 
-openclaw maintainers first, contributors second — every contributor gets a substantive, honest review faster than a human team could deliver one.
-
-## Design stance: abundant intelligence, scarce trust
-
-Model calls are cheap and getting cheaper; engineer time and trust are not. Whenever behavior can be a model judgment with a clear prompt and an auditable output, prefer that over deterministic machinery. Code exists for the trust boundary only: authentication, idempotency, the append-only action ledger, spend limits, and destructive-action gates. Everything else — candidate selection, failure recovery, retry strategy, triage policy, anomaly diagnosis — should trend toward Codex-driven with the reasoning recorded in the ledger.
-
-## In scope
-
-Review with proof-checking; policy-gated closing with revival paths; umbrella consolidation; state/report materialization; self-healing informed by model diagnosis.
-
-## Out of scope
-
-Merging without policy authorization; releases; touching repos outside the configured set; any spend without a ledger entry.
-
-## Quality bar
-
-Every action carries a reason a maintainer can read; wrong closes must be revivable in one comment; the system's own failures are triaged by the system before a human sees them.
-
-## Non-goals
-
-Perfect determinism (we buy correctness with verification, not rigidity); zero-cost operation; replacing maintainer taste on product direction.
-
-## Autonomy guidance
-
-Agents working on this repo should delete machinery when a model call plus ledger entry can replace it, keep workflows thin (logic in testable TS, not YAML bash), never add a pinned-text test where a review gate suffices, and coordinate cross-lane changes through the RFC issue rather than parallel pushes.
+현재 구현 수준은 원본 소스와 출처를 보존하고 실행 입구를 꺼둔 스캐폴드다. 위 관리 흐름, 리뷰 연동, Oracle 권한은 후속 구현 대상이다. [원본 VISION](docs/upstream/VISION.md)은 upstream 참고 자료로 보존한다.
