@@ -131,7 +131,8 @@ PR: https://github.com/thisisjun786/lina-check/pull/1 — base `main`, non-draft
 ## 리뷰 영수증
 
 리뷰는 두 층으로 돌았다. 태스크 안의 독립 리뷰어 subagent 2회전과, PR 개설 후 호스티드 리뷰어
-(Devin Review · Codex) 3회전이다. 총 21건을 받아 20건을 고치고 1건을 근거를 들어 반박했다.
+(Devin Review · Codex) 4회전이다. 총 22건을 받아 20건을 고치고 2건을 한계·의도로 명시했으며
+1건은 근거를 들어 반박했다(그 1건은 4회전에 새 근거로 재제기되어 결국 수정했다).
 미해결 스레드는 0건이다.
 
 ### 층 1 · 독립 리뷰어 subagent (2회전, 5건)
@@ -184,6 +185,18 @@ PR 개설과 새 커밋마다 Devin Review 와 Codex 가 자동으로 돌았다.
 | H14 | Devin | analysis | `lina-check-safe-tests.mjs:102` | mtime 은 빌드 출처가 아니다. 아티팩트 복원이 순서를 뒤집을 수 있다 | **한계로 명시.** 코드 변경 없음 | 내용 해시는 이 스캐폴드가 만들지 않는 빌드 메타데이터를 요구한다. 헤더 주석에 한계와 대처(복원 후 `build:all`)를 적었다 |
 | H15 | Devin | analysis | `lina-check-derived-contract.mjs:39` | `GUARD_SHA256` 이 가드 바이트를 중복해 수동 동기화가 필요하다 | **의도로 명시.** 코드 변경 없음 | 그 결합이 보안 속성이다. 검사 대상 파일에서 기대값을 유도하면 검사가 공허해진다. 주석에 적었다 |
 | H16 | Devin | analysis | `070_delivery_gates.md:108` | 기록이 PR 미개설·이메일 판단 대기 상태로 남아 있다 | 이 커밋 | 위 "결과" 절로 교체 |
+
+**4회전 · head `90baf416` · 1건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H17 | Codex | P2 | `lina-check-contract-selftest.mjs` | H1 의 재제기. 이번 근거는 다르다. squash 하면 baseline 이 조상이 아니라 형제가 되므로 그 뒤의 clone 에는 객체가 없고 `git show` 에서 죽는다 | `f91e4e15` | 새 clone 에서 `ancestor_of_branch=yes`·`ancestor_of_merge_ref=yes` 로 H1 반박은 그대로 유효함을 재확인하고, squash 시뮬레이션에서 `ancestor_after_squash=no` 를 관측해 지적을 수용. 리터럴 하한을 먼저 단정하고 객체가 있으면 `mode=diff`, 없으면 `mode=floor` 로 내려가게 고쳤다. 실제 두 분기 관측: `23->26 (diff)`, `23->26 (floor)` exit 0 |
+
+H1 과 H17 의 관계를 분명히 적어 둔다. H1 의 근거(`708a4fc` 에서 도달 불가)는 사실이 아니었고 그
+반박은 지금도 유효하다. H17 은 다른 상태(squash 이후)를 근거로 삼았고 그 상태에서는 지적이 맞다.
+같은 결론을 서로 다른 근거로 두 번 받은 것이 아니라, 두 번째에 새 사실이 들어온 경우다.
+`c80ecac` 로 핀을 옮기라는 제안은 두 번 모두 택하지 않았다. 그 커밋을 기준으로 삼으면 인계 커밋
+자체의 변경까지 이 PR 의 것으로 셈하게 되어 검사의 의미가 달라진다.
 
 ## 남은 것
 
