@@ -45,7 +45,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { SAFE_TESTS, TRIPWIRE_ENV, classifyBuildPair } from "./lina-check-derived-contract.mjs";
 
@@ -126,8 +126,14 @@ function distState() {
   return { present: true, disposition: "fresh", detail: null, pairs };
 }
 
-/** The only place this script starts a child process. */
-function launchTests(paths, concurrency) {
+/**
+ * The only place this script starts a child process.
+ *
+ * Exported so the launch-boundary control can call it directly. Driving the
+ * control through the CLI made it depend on the built-output preflight, which
+ * refuses earlier and would let a broken tripwire pass unnoticed.
+ */
+export function launchTests(paths, concurrency) {
   if (process.env[TRIPWIRE_ENV])
     throw new Error(
       TRIPWIRE_ENV + " tripped: launchTests() was reached, so this was not a preview",
@@ -218,11 +224,13 @@ function main(argv) {
   return outcome.status === null ? 1 : outcome.status;
 }
 
-try {
-  process.exitCode = main(process.argv.slice(2));
-} catch (error) {
-  process.stderr.write(
-    LABEL + " " + (error instanceof Error ? error.message : String(error)) + "\n",
-  );
-  process.exitCode = 1;
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  try {
+    process.exitCode = main(process.argv.slice(2));
+  } catch (error) {
+    process.stderr.write(
+      LABEL + " " + (error instanceof Error ? error.message : String(error)) + "\n",
+    );
+    process.exitCode = 1;
+  }
 }

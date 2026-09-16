@@ -43,6 +43,7 @@ import {
   blockedNodeTargets,
   classifyBuildPair,
 } from "./lina-check-derived-contract.mjs";
+import { launchTests } from "./lina-check-safe-tests.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
@@ -290,21 +291,25 @@ function runTripwireControls() {
     "negative control: preview reported an invalid distDisposition " +
       String(report.distDisposition),
   );
-  // The positive control needs the run to actually reach launchTests(), but the
-  // built-output preflight refuses earlier when dist/ is unusable. Establish that
-  // prerequisite from the preview report instead of failing a healthy contract,
-  // and name the skip so nobody reads it as a passed control. The delivery gate
-  // sequence builds before this runs, so both controls do execute there.
-  if (report.distDisposition !== "fresh")
-    return {
-      ran: 1,
-      skipped: "positive control needs fresh built output; dist is " + report.distDisposition,
-    };
-  const run = spawnSync(process.execPath, [script, "run"], { cwd: root, encoding: "utf8", env });
-  assert.notEqual(run.status, 0, "positive control: a run must reach the launch boundary");
+  // Positive control, isolated from the built-output preflight: call the launch
+  // site directly rather than through the CLI. Driving it through the CLI made it
+  // depend on dist/ being fresh, and skipping it there would let a broken
+  // tripwire exit successfully. This needs no built output, so it always runs.
+  const saved = process.env[TRIPWIRE_ENV];
+  process.env[TRIPWIRE_ENV] = "1";
+  let tripped = null;
+  try {
+    launchTests(["test/stable-json.test.ts"], 1);
+  } catch (error) {
+    tripped = error;
+  } finally {
+    if (saved === undefined) delete process.env[TRIPWIRE_ENV];
+    else process.env[TRIPWIRE_ENV] = saved;
+  }
+  assert.ok(tripped, "positive control: launchTests must refuse while the tripwire is set");
   assert.ok(
-    (run.stderr === null ? "" : run.stderr).includes(TRIPWIRE_ENV),
-    "positive control: the failure must name " + TRIPWIRE_ENV,
+    String(tripped.message).includes(TRIPWIRE_ENV),
+    "positive control: the refusal must name " + TRIPWIRE_ENV,
   );
   return { ran: 2, skipped: null };
 }
