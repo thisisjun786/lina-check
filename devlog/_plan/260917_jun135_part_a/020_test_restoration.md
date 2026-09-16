@@ -42,4 +42,16 @@ tripwire 관측 2건.
 
 ## 결과
 
-wp3 의 C 단계에서 채운다. 원본 기준 결과는 `060` 에 있다.
+복원한 13개를 실제로 돌렸다. `corepack pnpm run lina:test-safe` exit 0,
+`tests 333 / pass 333 / fail 0 / cancelled 0 / skipped 0 / todo 0`, `duration_ms 131118`.
+
+비실행 미리보기는 `corepack pnpm run lina:test-safe:preview` exit 0 이고 선언된 13개를 나열했다.
+미리보기가 테스트를 띄우지 않았다는 것은 자기 보고가 아니라 실행 경계에서 관측했다.
+tripwire 를 켠 상태에서 미리보기는 exit 0 이고, 같은 tripwire 에서 `run` 은 실패하며 실패 메시지가
+`LINA_CHECK_SPAWN_TRIPWIRE` 를 이름으로 든다. 두 대조를 `lina:contract-selftest` 이 함께 수행한다.
+
+복원은 upstream 테스트 바이트를 바꾼 것이 아니다. 바뀌지 않은 바이트를 새로 호출한 것이다.
+`git diff --quiet f611316d HEAD -- src dashboard test pnpm-lock.yaml` exit 0 이 그 근거다.
+
+상태별 대조와 측정 방법의 한계는 `060` 에 있다. 원본 기준의 종료 코드 일부는 파이프라인 뒤에서
+읽혀 신뢰할 수 없고, 그 사실을 `060` 이 항목마다 밝힌다.
