@@ -34,11 +34,18 @@
 | -- | -- | -- |
 | `corepack pnpm run lina:contract-selftest` | 0 | `rejected=28 helpers=11 tripwireControls=2 assertionCalls=23->26` |
 
-tripwire 대조 2건.
+tripwire 대조 3건. 방법은 H21·H23 을 거쳐 바뀌었고 아래가 현재 방법이다.
 
-- 음성 대조: `LINA_CHECK_SPAWN_TRIPWIRE=1` + `preview --json` → exit 0
-- 양성 대조: `LINA_CHECK_SPAWN_TRIPWIRE=1` + `run` → 실패, 진단
-  `[lina-check-safe-tests] LINA_CHECK_SPAWN_TRIPWIRE tripped: launchTests() was reached, so this was not a preview`
+- 음성 대조: `LINA_CHECK_SPAWN_TRIPWIRE=1` + `preview --json` → exit 0. 실행 경계에 닿지 않았다
+- 양성 대조: tripwire 를 켠 채 `launchTests()` 를 **직접 호출** → 예외, 메시지가 tripwire 를 이름으로
+  든다. 산출물이 필요 없으므로 빈 체크아웃에서도 항상 돈다
+- 라우팅 대조: tripwire 를 켠 채 `run` 을 CLI 로 실행 → 실패, 진단
+  `[lina-check-safe-tests] LINA_CHECK_SPAWN_TRIPWIRE tripped: launchTests() was reached, so this was not a preview`.
+  `main` 이 여전히 그 지점을 지난다는 것을 확인하며, 산출물이 최신일 때만 돈다
+
+양성 대조와 라우팅 대조를 나눈 이유가 있다. 직접 호출만 두면 tripwire 가 살아 있다는 것은 알지만
+`main` 이 그 지점을 지나는지는 모른다. CLI 만 두면 산출물이 없을 때 대조가 사라진다. 둘을 함께 두고
+각각의 전제를 출력에 적었다. selftest 출력은 `tripwireControls=2 routing=verified` 형태다.
 
 보존 확인: `git diff --name-only 1f36c10e HEAD -- src dashboard test config/target-repositories.json pnpm-lock.yaml .github` 0줄.
 
@@ -131,7 +138,7 @@ PR: https://github.com/thisisjun786/lina-check/pull/1 — base `main`, non-draft
 ## 리뷰 영수증
 
 리뷰는 두 층으로 돌았다. 태스크 안의 독립 리뷰어 subagent 2회전과, PR 개설 후 호스티드 리뷰어
-(Devin Review · Codex) 7회전이다. 총 26건을 받아 24건을 고치고 2건을 한계·의도로 명시했다.
+(Devin Review · Codex) 8회전이다. 총 31건을 받아 29건을 고치고 2건을 한계·의도로 명시했다.
 반박한 1건은 4회전에 새 근거로 재제기되어 결국 수정했다. 미해결 스레드는 0건이다.
 
 회전이 늘어난 이유를 적어 둔다. 내 수정이 새 결함을 만든 경우가 네 번 있었다. H5 의 pnpm 폴백이
@@ -228,6 +235,16 @@ H19 → H20 도 같은 종류의 연쇄다. 관용 분기를 추가하면 그 �
 
 H19→H20→H21 은 한 줄기다. 관용 분기를 넣고(H19), 그 진입 조건을 닫고(H20), 결국 관용 분기 자체를
 없앴다(H21). 마지막이 옳았다. 전제를 문서로 옮기는 것보다 전제를 없애는 쪽이 낫다.
+
+**8회전 · head `eb88705f` · 5건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H22 | Devin | analysis | `070_delivery_gates.md` | 영수증이 양성 대조를 여전히 tripwire `run` 으로 적고 있다. H21 이후 방법이 바뀌었다 | 이 커밋 | 위 대조 3건 절로 교체 |
+| H23 | Devin | bug | `lina-check-contract-selftest.mjs` | 직접 호출만으로는 `main` 이 `launchTests` 를 지나는지 확인하지 못한다. run 경로가 우회해도 두 대조가 통과한다 | 이 커밋 | 라우팅 대조 추가. 출력 `tripwireControls=2 routing=verified` |
+| H24 | Codex | P2 | `lina-check-contract-selftest.mjs` | H23 과 같은 지적 | 이 커밋 | H23 과 동일 |
+| H25 | Devin | bug | `lina-check-safe-tests.mjs` | 심링크로 실행하면 entrypoint 가드가 `main` 을 건너뛰고 조용히 exit 0 이 된다 | 이 커밋 | `realpathSync` 로 양쪽을 해소해 비교. 재확인: `ln -sf ... linked.mjs && node linked.mjs preview` 가 13개 목록과 `built output: fresh` 출력 |
+| H26 | Codex | P2 | `lina-check-contract-selftest.mjs` | `probe-not-blocked` 거부 경로를 아무 픽스처도 밟지 않는다. 그 가드를 지워도 selftest 가 통과한다 | 이 커밋 | 프로브 목록은 리터럴과 일치시킨 채 `blockedScripts` 에서 대상 하나를 제거하는 픽스처 추가. 거부 경로 29 → 30 |
 
 ## 남은 것
 

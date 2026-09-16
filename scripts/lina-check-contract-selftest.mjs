@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   BUILD_DISPOSITIONS,
+  BOUNDARY_PROBE_SCRIPTS,
   DerivedContractError,
   EXCLUDED_TESTS,
   GUARD_SHA256,
@@ -179,6 +180,10 @@ const cases = [
     "probe-mismatch",
   ],
   ["probe-workflow-mismatch", (i) => i.config.derived.boundaryProbes.workflows.pop()],
+  [
+    "probe-not-blocked",
+    (i) => delete i.config.blockedScripts[BOUNDARY_PROBE_SCRIPTS[0]],
+  ],
   ["replaced-docs-mismatch", (i) => (i.docs = ["README.md"])],
 ];
 
@@ -311,7 +316,22 @@ function runTripwireControls() {
     String(tripped.message).includes(TRIPWIRE_ENV),
     "positive control: the refusal must name " + TRIPWIRE_ENV,
   );
-  return { ran: 2, skipped: null };
+  // Routing control. The direct call above proves the tripwire is alive, but not
+  // that run mode still routes through it: if main stopped calling launchTests,
+  // both controls above would keep passing. Driving the CLI closes that, and it
+  // needs usable built output, so it is reported separately rather than skipped
+  // silently. The delivery gate sequence builds first, so it runs there.
+  let routing = "skipped: built output is " + report.distDisposition;
+  if (report.distDisposition === "fresh") {
+    const run = spawnSync(process.execPath, [script, "run"], { cwd: root, encoding: "utf8", env });
+    assert.notEqual(run.status, 0, "routing control: run mode must reach the launch boundary");
+    assert.ok(
+      (run.stderr === null ? "" : run.stderr).includes(TRIPWIRE_ENV),
+      "routing control: the refusal must name " + TRIPWIRE_ENV,
+    );
+    routing = "verified";
+  }
+  return { ran: 2, routing };
 }
 
 function countAssertionCalls(source) {
@@ -368,7 +388,8 @@ try {
       helpers +
       " tripwireControls=" +
       controls.ran +
-      (controls.skipped === null ? "" : " (skipped: " + controls.skipped + ")") +
+      " routing=" +
+      controls.routing +
       " assertionCalls=" +
       integrity.baseline +
       "->" +

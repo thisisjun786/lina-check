@@ -41,7 +41,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
@@ -224,7 +224,23 @@ function main(argv) {
   return outcome.status === null ? 1 : outcome.status;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+/**
+ * Compare resolved paths, not the raw argv value. Started through a symlink the
+ * two spellings differ, and a plain URL comparison would silently skip main and
+ * exit 0 while the caller believed the tests ran.
+ */
+function startedDirectly() {
+  const invoked = process.argv[1];
+  if (invoked === undefined) return false;
+  if (import.meta.url === pathToFileURL(invoked).href) return true;
+  try {
+    return realpathSync(invoked) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedDirectly()) {
   try {
     process.exitCode = main(process.argv.slice(2));
   } catch (error) {
