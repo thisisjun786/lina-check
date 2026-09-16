@@ -1,0 +1,95 @@
+{
+  "probes": [
+    {
+      "action": "auto-fix",
+      "script": "repair:execute-fix",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:execute-fix is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-fix",
+      "script": "repair:apply-result",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:apply-result is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-close",
+      "script": "apply-decisions",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: apply-decisions is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-close",
+      "script": "repair:finalize-open-prs",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:finalize-open-prs is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-merge",
+      "script": "e2e:automerge",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: e2e:automerge is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-merge",
+      "script": "repair:publish-main",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:publish-main is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-label",
+      "script": "repair:cleanup-replacement-labels",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:cleanup-replacement-labels is disabled. See README.md before configuring or enabling automation."
+    },
+    {
+      "action": "auto-label",
+      "script": "repair:tag-clawsweeper",
+      "exitCode": 1,
+      "closed": true,
+      "diagnostic": "LINA Check scaffold: repair:tag-clawsweeper is disabled. See README.md before configuring or enabling automation."
+    }
+  ],
+  "workflows": [
+    {
+      "workflow": "automerge-e2e",
+      "activeYaml": false,
+      "parked": true
+    },
+    {
+      "workflow": "clawsweeper-dispatch",
+      "activeYaml": false,
+      "parked": true
+    },
+    {
+      "workflow": "repair-comment-router",
+      "activeYaml": false,
+      "parked": true
+    },
+    {
+      "workflow": "repair-publish-results",
+      "activeYaml": false,
+      "parked": true
+    },
+    {
+      "workflow": "sweep",
+      "activeYaml": false,
+      "parked": true
+    }
+  ],
+  "entrancesClosed": true,
+  "workflowsParked": true,
+  "worktreeUnchanged": true,
+  "notProven": [
+    "direct node execution of built or source entrypoints bypasses these package guards",
+    "the remote Actions setting, App installation state and rulesets are not observed here",
+    "this says nothing about whether the upstream capability exists; it does, and it builds"
+  ]
+}
