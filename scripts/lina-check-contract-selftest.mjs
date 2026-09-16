@@ -289,18 +289,28 @@ function countAssertionCalls(source) {
 }
 
 function runAssertionIntegrity() {
+  const current = countAssertionCalls(readFileSync(join(root, VALIDATOR), "utf8"));
+  // The literal floor always applies and needs no Git history.
+  assert.ok(
+    current >= BASELINE_ASSERTION_CALLS,
+    "the validator has fewer assertions than the recorded baseline floor",
+  );
   const shown = spawnSync("git", ["-C", root, "show", BASELINE_COMMIT + ":" + VALIDATOR], {
     encoding: "utf8",
   });
-  assert.equal(shown.status, 0, "could not read the baseline validator from git");
+  if (shown.status !== 0) {
+    // The baseline object is unreachable. That is expected in a clone made after
+    // this branch is squash-merged, where the baseline becomes a sibling rather
+    // than an ancestor. Degrade to the literal floor and say so, rather than
+    // failing and making the advertised self-test unusable.
+    return { baseline: BASELINE_ASSERTION_CALLS, current, mode: "floor" };
+  }
   const baseline = countAssertionCalls(shown.stdout);
   assert.equal(
     baseline,
     BASELINE_ASSERTION_CALLS,
     "the recorded baseline assertion count no longer matches the baseline commit",
   );
-  const current = countAssertionCalls(readFileSync(join(root, VALIDATOR), "utf8"));
-  assert.ok(current >= baseline, "the validator now has fewer assertions than the baseline");
   const diff = spawnSync("git", ["-C", root, "diff", BASELINE_COMMIT, "--", VALIDATOR], {
     encoding: "utf8",
   });
@@ -309,7 +319,7 @@ function runAssertionIntegrity() {
     .split("\n")
     .filter((line) => line.startsWith("-") && ASSERTION_CALL.test(line.slice(1)));
   assert.deepEqual(removed, [], "an assertion line was removed: " + removed.join(" | "));
-  return { baseline, current };
+  return { baseline, current, mode: "diff" };
 }
 
 try {
@@ -329,6 +339,9 @@ try {
       integrity.baseline +
       "->" +
       integrity.current +
+      " (" +
+      integrity.mode +
+      ")" +
       "\n",
   );
   process.exitCode = 0;
