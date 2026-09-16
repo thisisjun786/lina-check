@@ -21,6 +21,26 @@ export const DERIVED_SCRIPT_NAMES = Object.freeze([
   "lina:test-safe:preview",
 ]);
 
+/**
+ * Exact command for each derived script. Pinning the names alone is not enough:
+ * a matching pair of edits to the configuration and package.json could otherwise
+ * point lina:test-safe:preview at the run mode, or point a script at an inert
+ * module, while every name check still passed.
+ */
+export const DERIVED_SCRIPT_COMMANDS = Object.freeze({
+  "lina:boundary-probe": "node scripts/lina-check-boundary-probe.mjs",
+  "lina:contract-selftest": "node scripts/lina-check-contract-selftest.mjs",
+  "lina:test-safe": "node scripts/lina-check-safe-tests.mjs run",
+  "lina:test-safe:preview": "node scripts/lina-check-safe-tests.mjs preview",
+});
+
+/** The probe must not invoke anything unless the guard it relies on is unchanged. */
+export const GUARD_PATH = "scripts/scaffold-disabled.mjs";
+export const GUARD_SHA256 = "3ca3cf5b1fa79fa18b5f492e70415ccb19d44fbfcbed5fe099a5d928bfd7b573";
+
+/** GitHub reads both spellings, so parking only the .yml form proves nothing. */
+export const WORKFLOW_EXTENSIONS = Object.freeze([".yml", ".yaml"]);
+
 /** Upstream tests restored for execution: hermetic and compatible with the parked profile. */
 export const SAFE_TESTS = Object.freeze([
   "test/apply-close-policy-guards.test.ts",
@@ -105,12 +125,40 @@ if (SAFE_TESTS.some((path) => EXCLUDED_TESTS.includes(path)))
   throw new Error("SAFE_TESTS and EXCLUDED_TESTS must be disjoint");
 if (BOUNDARY_PROBE_SCRIPTS.length !== 8 || new Set(BOUNDARY_PROBE_SCRIPTS).size !== 8)
   throw new Error("BOUNDARY_PROBES must hold 8 distinct scripts");
+if (!sameList(Object.keys(DERIVED_SCRIPT_COMMANDS).sort(), [...DERIVED_SCRIPT_NAMES]))
+  throw new Error("DERIVED_SCRIPT_COMMANDS must cover exactly DERIVED_SCRIPT_NAMES");
 
 export const guardCommand = (name) => "node scripts/scaffold-disabled.mjs " + name;
 
 /** Refuse to invoke a probe target whose package script is no longer the scaffold guard. */
 export function assertProbeTargetGuarded(packageScripts, name) {
   if (packageScripts[name] !== guardCommand(name)) fail("probe-unguarded", name);
+}
+
+/**
+ * The command text pointing at the guard is not the same as the guard still being
+ * a guard. Verify its bytes before the probe invokes anything, so a guard that was
+ * edited to act first and print the familiar diagnostic afterwards cannot pass.
+ */
+export function assertGuardIntact(readFile, digest) {
+  const actual = digest(readFile(GUARD_PATH));
+  if (actual !== GUARD_SHA256) fail("guard-tampered", GUARD_PATH + " sha256=" + actual);
+}
+
+/** A pre/post script would run alongside the guarded command. */
+export function assertNoLifecycleHooks(packageScripts, names) {
+  for (const name of names)
+    for (const prefix of ["pre", "post"])
+      if (Object.hasOwn(packageScripts, prefix + name))
+        fail("probe-lifecycle-hook", prefix + name);
+}
+
+/** entries: [{ workflow, active, parked }] with active covering every YAML spelling. */
+export function assertWorkflowsParked(entries) {
+  for (const entry of entries) {
+    if (entry.active) fail("workflow-active", entry.workflow);
+    if (!entry.parked) fail("workflow-not-parked", entry.workflow);
+  }
 }
 
 export function assertWorktreeUnchanged(before, after) {
@@ -169,7 +217,9 @@ export function assertDerivedContract({
     const command = entry.command;
     const match = typeof command === "string" ? DERIVED_SCRIPT_COMMAND.exec(command) : null;
     if (!match || !declared.includes(match[1])) fail("script-command", name);
-    if (packageScripts[name] !== command) fail("script-package-mismatch", name);
+    if (command !== DERIVED_SCRIPT_COMMANDS[name]) fail("script-command", name);
+    if (packageScripts[name] !== DERIVED_SCRIPT_COMMANDS[name])
+      fail("script-package-mismatch", name);
   }
   for (const path of declared) {
     if (!path.endsWith(".mjs")) continue;
@@ -192,11 +242,13 @@ export function assertDerivedContract({
     if (!nonEmptyReason(derived.excludedTests[path])) fail("excluded-tests-reason", path);
 
   const probes = derived.boundaryProbes.scripts;
-  if (!Array.isArray(probes)) fail("probe-subset", "boundaryProbes.scripts is not an array");
-  for (const name of BOUNDARY_PROBE_SCRIPTS)
-    if (!probes.includes(name)) fail("probe-subset", name);
+  if (!Array.isArray(probes) || !sameList(probes, [...BOUNDARY_PROBE_SCRIPTS]))
+    fail("probe-mismatch", "declared probe scripts differ from BOUNDARY_PROBE_SCRIPTS");
   for (const name of probes)
     if (!Object.hasOwn(config.blockedScripts, name)) fail("probe-not-blocked", name);
+  const probeWorkflows = derived.boundaryProbes.workflows;
+  if (!Array.isArray(probeWorkflows) || !sameList(probeWorkflows, [...BOUNDARY_WORKFLOWS]))
+    fail("probe-workflow-mismatch", "declared probe workflows differ from BOUNDARY_WORKFLOWS");
 
   const replaced = derived.replacedUpstreamDocs;
   if (!Array.isArray(replaced) || !sameList([...replaced].sort(), [...docs].sort()))
@@ -209,4 +261,3 @@ export function assertDerivedContract({
     probes: probes.length,
   };
 }
-

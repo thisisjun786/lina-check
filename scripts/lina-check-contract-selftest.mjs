@@ -29,10 +29,14 @@ import { fileURLToPath } from "node:url";
 import {
   DerivedContractError,
   EXCLUDED_TESTS,
+  GUARD_SHA256,
   SAFE_TESTS,
   TRIPWIRE_ENV,
   assertDerivedContract,
+  assertGuardIntact,
+  assertNoLifecycleHooks,
   assertProbeTargetGuarded,
+  assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
 } from "./lina-check-derived-contract.mjs";
@@ -93,8 +97,22 @@ const cases = [
     (i) => (i.config.derived.scripts["lina:test-safe"].command = "node scripts/elsewhere.mjs run"),
   ],
   [
+    "script-command-substitution",
+    (i) =>
+      (i.config.derived.scripts["lina:test-safe:preview"].command =
+        "node scripts/lina-check-safe-tests.mjs run"),
+    "script-command",
+  ],
+  [
     "script-package-mismatch",
     (i) => (i.packageScripts["lina:test-safe"] = "node scripts/lina-check-safe-tests.mjs preview"),
+  ],
+  [
+    "script-package-substitution",
+    (i) =>
+      (i.packageScripts["lina:test-safe:preview"] =
+        "node scripts/lina-check-safe-tests.mjs run"),
+    "script-package-mismatch",
   ],
   [
     "script-blocked-target",
@@ -140,8 +158,13 @@ const cases = [
     "excluded-tests-reason",
     (i) => (i.config.derived.excludedTests[EXCLUDED_TESTS[0]] = { reason: " " }),
   ],
-  ["probe-subset", (i) => i.config.derived.boundaryProbes.scripts.shift()],
-  ["probe-not-blocked", (i) => i.config.derived.boundaryProbes.scripts.push("not-a-script")],
+  ["probe-mismatch", (i) => i.config.derived.boundaryProbes.scripts.shift()],
+  [
+    "probe-mismatch-extra",
+    (i) => i.config.derived.boundaryProbes.scripts.push("review"),
+    "probe-mismatch",
+  ],
+  ["probe-workflow-mismatch", (i) => i.config.derived.boundaryProbes.workflows.pop()],
   ["replaced-docs-mismatch", (i) => (i.docs = ["README.md"])],
 ];
 
@@ -175,7 +198,32 @@ function runHelperCases() {
   });
   assert.throws(() => assertWorktreeUnchanged("", " M src/x.ts"), { code: "worktree-changed" });
   assertWorktreeUnchanged("same", "same");
-  return 3;
+  // A guard that still carries the expected command text can have been edited to
+  // act first and print the familiar diagnostic afterwards. Digest, not text.
+  assert.throws(() => assertGuardIntact(() => "tampered", () => "0".repeat(64)), {
+    code: "guard-tampered",
+  });
+  assertGuardIntact(() => "whatever", () => GUARD_SHA256);
+  assert.throws(
+    () => assertNoLifecycleHooks({ "prerepair:execute-fix": "x" }, ["repair:execute-fix"]),
+    { code: "probe-lifecycle-hook" },
+  );
+  assert.throws(
+    () => assertNoLifecycleHooks({ "postapply-decisions": "x" }, ["apply-decisions"]),
+    { code: "probe-lifecycle-hook" },
+  );
+  assertNoLifecycleHooks({ "repair:execute-fix": "x" }, ["repair:execute-fix"]);
+  // GitHub reads both spellings, so a .yaml sibling must not read as parked.
+  assert.throws(
+    () => assertWorkflowsParked([{ workflow: "sweep", active: true, parked: true }]),
+    { code: "workflow-active" },
+  );
+  assert.throws(
+    () => assertWorkflowsParked([{ workflow: "sweep", active: false, parked: false }]),
+    { code: "workflow-not-parked" },
+  );
+  assertWorkflowsParked([{ workflow: "sweep", active: false, parked: true }]);
+  return 11;
 }
 
 function runTripwireControls() {

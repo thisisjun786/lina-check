@@ -172,7 +172,7 @@
     ".github/workflows/worker-records-ops.yml": ".github/workflows/worker-records-ops.yml.disabled"
   },
   "derived": {
-    "note": "LINA Check changes beyond the preserved upstream tree. The permitted sets are literals in scripts/lina-check-derived-contract.mjs; this section records why each entry is allowed. Editing this file alone cannot widen them.",
+    "note": "LINA Check changes beyond the preserved upstream tree. scripts/lina-check-derived-contract.mjs fixes the restored and excluded test lists, the derived script names AND their exact commands, the probe script and workflow lists, and the replaced upstream docs; a declaration differing from those literals is rejected. What this section actually supplies is the membership of derived.files, constrained by location patterns, plus the recorded reason for every entry.",
     "files": {
       "scripts/lina-check-derived-contract.mjs": { "reason": "Owns the derived-change literals and validates this declaration." },
       "scripts/lina-check-safe-tests.mjs": { "reason": "Runs or previews only the declared restored tests; no glob and no environment override." },
@@ -208,7 +208,7 @@
         { "path": "test/manual-publication-policy.test.ts", "reason": "Manual publication policy. Pure." },
         { "path": "test/parked-command-finalization.test.ts", "reason": "Parked command finalisation. In-process worker harness with a stubbed global fetch." },
         { "path": "test/pr-label-policy.test.ts", "reason": "Label policy. Imports built output only." },
-        { "path": "test/repository-profiles.test.ts", "reason": "Target repository profiles. Contains no process, file or network call at all." },
+        { "path": "test/repository-profiles.test.ts", "reason": "Target repository profiles. No process spawn and no network call; it reads two in-repo files, dashboard/wrangler.toml and config/target-repositories.json." },
         { "path": "test/stable-json.test.ts", "reason": "Deterministic serialisation used by the checkers. Pure." }
       ]
     },
