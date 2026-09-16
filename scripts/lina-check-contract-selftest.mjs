@@ -6,10 +6,15 @@
  * deliberately broken declaration for every rejection path and asserts that the
  * contract rejects it with the expected code.
  *
- * It also runs the two tripwire controls for the preview claim: the negative
- * control (preview must not reach the launch boundary) and the positive control
- * (a real run must reach it and say so by name). Without the positive control a
- * dead tripwire would look like a passing preview.
+* It also runs the two tripwire controls for the preview claim: the negative
+* control (preview must not reach the launch boundary) and the positive control
+* (a real run must reach it and say so by name). Without the positive control a
+* dead tripwire would look like a passing preview.
+ *
+ * Finally it checks that the validator itself has not lost assertions relative to
+ * the fork handoff baseline. Editing scripts/check-scaffold.mjs is a known way
+ * around every check in this repository, so that bypass gets an early warning
+ * rather than only a sentence in the plan.
  *
  * Exit codes: 0 every rejection path rejected, 1 a path failed to reject.
  */
@@ -34,6 +39,10 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
+const BASELINE_COMMIT = "f611316dab341b978a1ef073ee4f68aa63c02059";
+const BASELINE_ASSERTION_CALLS = 23;
+const ASSERTION_CALL = /^\s*assert(\.|\()/;
+const VALIDATOR = "scripts/check-scaffold.mjs";
 const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"];
 const config = JSON.parse(readFileSync(join(root, "config", "lina-check-scaffold.json"), "utf8"));
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
@@ -188,10 +197,39 @@ function runTripwireControls() {
   return 2;
 }
 
+function countAssertionCalls(source) {
+  return source.split("\n").filter((line) => ASSERTION_CALL.test(line)).length;
+}
+
+function runAssertionIntegrity() {
+  const shown = spawnSync("git", ["-C", root, "show", BASELINE_COMMIT + ":" + VALIDATOR], {
+    encoding: "utf8",
+  });
+  assert.equal(shown.status, 0, "could not read the baseline validator from git");
+  const baseline = countAssertionCalls(shown.stdout);
+  assert.equal(
+    baseline,
+    BASELINE_ASSERTION_CALLS,
+    "the recorded baseline assertion count no longer matches the baseline commit",
+  );
+  const current = countAssertionCalls(readFileSync(join(root, VALIDATOR), "utf8"));
+  assert.ok(current >= baseline, "the validator now has fewer assertions than the baseline");
+  const diff = spawnSync("git", ["-C", root, "diff", BASELINE_COMMIT, "--", VALIDATOR], {
+    encoding: "utf8",
+  });
+  assert.equal(diff.status, 0, "could not diff the validator against the baseline");
+  const removed = diff.stdout
+    .split("\n")
+    .filter((line) => line.startsWith("-") && ASSERTION_CALL.test(line.slice(1)));
+  assert.deepEqual(removed, [], "an assertion line was removed: " + removed.join(" | "));
+  return { baseline, current };
+}
+
 try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
   const controls = runTripwireControls();
+  const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +
       " rejected=" +
@@ -200,6 +238,10 @@ try {
       helpers +
       " tripwireControls=" +
       controls +
+      " assertionCalls=" +
+      integrity.baseline +
+      "->" +
+      integrity.current +
       "\n",
   );
   process.exitCode = 0;
@@ -209,4 +251,3 @@ try {
   );
   process.exitCode = 1;
 }
-

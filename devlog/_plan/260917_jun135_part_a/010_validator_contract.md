@@ -54,6 +54,12 @@ Derived declarations validated: 11 files; 4 scripts; 13 restored upstream tests;
 `:134` 의 추가 파일 허용과 `:90` 의 파생 스크립트 허용이며, 넓힌 만큼은 `assertDerivedContract` 의
 새 검사로 다시 좁혔다. 삭제한 단정은 없다.
 
+수용 기준 9 는 문장으로만 두지 않고 기계 검사로 바꿨다. 검증기 파일을 직접 고치는 것은 이
+저장소의 모든 검사를 지나가는 알려진 우회로이므로(우회 (c)), 그 우회에 조기 경고를 붙였다.
+`lina:contract-selftest` 이 baseline 커밋의 검증기를 읽어 단정 호출 23건을 확인하고, 현재 파일이
+그보다 적지 않은지, 그리고 diff 에서 단정 줄이 삭제되지 않았는지 본다.
+출력은 `assertionCalls=23->26` 이다. 강제 계층이 아니라 경고라는 성격은 그대로다.
+
 ---
 
 ## wp2 P 재확인 · 구현 수준 계획
