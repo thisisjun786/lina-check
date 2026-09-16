@@ -131,12 +131,12 @@ PR: https://github.com/thisisjun786/lina-check/pull/1 — base `main`, non-draft
 ## 리뷰 영수증
 
 리뷰는 두 층으로 돌았다. 태스크 안의 독립 리뷰어 subagent 2회전과, PR 개설 후 호스티드 리뷰어
-(Devin Review · Codex) 5회전이다. 총 23건을 받아 21건을 고치고 2건을 한계·의도로 명시했다.
+(Devin Review · Codex) 5회전이다. 총 24건을 받아 22건을 고치고 2건을 한계·의도로 명시했다.
 반박한 1건은 4회전에 새 근거로 재제기되어 결국 수정했다. 미해결 스레드는 0건이다.
 
-회전이 늘어난 이유를 적어 둔다. 내 수정이 새 결함을 만든 경우가 세 번 있었다. H5 의 pnpm 폴백이
-H7·H10 에 반려됐고, H2 의 전체 트리 mtime 비교가 H6·H9 에 반려됐고, H17 의 floor 모드가 H18 에
-반려됐다. 수정이 곧 개선이 아니라는 것을 기록으로 남긴다.
+회전이 늘어난 이유를 적어 둔다. 내 수정이 새 결함을 만든 경우가 네 번 있었다. H5 의 pnpm 폴백이
+H7·H10 에 반려됐고, H2 의 전체 트리 mtime 비교가 H6·H9 에 반려됐고, H17 의 floor 모드가 H18 에,
+H6 의 산출물 최신성 게이트가 H19 에 반려됐다. 수정이 곧 개선이 아니라는 것을 기록으로 남긴다.
 
 ### 층 1 · 독립 리뷰어 subagent (2회전, 5건)
 
@@ -206,6 +206,11 @@ H1 과 H17 의 관계를 분명히 적어 둔다. H1 의 근거(`708a4fc` 에서
 | # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
 | -- | -- | -- | -- | -- | -- | -- |
 | H18 | Devin | bug | `lina-check-contract-selftest.mjs` | H17 의 floor 모드가 하한을 과거 baseline 23 으로 두어, 현재 26개 검증기가 단정 3개를 잃어도 통과한다 | `dd9d168f` | 하한을 이 변경이 확립한 26 으로 올렸다. 세 경로 관측: 객체 있음 `23->26 (diff)`, 객체 없음 `26->26 (floor)`, 검증기에서 단정 4개 제거해 22개로 만들면 exit 1 과 `the validator has 22 assertion calls, below the recorded floor of 26` |
+| H19 | Codex | P2 | `lina-check-contract-selftest.mjs` | H6 이 넣은 산출물 최신성 게이트 때문에, tripwire 양성 대조가 `launchTests()` 에 닿기 전에 exit 3 으로 끝난다. `dist/` 없는 새 체크아웃에서 계약이 건강한데도 selftest 가 실패한다 | 이 커밋 | 재현 확인: `dist` 를 옮기면 exit 1 과 `positive control: the failure must name LINA_CHECK_SPAWN_TRIPWIRE`. 수정 후 네 상태 관측: fresh → `tripwireControls=2`, absent → `tripwireControls=1 (skipped: ... dist is absent)` exit 0, stale → 같은 형태로 skip, 재빌드 → 다시 `2` |
+
+H19 의 처리 방식을 적어 둔다. 양성 대조를 없애거나 통과시킨 것이 아니라, 전제를 명시하고 건너뛴
+것을 이름으로 남겼다. 건너뛴 대조를 통과한 대조로 읽을 수 없게 하는 것이 요점이다. 인도 게이트
+순서에서는 `build:all` 이 selftest 보다 먼저 돌기 때문에 두 대조가 실제로 모두 실행된다.
 
 ## 남은 것
 

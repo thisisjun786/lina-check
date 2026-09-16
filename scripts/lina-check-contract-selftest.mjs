@@ -279,14 +279,25 @@ function runTripwireControls() {
     env,
   });
   assert.equal(preview.status, 0, "negative control: preview must not reach the launch boundary");
-  assert.equal(JSON.parse(preview.stdout).executed, false);
+  const report = JSON.parse(preview.stdout);
+  assert.equal(report.executed, false);
+  // The positive control needs the run to actually reach launchTests(), but the
+  // built-output preflight refuses earlier when dist/ is unusable. Establish that
+  // prerequisite from the preview report instead of failing a healthy contract,
+  // and name the skip so nobody reads it as a passed control. The delivery gate
+  // sequence builds before this runs, so both controls do execute there.
+  if (report.distDisposition !== "fresh")
+    return {
+      ran: 1,
+      skipped: "positive control needs fresh built output; dist is " + report.distDisposition,
+    };
   const run = spawnSync(process.execPath, [script, "run"], { cwd: root, encoding: "utf8", env });
   assert.notEqual(run.status, 0, "positive control: a run must reach the launch boundary");
   assert.ok(
     (run.stderr === null ? "" : run.stderr).includes(TRIPWIRE_ENV),
     "positive control: the failure must name " + TRIPWIRE_ENV,
   );
-  return 2;
+  return { ran: 2, skipped: null };
 }
 
 function countAssertionCalls(source) {
@@ -342,7 +353,8 @@ try {
       " helpers=" +
       helpers +
       " tripwireControls=" +
-      controls +
+      controls.ran +
+      (controls.skipped === null ? "" : " (skipped: " + controls.skipped + ")") +
       " assertionCalls=" +
       integrity.baseline +
       "->" +
