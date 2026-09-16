@@ -20,10 +20,12 @@
 * status before and after. That comparison is not a byte-identical claim: it
 * cannot see ignored-file writes or effects outside the repository.
  *
- * Corepack is this project's pinned launcher, but a Node installation without it
- * should not make the probe unrunnable when pnpm is present. The launcher is
- * resolved at runtime and named in the report, so the record says which binary
- * started the guarded scripts. Either way the guard decides the outcome.
+* Corepack is this project's pinned launcher, but a Node installation without it
+ * must not be papered over with an arbitrary PATH pnpm: that would certify the
+ * guards under an unsupported package manager and make this validation
+ * environment-dependent. The probe requires Corepack, checks that the pnpm it
+ * launches is the pinned version from package.json, and fails with an
+ * actionable message otherwise instead of an opaque spawn error.
 *
 * Exit codes: 0 every declared entrance closed, 1 an entrance was open, a
 * workflow was active, the guard was altered, or the tree moved.
@@ -42,6 +44,7 @@ import {
   WORKFLOW_EXTENSIONS,
   assertGuardIntact,
   assertNoLifecycleHooks,
+  assertPinnedPnpm,
   assertProbeTargetGuarded,
   assertWorkflowsParked,
   assertWorktreeUnchanged,
@@ -50,17 +53,22 @@ import {
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-boundary-probe]";
 const WORKFLOW_DIR = join(root, ".github", "workflows");
-const LAUNCHERS = Object.freeze([
-  Object.freeze({ name: "corepack", prefix: Object.freeze(["pnpm", "run"]) }),
-  Object.freeze({ name: "pnpm", prefix: Object.freeze(["run"]) }),
-]);
+const LAUNCHER = "corepack";
 
-function resolveLauncher() {
-  for (const launcher of LAUNCHERS) {
-    const probe = spawnSync(launcher.name, ["--version"], { encoding: "utf8" });
-    if (!probe.error && probe.status === 0) return launcher;
-  }
-  return null;
+/** Require Corepack and confirm it launches the pinned pnpm. No fallback. */
+function resolvePinnedPnpm(packageManagerField) {
+  const probe = spawnSync(LAUNCHER, ["pnpm", "--version"], { encoding: "utf8" });
+  if (probe.error || probe.status !== 0)
+    throw new Error(
+      LAUNCHER +
+        " could not launch pnpm. This project pins pnpm through Corepack (AGENTS.md)," +
+        " and the probe will not fall back to an unpinned pnpm because that would" +
+        " certify the guards under an unsupported package manager. Enable Corepack," +
+        " then rerun.",
+    );
+  const observed = String(probe.stdout === null ? "" : probe.stdout).trim();
+  assertPinnedPnpm(packageManagerField, observed);
+  return observed;
 }
 
 function gitStatus() {
@@ -69,8 +77,8 @@ function gitStatus() {
   return result.stdout;
 }
 
-function invoke(launcher, script) {
-  const result = spawnSync(launcher.name, [...launcher.prefix, script], {
+function invoke(script) {
+  const result = spawnSync(LAUNCHER, ["pnpm", "run", script], {
     cwd: root,
     encoding: "utf8",
   });
@@ -98,11 +106,7 @@ function workflowState(workflow) {
 function main() {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const scripts = BOUNDARY_PROBES.map(({ script }) => script);
-  const launcher = resolveLauncher();
-  if (launcher === null)
-    throw new Error(
-      "no package-script launcher found; install Corepack (this project's pinned launcher) or pnpm",
-    );
+  const pnpmVersion = resolvePinnedPnpm(pkg.packageManager);
   assertGuardIntact(
     (path) => readFileSync(join(root, path)),
     (bytes) => createHash("sha256").update(bytes).digest("hex"),
@@ -113,7 +117,7 @@ function main() {
   const before = gitStatus();
   const probes = [];
   for (const { action, script } of BOUNDARY_PROBES)
-    probes.push({ action, script, ...invoke(launcher, script) });
+    probes.push({ action, script, ...invoke(script) });
   const workflows = BOUNDARY_WORKFLOWS.map(workflowState);
   // Directory-wide sweep: a declared workflow list cannot see a file nobody declared.
   const strayActive = readdirSync(WORKFLOW_DIR).filter((name) => /\.ya?ml$/i.test(name));
@@ -126,7 +130,8 @@ function main() {
     probes,
     workflows,
     strayActiveWorkflowFiles: strayActive,
-    launcher: launcher.name,
+    launcher: LAUNCHER,
+    pnpmVersion,
     entrancesClosed,
     workflowsParked,
     guardVerified: true,

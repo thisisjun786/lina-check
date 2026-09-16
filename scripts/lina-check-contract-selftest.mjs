@@ -35,11 +35,12 @@ import {
   assertDerivedContract,
   assertGuardIntact,
   assertNoLifecycleHooks,
+  assertPinnedPnpm,
   assertProbeTargetGuarded,
   assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
-  distDisposition,
+  classifyBuildPair,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -224,21 +225,39 @@ function runHelperCases() {
     { code: "workflow-not-parked" },
   );
   assertWorkflowsParked([{ workflow: "sweep", active: false, parked: true }]);
-  // Built-output freshness. Existence is not freshness: a dist/ older than the
-  // newest src/ change would let the restored tests validate superseded code.
-  assert.equal(distDisposition({ present: false, srcNewestMs: 1, distNewestMs: 2 }), "absent");
+  // Built-output freshness is decided per source/output pair. Comparing the
+  // newest file anywhere under each tree would let a partial build refresh
+  // unrelated output and hide a superseded module a restored test imports.
   assert.equal(
-    distDisposition({ present: true, srcNewestMs: 1, distNewestMs: Number.NEGATIVE_INFINITY }),
-    "empty",
+    classifyBuildPair({ outputExists: false, sourceMtimeMs: 1, outputMtimeMs: 2 }),
+    "missing",
   );
   assert.equal(
-    distDisposition({ present: true, srcNewestMs: Number.NEGATIVE_INFINITY, distNewestMs: 2 }),
+    classifyBuildPair({ outputExists: true, sourceMtimeMs: 3, outputMtimeMs: 2 }),
+    "stale",
+  );
+  assert.equal(
+    classifyBuildPair({ outputExists: true, sourceMtimeMs: 2, outputMtimeMs: 2 }),
+    "current",
+  );
+  assert.equal(
+    classifyBuildPair({ outputExists: true, sourceMtimeMs: 1, outputMtimeMs: 2 }),
+    "current",
+  );
+  assert.equal(
+    classifyBuildPair({
+      outputExists: true,
+      sourceMtimeMs: Number.NEGATIVE_INFINITY,
+      outputMtimeMs: 2,
+    }),
     "unknown",
   );
-  assert.equal(distDisposition({ present: true, srcNewestMs: 3, distNewestMs: 2 }), "stale");
-  assert.equal(distDisposition({ present: true, srcNewestMs: 2, distNewestMs: 2 }), "fresh");
-  assert.equal(distDisposition({ present: true, srcNewestMs: 1, distNewestMs: 2 }), "fresh");
-  return 17;
+  // The probe must not certify the guards under an unpinned package manager.
+  assertPinnedPnpm("pnpm@12.4.1", "12.4.1");
+  assert.throws(() => assertPinnedPnpm("pnpm@12.4.1", "11.0.0"), {
+    code: "launcher-unpinned",
+  });
+  return 18;
 }
 
 function runTripwireControls() {

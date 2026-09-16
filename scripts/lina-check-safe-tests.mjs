@@ -11,10 +11,12 @@
  * LINA_CHECK_SPAWN_TRIPWIRE makes that boundary fail loudly, so non-execution
  * can be observed rather than trusted.
  *
- * Exit codes: 0 ok, 1 test failure, 2 usage or declaration violation,
- * 3 built output unusable for a run, meaning dist/ is absent, empty, or older
- *   than the newest src/ change. Existence alone is not freshness: a stale dist/
- *   would let the restored tests validate superseded code and still pass.
+* Exit codes: 0 ok, 1 test failure, 2 usage or declaration violation,
+* 3 built output unusable for a run, meaning dist/ is absent, empty, or older
+ *   than its source. Existence alone is not freshness, and neither is the newest
+ *   timestamp anywhere under dist/: a partial build such as build:repair would
+ *   refresh unrelated output while the module a restored test imports stays old.
+ *   Freshness is therefore decided per source/output pair.
  *
  * A broken declaration is a configuration fault, not a test failure, so it exits
  * 2 even when the failure surfaces as a thrown read or parse error.
@@ -29,11 +31,11 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { availableParallelism } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { SAFE_TESTS, TRIPWIRE_ENV, distDisposition } from "./lina-check-derived-contract.mjs";
+import { SAFE_TESTS, TRIPWIRE_ENV, classifyBuildPair } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-safe-tests]";
@@ -76,27 +78,32 @@ function childEnv() {
   return { env, removed: removed.sort() };
 }
 
-function newestMtimeMs(directory, pattern) {
-  if (!existsSync(directory)) return Number.NEGATIVE_INFINITY;
-  let newest = Number.NEGATIVE_INFINITY;
-  for (const entry of readdirSync(directory, { recursive: true, withFileTypes: true })) {
-    if (!entry.isFile() || !pattern.test(entry.name)) continue;
-    const mtimeMs = statSync(join(entry.parentPath, entry.name)).mtimeMs;
-    if (mtimeMs > newest) newest = mtimeMs;
-  }
-  return newest;
-}
-
 function distState() {
-  const present = existsSync(join(root, "dist"));
-  const srcNewestMs = newestMtimeMs(join(root, "src"), /\.ts$/);
-  const distNewestMs = newestMtimeMs(join(root, "dist"), /\.js$/);
-  return {
-    present,
-    srcNewestMs,
-    distNewestMs,
-    disposition: distDisposition({ present, srcNewestMs, distNewestMs }),
-  };
+  const sourceDir = join(root, "src");
+  const outputDir = join(root, "dist");
+  if (!existsSync(outputDir)) return { present: false, disposition: "absent", detail: null, pairs: 0 };
+  if (!existsSync(sourceDir))
+    return { present: true, disposition: "unknown", detail: "src/ is absent", pairs: 0 };
+  let pairs = 0;
+  for (const entry of readdirSync(sourceDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) continue;
+    const source = join(entry.parentPath, entry.name);
+    const rel = relative(sourceDir, source);
+    const output = join(outputDir, rel.slice(0, -".ts".length) + ".js");
+    const outputExists = existsSync(output);
+    const verdict = classifyBuildPair({
+      outputExists,
+      sourceMtimeMs: statSync(source).mtimeMs,
+      outputMtimeMs: outputExists ? statSync(output).mtimeMs : Number.NEGATIVE_INFINITY,
+    });
+    if (verdict === "missing")
+      return { present: true, disposition: "incomplete", detail: rel, pairs };
+    if (verdict !== "current")
+      return { present: true, disposition: verdict, detail: rel, pairs };
+    pairs += 1;
+  }
+  if (pairs === 0) return { present: true, disposition: "empty", detail: null, pairs };
+  return { present: true, disposition: "fresh", detail: null, pairs };
 }
 
 /** The only place this script starts a child process. */
@@ -147,6 +154,7 @@ function main(argv) {
       files: paths,
       distPresent: dist.present,
       distDisposition: dist.disposition,
+      distPairs: dist.pairs,
       command,
       upstreamTarget: "unit-subset",
     };
@@ -165,11 +173,16 @@ function main(argv) {
     const reason = {
       absent: "dist/ is absent",
       empty: "dist/ holds no built JavaScript",
-      stale: "dist/ is older than the newest src/ change, so these tests would validate superseded code",
-      unknown: "src/ could not be inspected, so built-output freshness is unknown",
+      incomplete: "a source file has no built output, so these tests would import a missing or superseded module",
+      stale: "a built file is older than its source, so these tests would validate superseded code",
+      unknown: "built-output freshness could not be determined",
     };
     process.stderr.write(
-      LABEL + " " + reason[dist.disposition] + "; run: corepack pnpm run build:all\n",
+      LABEL +
+        " " +
+        reason[dist.disposition] +
+        (dist.detail === null ? "" : " (" + dist.detail + ")") +
+        "; run: corepack pnpm run build:all\n",
     );
     return 3;
   }

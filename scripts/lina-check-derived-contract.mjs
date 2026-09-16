@@ -42,18 +42,30 @@ export const GUARD_SHA256 = "3ca3cf5b1fa79fa18b5f492e70415ccb19d44fbfcbed5fe099a
 export const WORKFLOW_EXTENSIONS = Object.freeze([".yml", ".yaml"]);
 
 /**
- * Decide whether built output may be trusted for a restored-test run.
+ * Decide whether one source file's built output may be trusted.
  *
- * Existence is not freshness. The restored tests import from dist/, so a dist/
- * built before the last src/ edit would let them validate superseded code and
- * still report success. Kept pure so the self-test can cover every disposition
- * without touching the filesystem.
+ * Comparing the newest file anywhere under src/ with the newest file anywhere
+ * under dist/ is not sufficient: a partial build such as build:repair refreshes
+ * unrelated output and makes the whole tree look current while the module a
+ * restored test imports stays old. Freshness is therefore decided per
+ * source/output pair. Kept pure so the self-test can cover every case without
+ * touching the filesystem.
  */
-export function distDisposition({ present, srcNewestMs, distNewestMs }) {
-  if (!present) return "absent";
-  if (!Number.isFinite(distNewestMs)) return "empty";
-  if (!Number.isFinite(srcNewestMs)) return "unknown";
-  return srcNewestMs > distNewestMs ? "stale" : "fresh";
+export function classifyBuildPair({ outputExists, sourceMtimeMs, outputMtimeMs }) {
+  if (!outputExists) return "missing";
+  if (!Number.isFinite(sourceMtimeMs) || !Number.isFinite(outputMtimeMs)) return "unknown";
+  return sourceMtimeMs > outputMtimeMs ? "stale" : "current";
+}
+
+/**
+ * This project pins pnpm through Corepack (AGENTS.md). A probe that silently
+ * accepted an arbitrary PATH pnpm would certify the guards under an unsupported
+ * package manager, so the observed version must equal the pinned one.
+ */
+export function assertPinnedPnpm(packageManagerField, observedVersion) {
+  const expected = String(packageManagerField).replace(/^pnpm@/, "");
+  if (observedVersion !== expected)
+    fail("launcher-unpinned", "expected pnpm " + expected + ", observed " + observedVersion);
 }
 
 /** Upstream tests restored for execution: hermetic and compatible with the parked profile. */
