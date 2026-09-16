@@ -47,6 +47,11 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
 const BASELINE_COMMIT = "1f36c10eeea8d3c36c477e7f91e0d405781556b3";
 const BASELINE_ASSERTION_CALLS = 23;
+// The count this change establishes. The floor must be the current expectation,
+// not the historical baseline: a floor of 23 would let the 26-assertion
+// validator shed three and still pass whenever the baseline object is absent.
+// Adding assertions legitimately raises this number; it never lowers.
+const VALIDATOR_ASSERTION_FLOOR = 26;
 const ASSERTION_CALL = /^\s*assert(\.|\()/;
 const VALIDATOR = "scripts/check-scaffold.mjs";
 const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"];
@@ -292,8 +297,11 @@ function runAssertionIntegrity() {
   const current = countAssertionCalls(readFileSync(join(root, VALIDATOR), "utf8"));
   // The literal floor always applies and needs no Git history.
   assert.ok(
-    current >= BASELINE_ASSERTION_CALLS,
-    "the validator has fewer assertions than the recorded baseline floor",
+    current >= VALIDATOR_ASSERTION_FLOOR,
+    "the validator has " +
+      current +
+      " assertion calls, below the recorded floor of " +
+      VALIDATOR_ASSERTION_FLOOR,
   );
   const shown = spawnSync("git", ["-C", root, "show", BASELINE_COMMIT + ":" + VALIDATOR], {
     encoding: "utf8",
@@ -303,7 +311,7 @@ function runAssertionIntegrity() {
     // this branch is squash-merged, where the baseline becomes a sibling rather
     // than an ancestor. Degrade to the literal floor and say so, rather than
     // failing and making the advertised self-test unusable.
-    return { baseline: BASELINE_ASSERTION_CALLS, current, mode: "floor" };
+    return { baseline: VALIDATOR_ASSERTION_FLOOR, current, mode: "floor" };
   }
   const baseline = countAssertionCalls(shown.stdout);
   assert.equal(
