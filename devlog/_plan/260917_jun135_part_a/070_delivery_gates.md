@@ -4,7 +4,7 @@
 
 | 항목 | 값 |
 | -- | -- |
-| 측정 SHA | `25c29266d62c7444a1885010908c7f8999336f19` (리뷰 지적 반영 후) |
+| 측정 SHA | `9af419172c835112740abcd873ee67f9fe6bbd14` (호스티드 리뷰 3회전 반영 후) |
 | 브랜치 | `codex/jun-135-fork-baseline` |
 | base | `main` (`c80ecac8`) |
 | 런타임 | Node 24.20.0, pnpm 12.4.1 (Corepack) |
@@ -12,7 +12,8 @@
 | 작업물 | 측정 시 `git status --porcelain` 0줄 |
 
 이 문서를 커밋하면 head 가 한 번 더 움직인다. 그 diff 는 이 markdown 파일뿐이고, 아래 표의
-수치는 `25c29266` 에서 나온 것이다. 그 사실을 감추지 않고 여기 적는다.
+수치는 `9af41917` 에서 나온 것이다. 그 사실을 감추지 않고 여기 적는다. 리뷰가 새 커밋을 만들
+때마다 이 표를 다시 측정했다. 새 head 는 이전 증거를 무효화하기 때문이다.
 
 ## 필수 게이트 8항목
 
@@ -105,11 +106,35 @@ author·committer 가 `작성자의 비공개 주소` 이고, 이미 원격에 �
    `scripts/lina-check-contract-selftest.mjs` 의 `BASELINE_COMMIT` 상수를 함께 고쳐야 한다.
 
 2번은 인계 기준 SHA 를 바꾸는 일이고 코디네이터 기록에도 영향이 있으므로 임의로 하지 않았다.
-사용자 판단을 기다리는 상태로 남긴다. PR 은 아직 열리지 않았다.
+
+### 결과: 코디네이터가 2번을 택했다
+
+1번은 `작성자의 비공개 주소` 을 공개 저장소 이력에 영구히 남기기 때문이다. 미푸시 커밋 10개의
+author·committer 를 이미 게시된 `c80ecac8` 과 같은 noreply 주소로 맞췄다.
+
+| | 재작성 전 | 재작성 후 |
+| -- | -- | -- |
+| baseline | `f611316d` | `1f36c10eeea8d3c36c477e7f91e0d405781556b3` |
+| head | `cd4f975c` | `65a449aa411792784f021b98f8910433a1382baa` |
+
+트리는 동일하다. 내용 차이는 baseline SHA 참조 6개 파일 20줄뿐이고 코디네이터가 repoint 했다.
+재작성 전 이력은 로컬 태그 `jun135-pre-email-rewrite` 에 있다. `c80ecac8` 이하와 upstream pin
+`1ed7bd4e` 는 건드리지 않았다.
+
+그 뒤 내가 만든 커밋도 같은 문제로 한 번 거부됐다. 저장소의 `user.email` 이 여전히
+`작성자의 비공개 주소` 이었기 때문이다. 저장소 로컬 설정을 noreply 로 바꾸고 해당 커밋을 amend 해서
+해결했다. 지금은 `c80ecac8..HEAD` 의 모든 커밋이 같은 noreply 주소다.
+
+PR: https://github.com/thisisjun786/lina-check/pull/1 — base `main`, non-draft, `state: OPEN`,
+`mergeStateStatus: CLEAN`. 머지는 코디네이터가 한다.
 
 ## 리뷰 영수증
 
-리뷰는 두 번 돌았다. 1차에서 5건을 받고 전부 처리했으며, 2차는 각 건을 실제 우회 시도로 재확인했다.
+리뷰는 두 층으로 돌았다. 태스크 안의 독립 리뷰어 subagent 2회전과, PR 개설 후 호스티드 리뷰어
+(Devin Review · Codex) 3회전이다. 총 21건을 받아 20건을 고치고 1건을 근거를 들어 반박했다.
+미해결 스레드는 0건이다.
+
+### 층 1 · 독립 리뷰어 subagent (2회전, 5건)
 
 | 지적 | 등급 | 내용 | 처리 커밋 | 재확인 |
 | -- | -- | -- | -- | -- |
@@ -123,6 +148,42 @@ author·committer 가 `작성자의 비공개 주소` 이고, 이미 원격에 �
 시도했고 작업물은 `25c29266` 에서 깨끗하게 남았다. 미해결 지적은 없다.
 
 음성 검증 범위가 리뷰로 늘었다. 거부 경로 25건 → 28건, 순수 보조 함수 3건 → 11건.
+
+### 층 2 · 호스티드 리뷰어 (3회전, 16건)
+
+PR 개설과 새 커밋마다 Devin Review 와 Codex 가 자동으로 돌았다. 등급 표기는 제공자의 것이다
+(Codex `P1`/`P2`, Devin `bug`/`analysis`).
+
+**1회전 · head `65a449aa` · 5건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H1 | Codex | P1 | `lina-check-contract-selftest.mjs:47` | baseline `1f36c10e` 가 `708a4fc` 에서 도달 불가라 fresh clone 에서 `git show` 가 깨진다 | **반박.** 코드 변경 없음 | `--single-branch` 새 clone 에서 `OBJECT_PRESENT=yes`, `ANCESTOR_OF_HEAD=yes`, `git show` 150줄·assert 23건. PR merge ref 는 `708a4fc` 가 아니라 `a2ff36ac` 이고 그것의 조상이기도 하다 |
+| H2 | Codex | P2 | `lina-check-safe-tests.mjs:85` | `dist/` 존재만 확인해 낡은 산출물로 통과 보고가 가능하다 | `eaf933aa` | `touch src/...` → exit 3, 미리보기 `stale`, `build:all` 후 `fresh`·333 통과 |
+| H3 | Devin | bug | `lina-check-safe-tests.mjs:35` | 깨진 선언이 throw 로 나가 설정 오류가 테스트 실패(1)로 오분류된다 | `eaf933aa` | 임시 디렉터리에서 4경우(깨진 JSON·선언 부재·파일 부재·잘못된 사용법) 전부 exit 2 |
+| H4 | Devin | analysis | `lina-check-safe-tests.mjs:43` | 자격증명 필터가 넓어 비자격증명 설정까지 지워 픽스처가 달라질 수 있다 | `eaf933aa` | 좁히지 않고 관측 가능하게. 실행 직전 `env filtered: ...` 출력. 이 호스트는 `none` |
+| H5 | Devin | analysis | `lina-check-boundary-probe.mjs:56` | `corepack` 을 무조건 찾아 없는 환경에서 프로브가 못 돈다 | `eaf933aa` → `d5493450` 로 수정 | 1차엔 pnpm 폴백을 넣었으나 2회전 H7·H10 이 그것을 반려. 최종은 Corepack 요구 + 명확한 실패 |
+
+**2회전 · head `eaf933aa` · 5건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H6 | Devin | bug | `lina-check-safe-tests.mjs:99` | 부분 빌드가 무관한 산출물을 새로 만들면 전체 최대 mtime 비교가 낡은 모듈을 통과시킨다 | `d5493450` | 전체 트리 비교가 건강해 보이는 상태(최신 dist 1789583670 > 최신 src 1789583575)에서 `dist/stable-json.js` 만 2020년으로 낮춤 → exit 3, `stable-json.ts` 지목 |
+| H7 | Devin | bug | `lina-check-boundary-probe.mjs:56` | Corepack 없을 때 임의의 PATH pnpm 으로 프로브가 인증된다 | `d5493450` | 폴백 제거. Corepack 요구 + `packageManager` 핀 대조. `launcher=corepack pnpm=12.4.1` |
+| H8 | Devin | analysis | `README.md:10` | README 가 build·lint 만 있다고 말하고 `lina:*` 4개를 빠뜨렸다 | `d5493450` | 네 명령과 선언 위치·쌍 단위 최신성·운영 준비 아님을 함께 기재 |
+| H9 | Codex | P2 | `lina-check-derived-contract.mjs:56` | H6 과 같은 부분 빌드 문제 | `d5493450` | H6 과 동일 증거 |
+| H10 | Codex | P2 | `lina-check-boundary-probe.mjs:55` | H7 과 같은 미고정 pnpm 문제 | `d5493450` | H7 과 동일 증거 |
+
+**3회전 · head `d5493450` · 6건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H11 | Devin | bug | `lina-check-safe-tests.mjs:106` | 원본이 삭제되면 남은 산출물을 아무도 보지 않아, 삭제된 코드로 테스트가 통과한다 | `9af41917` | `dist/__orphan_proof.js` 생성 → exit 3, `orphaned`, 파일 이름 지목. 제거 후 `fresh` 384쌍 |
+| H12 | Devin | bug | `lina-check-derived-contract.mjs:260` | `safeTests.files` 에 `null` 이 있으면 `DerivedContractError` 대신 `TypeError` 가 난다 | `9af41917` | 실제로 `name=TypeError` 를 재현한 뒤 수정. 이제 `safe-tests-mismatch`, selftest 픽스처 추가(29건) |
+| H13 | Codex | P2 | `lina-check-safe-tests.mjs:92` | H11 과 같은 orphan 문제 | `9af41917` | H11 과 동일 증거 |
+| H14 | Devin | analysis | `lina-check-safe-tests.mjs:102` | mtime 은 빌드 출처가 아니다. 아티팩트 복원이 순서를 뒤집을 수 있다 | **한계로 명시.** 코드 변경 없음 | 내용 해시는 이 스캐폴드가 만들지 않는 빌드 메타데이터를 요구한다. 헤더 주석에 한계와 대처(복원 후 `build:all`)를 적었다 |
+| H15 | Devin | analysis | `lina-check-derived-contract.mjs:39` | `GUARD_SHA256` 이 가드 바이트를 중복해 수동 동기화가 필요하다 | **의도로 명시.** 코드 변경 없음 | 그 결합이 보안 속성이다. 검사 대상 파일에서 기대값을 유도하면 검사가 공허해진다. 주석에 적었다 |
+| H16 | Devin | analysis | `070_delivery_gates.md:108` | 기록이 PR 미개설·이메일 판단 대기 상태로 남아 있다 | 이 커밋 | 위 "결과" 절로 교체 |
 
 ## 남은 것
 
