@@ -153,7 +153,13 @@ export function launchTests(paths, concurrency) {
   });
 }
 
-function main(argv) {
+/**
+ * Exported with an injectable built-output probe so the routing control can
+ * exercise this function, not just the launch helper, without needing a build.
+ * Production callers pass nothing and get the real probe.
+ */
+export function main(argv, deps = {}) {
+  const probeDist = deps.distState ?? distState;
   const mode = argv[0];
   if (mode !== "run" && mode !== "preview") {
     process.stderr.write(USAGE + "\n");
@@ -170,7 +176,7 @@ function main(argv) {
     return 2;
   }
   const paths = declaration.paths;
-  const dist = distState();
+  const dist = probeDist();
   const concurrency = Math.min(availableParallelism(), MAX_CONCURRENCY);
   const command = ["node", "--test", "--test-concurrency=" + concurrency, ...paths];
   if (mode === "preview") {

@@ -39,13 +39,14 @@ tripwire 대조 3건. 방법은 H21·H23 을 거쳐 바뀌었고 아래가 현�
 - 음성 대조: `LINA_CHECK_SPAWN_TRIPWIRE=1` + `preview --json` → exit 0. 실행 경계에 닿지 않았다
 - 양성 대조: tripwire 를 켠 채 `launchTests()` 를 **직접 호출** → 예외, 메시지가 tripwire 를 이름으로
   든다. 산출물이 필요 없으므로 빈 체크아웃에서도 항상 돈다
-- 라우팅 대조: tripwire 를 켠 채 `run` 을 CLI 로 실행 → 실패, 진단
-  `[lina-check-safe-tests] LINA_CHECK_SPAWN_TRIPWIRE tripped: launchTests() was reached, so this was not a preview`.
-  `main` 이 여전히 그 지점을 지난다는 것을 확인하며, 산출물이 최신일 때만 돈다
+- 라우팅 대조: tripwire 를 켠 채 `main(["run"], { distState: ... })` 를 직접 호출 → 예외, 메시지가
+  tripwire 를 이름으로 든다. `main` 이 여전히 그 지점을 지난다는 것을 확인한다. 산출물 판정을
+  주입하므로 전제가 없고 건너뛰지 않는다
 
-양성 대조와 라우팅 대조를 나눈 이유가 있다. 직접 호출만 두면 tripwire 가 살아 있다는 것은 알지만
-`main` 이 그 지점을 지나는지는 모른다. CLI 만 두면 산출물이 없을 때 대조가 사라진다. 둘을 함께 두고
-각각의 전제를 출력에 적었다. selftest 출력은 `tripwireControls=2 routing=verified` 형태다.
+양성 대조와 라우팅 대조를 나눈 이유가 있다. 직접 `launchTests` 호출만 두면 tripwire 가 살아 있다는
+것은 알지만 `main` 이 그 지점을 지나는지는 모른다. 반대로 CLI 만 두면 산출물이 없을 때 대조가
+사라진다. 그래서 `main` 을 호출하고 산출물 판정만 주입했다. 주입 지점은 기본값 매개변수이므로
+운영 호출부는 실제 판정을 그대로 쓴다. selftest 출력은 `tripwireControls=3 routing=verified` 다.
 
 보존 확인: `git diff --name-only 1f36c10e HEAD -- src dashboard test config/target-repositories.json pnpm-lock.yaml .github` 0줄.
 
@@ -138,7 +139,7 @@ PR: https://github.com/thisisjun786/lina-check/pull/1 — base `main`, non-draft
 ## 리뷰 영수증
 
 리뷰는 두 층으로 돌았다. 태스크 안의 독립 리뷰어 subagent 2회전과, PR 개설 후 호스티드 리뷰어
-(Devin Review · Codex) 8회전이다. 총 31건을 받아 29건을 고치고 2건을 한계·의도로 명시했다.
+(Devin Review · Codex) 9회전이다. 총 32건을 받아 30건을 고치고 2건을 한계·의도로 명시했다.
 반박한 1건은 4회전에 새 근거로 재제기되어 결국 수정했다. 미해결 스레드는 0건이다.
 
 회전이 늘어난 이유를 적어 둔다. 내 수정이 새 결함을 만든 경우가 네 번 있었다. H5 의 pnpm 폴백이
@@ -251,3 +252,13 @@ H19→H20→H21 은 한 줄기다. 관용 분기를 넣고(H19), 그 진입 조�
 - push 와 PR 개설. 위 이메일 선택을 기다린다.
 - 머지는 코디네이터가 한다. 이 태스크는 머지하지 않는다.
 - JUN-135 는 Done 으로 올리지 않는다. 이 브랜치는 Part A 만 인도한다.
+| H26 | Codex | P2 | `lina-check-contract-selftest.mjs` | `probe-not-blocked` 거부 경로를 아무 픽스처도 밟지 않는다. 그 가드를 지워도 selftest 가 통과한다 | 이 커밋 | 프로브 목록은 리터럴과 일치시킨 채 `blockedScripts` 에서 대상 하나를 제거하는 픽스처 추가. 거부 경로 29 → 30 |
+
+**9회전 · head `31a6815c` · 1건**
+
+| # | 제공자 | 등급 | 위치 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- | -- | -- |
+| H27 | Codex | P2 | `lina-check-contract-selftest.mjs` | H23 이 넣은 라우팅 대조가 여전히 조건부다. `dist/` 없는 새 체크아웃에서는 건너뛰므로 `main` 이 `launchTests` 를 우회해도 통과한다 | 이 커밋 | 조건을 없앴다. `main` 을 export 하고 산출물 판정을 주입 가능한 기본값 매개변수로 만들어, 대조가 빌드 없이 `main` 자체를 실행한다. 세 상태 관측: fresh → `tripwireControls=3 routing=verified`, **absent → 동일**, absent + `main` 이 `launchTests` 우회 → exit 1 `routing control: run mode must reach the launch boundary` |
+
+H19→H21→H23→H27 이 한 줄기다. 조건부 대조를 넣고, 전제를 문서로 옮기고, 대조를 하나 더 넣고,
+결국 조건 자체를 주입으로 없앴다. 조건부 검증은 그 조건이 성립하지 않는 곳에서 정확히 무용하다.

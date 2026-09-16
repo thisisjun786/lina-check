@@ -44,7 +44,7 @@ import {
   blockedNodeTargets,
   classifyBuildPair,
 } from "./lina-check-derived-contract.mjs";
-import { launchTests } from "./lina-check-safe-tests.mjs";
+import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
@@ -318,20 +318,28 @@ function runTripwireControls() {
   );
   // Routing control. The direct call above proves the tripwire is alive, but not
   // that run mode still routes through it: if main stopped calling launchTests,
-  // both controls above would keep passing. Driving the CLI closes that, and it
-  // needs usable built output, so it is reported separately rather than skipped
-  // silently. The delivery gate sequence builds first, so it runs there.
-  let routing = "skipped: built output is " + report.distDisposition;
-  if (report.distDisposition === "fresh") {
-    const run = spawnSync(process.execPath, [script, "run"], { cwd: root, encoding: "utf8", env });
-    assert.notEqual(run.status, 0, "routing control: run mode must reach the launch boundary");
-    assert.ok(
-      (run.stderr === null ? "" : run.stderr).includes(TRIPWIRE_ENV),
-      "routing control: the refusal must name " + TRIPWIRE_ENV,
-    );
-    routing = "verified";
+  // that control would keep passing. Drive main itself, injecting a fresh
+  // built-output verdict so the control needs no build and never has to be
+  // skipped. Production callers get the real probe.
+  const savedRouting = process.env[TRIPWIRE_ENV];
+  process.env[TRIPWIRE_ENV] = "1";
+  let routed = null;
+  try {
+    runnerMain(["run"], {
+      distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    });
+  } catch (error) {
+    routed = error;
+  } finally {
+    if (savedRouting === undefined) delete process.env[TRIPWIRE_ENV];
+    else process.env[TRIPWIRE_ENV] = savedRouting;
   }
-  return { ran: 2, routing };
+  assert.ok(routed, "routing control: run mode must reach the launch boundary");
+  assert.ok(
+    String(routed.message).includes(TRIPWIRE_ENV),
+    "routing control: the refusal must name " + TRIPWIRE_ENV,
+  );
+  return { ran: 3, routing: "verified" };
 }
 
 function countAssertionCalls(source) {
