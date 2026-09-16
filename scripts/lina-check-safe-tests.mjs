@@ -15,8 +15,20 @@
 * 3 built output unusable for a run, meaning dist/ is absent, empty, or older
  *   than its source. Existence alone is not freshness, and neither is the newest
  *   timestamp anywhere under dist/: a partial build such as build:repair would
- *   refresh unrelated output while the module a restored test imports stays old.
- *   Freshness is therefore decided per source/output pair.
+*   refresh unrelated output while the module a restored test imports stays old.
+*   Freshness is therefore decided per source/output pair.
+ *
+ *   Both directions are checked. A source without output is incomplete; an
+ *   output without source is orphaned, because TypeScript does not remove the
+ *   JavaScript left behind by a deleted or renamed module and a restored test
+ *   importing that path would pass against code no longer in src/.
+ *
+ *   The comparison uses modification times, which are not build provenance.
+ *   Restoring artifacts from an archive can invert the order, making current
+ *   output look stale or older output stamped after its source look current.
+ *   Content hashing would need build metadata this scaffold does not produce, so
+ *   the limit is named rather than hidden: after any artifact restoration, run
+ *   build:all before trusting a result.
  *
  * A broken declaration is a configuration fault, not a test failure, so it exits
  * 2 even when the failure surfaces as a thrown read or parse error.
@@ -102,6 +114,14 @@ function distState() {
       return { present: true, disposition: verdict, detail: rel, pairs };
     pairs += 1;
   }
+  // Reverse direction: built output whose source is gone still satisfies every
+  // remaining pair, yet can supply the module a restored test imports.
+  for (const entry of readdirSync(outputDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+    const rel = relative(outputDir, join(entry.parentPath, entry.name));
+    if (!existsSync(join(sourceDir, rel.slice(0, -".js".length) + ".ts")))
+      return { present: true, disposition: "orphaned", detail: rel, pairs };
+  }
   if (pairs === 0) return { present: true, disposition: "empty", detail: null, pairs };
   return { present: true, disposition: "fresh", detail: null, pairs };
 }
@@ -174,6 +194,7 @@ function main(argv) {
       absent: "dist/ is absent",
       empty: "dist/ holds no built JavaScript",
       incomplete: "a source file has no built output, so these tests would import a missing or superseded module",
+      orphaned: "built output remains for a source file that no longer exists, so these tests could import code absent from src/",
       stale: "a built file is older than its source, so these tests would validate superseded code",
       unknown: "built-output freshness could not be determined",
     };

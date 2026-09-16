@@ -34,7 +34,14 @@ export const DERIVED_SCRIPT_COMMANDS = Object.freeze({
   "lina:test-safe:preview": "node scripts/lina-check-safe-tests.mjs preview",
 });
 
-/** The probe must not invoke anything unless the guard it relies on is unchanged. */
+/**
+ * The probe must not invoke anything unless the guard it relies on is unchanged.
+ *
+ * The digest duplicates the guard's bytes on purpose. A legitimate guard edit is
+ * meant to require a deliberate, reviewable digest update: that coupling is the
+ * security property, not an oversight. Deriving the expected value from the file
+ * being checked would make the check vacuous.
+ */
 export const GUARD_PATH = "scripts/scaffold-disabled.mjs";
 export const GUARD_SHA256 = "3ca3cf5b1fa79fa18b5f492e70415ccb19d44fbfcbed5fe099a5d928bfd7b573";
 
@@ -256,7 +263,15 @@ export function assertDerivedContract({
   }
 
   const safe = derived.safeTests.files;
-  if (!Array.isArray(safe) || !sameList(safe.map(({ path }) => path), [...SAFE_TESTS]))
+  // Read the path defensively: a null or non-object entry must surface as a
+  // stable contract rejection, not as a TypeError from destructuring.
+  if (
+    !Array.isArray(safe) ||
+    !sameList(
+      safe.map((entry) => (typeof entry === "object" && entry !== null ? entry.path : undefined)),
+      [...SAFE_TESTS],
+    )
+  )
     fail("safe-tests-mismatch", "declared restored tests differ from SAFE_TESTS");
   for (const entry of safe) {
     if (!nonEmptyReason(entry)) fail("safe-tests-reason", entry.path);

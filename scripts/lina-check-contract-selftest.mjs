@@ -153,6 +153,11 @@ const cases = [
     (i) => i.config.derived.safeTests.files.pop(),
     "safe-tests-mismatch",
   ],
+  [
+    "safe-tests-null-entry",
+    (i) => (i.config.derived.safeTests.files[0] = null),
+    "safe-tests-mismatch",
+  ],
   ["safe-tests-reason", (i) => (i.config.derived.safeTests.files[0].reason = "")],
   ["safe-tests-unknown-path", (i) => i.baselinePaths.delete(SAFE_TESTS[0])],
   ["excluded-tests-mismatch", (i) => delete i.config.derived.excludedTests[EXCLUDED_TESTS[0]]],
