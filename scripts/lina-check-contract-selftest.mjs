@@ -1,0 +1,212 @@
+#!/usr/bin/env node
+
+/**
+ * Definition: negative verification for the derived-change contract. A contract
+ * that only ever sees valid input proves nothing, so this self-test feeds a
+ * deliberately broken declaration for every rejection path and asserts that the
+ * contract rejects it with the expected code.
+ *
+ * It also runs the two tripwire controls for the preview claim: the negative
+ * control (preview must not reach the launch boundary) and the positive control
+ * (a real run must reach it and say so by name). Without the positive control a
+ * dead tripwire would look like a passing preview.
+ *
+ * Exit codes: 0 every rejection path rejected, 1 a path failed to reject.
+ */
+
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+import {
+  DerivedContractError,
+  EXCLUDED_TESTS,
+  SAFE_TESTS,
+  TRIPWIRE_ENV,
+  assertDerivedContract,
+  assertProbeTargetGuarded,
+  assertWorktreeUnchanged,
+  blockedNodeTargets,
+} from "./lina-check-derived-contract.mjs";
+
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const LABEL = "[lina-check-contract-selftest]";
+const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"];
+const config = JSON.parse(readFileSync(join(root, "config", "lina-check-scaffold.json"), "utf8"));
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+
+function baseInput() {
+  const cloned = structuredClone(config);
+  return {
+    config: cloned,
+    upstreamScripts: { review: "node dist/placeholder.js review" },
+    packageScripts: structuredClone(pkg.scripts),
+    baselinePaths: new Set([...SAFE_TESTS, ...EXCLUDED_TESTS, "src/clawsweeper.ts"]),
+    presentPaths: new Set(Object.keys(cloned.derived.files)),
+    coreAdditions: new Set(),
+    docs: [...DOCS],
+    readFile: () => "",
+    isRegularFile: () => true,
+  };
+}
+
+const first = (input) => Object.keys(input.config.derived.files)[0];
+
+const cases = [
+  ["derived-shape", (i) => delete i.config.derived.files],
+  ["derived-empty", (i) => (i.config.derived.files = {})],
+  [
+    "derived-traversal",
+    (i) => {
+      i.config.derived.files["scripts/../lina-check-x.mjs"] = { reason: "bad" };
+      i.presentPaths.add("scripts/../lina-check-x.mjs");
+    },
+  ],
+  [
+    "derived-location",
+    (i) => {
+      i.config.derived.files["src/lina-check-x.mjs"] = { reason: "bad" };
+      i.presentPaths.add("src/lina-check-x.mjs");
+    },
+  ],
+  ["derived-upstream-collision", (i) => i.baselinePaths.add(first(i))],
+  ["derived-reason", (i) => (i.config.derived.files[first(i)] = { reason: "   " })],
+  ["derived-missing", (i) => i.presentPaths.delete(first(i))],
+  ["derived-symlink", (i) => (i.isRegularFile = () => false)],
+  ["derived-undeclared", (i) => i.presentPaths.add("scripts/lina-check-rogue.mjs")],
+  ["script-set", (i) => delete i.config.derived.scripts["lina:test-safe"]],
+  ["script-upstream-name", (i) => (i.upstreamScripts["lina:test-safe"] = "x")],
+  [
+    "script-command",
+    (i) => (i.config.derived.scripts["lina:test-safe"].command = "node scripts/elsewhere.mjs run"),
+  ],
+  [
+    "script-package-mismatch",
+    (i) => (i.packageScripts["lina:test-safe"] = "node scripts/lina-check-safe-tests.mjs preview"),
+  ],
+  [
+    "script-blocked-target",
+    (i) => {
+      const target = [...blockedNodeTargets(i.config.blockedScripts)][0];
+      assert.ok(target, "expected at least one blocked node target");
+      i.readFile = () => "import x from '" + target + "';";
+    },
+  ],
+  [
+    "safe-tests-mismatch-substitution",
+    (i) => {
+      const files = i.config.derived.safeTests.files;
+      files[files.length - 1] = { path: EXCLUDED_TESTS[0], reason: "same count, swapped in" };
+    },
+    "safe-tests-mismatch",
+  ],
+  [
+    "safe-tests-mismatch-reorder",
+    (i) => {
+      const files = i.config.derived.safeTests.files;
+      [files[0], files[1]] = [files[1], files[0]];
+    },
+    "safe-tests-mismatch",
+  ],
+  [
+    "safe-tests-mismatch-duplicate",
+    (i) => {
+      const files = i.config.derived.safeTests.files;
+      files[1] = structuredClone(files[0]);
+    },
+    "safe-tests-mismatch",
+  ],
+  [
+    "safe-tests-mismatch-count",
+    (i) => i.config.derived.safeTests.files.pop(),
+    "safe-tests-mismatch",
+  ],
+  ["safe-tests-reason", (i) => (i.config.derived.safeTests.files[0].reason = "")],
+  ["safe-tests-unknown-path", (i) => i.baselinePaths.delete(SAFE_TESTS[0])],
+  ["excluded-tests-mismatch", (i) => delete i.config.derived.excludedTests[EXCLUDED_TESTS[0]]],
+  [
+    "excluded-tests-reason",
+    (i) => (i.config.derived.excludedTests[EXCLUDED_TESTS[0]] = { reason: " " }),
+  ],
+  ["probe-subset", (i) => i.config.derived.boundaryProbes.scripts.shift()],
+  ["probe-not-blocked", (i) => i.config.derived.boundaryProbes.scripts.push("not-a-script")],
+  ["replaced-docs-mismatch", (i) => (i.docs = ["README.md"])],
+];
+
+function runDeclarationCases() {
+  const summary = assertDerivedContract(baseInput());
+  assert.equal(summary.safeTests, SAFE_TESTS.length);
+  let checked = 0;
+  for (const [name, mutate, expected] of cases) {
+    const input = baseInput();
+    mutate(input);
+    let raised = null;
+    try {
+      assertDerivedContract(input);
+    } catch (error) {
+      raised = error;
+    }
+    assert.ok(raised, name + ": the contract accepted a declaration it must reject");
+    assert.ok(
+      raised instanceof DerivedContractError,
+      name + ": expected DerivedContractError, saw " + String(raised && raised.name),
+    );
+    assert.equal(raised.code, expected === undefined ? name : expected, name);
+    checked += 1;
+  }
+  return checked;
+}
+
+function runHelperCases() {
+  assert.throws(() => assertProbeTargetGuarded({ "repair:execute-fix": "node dist/x.js" }, "repair:execute-fix"), {
+    code: "probe-unguarded",
+  });
+  assert.throws(() => assertWorktreeUnchanged("", " M src/x.ts"), { code: "worktree-changed" });
+  assertWorktreeUnchanged("same", "same");
+  return 3;
+}
+
+function runTripwireControls() {
+  const env = { ...process.env, [TRIPWIRE_ENV]: "1" };
+  const script = "scripts/lina-check-safe-tests.mjs";
+  const preview = spawnSync(process.execPath, [script, "preview", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+    env,
+  });
+  assert.equal(preview.status, 0, "negative control: preview must not reach the launch boundary");
+  assert.equal(JSON.parse(preview.stdout).executed, false);
+  const run = spawnSync(process.execPath, [script, "run"], { cwd: root, encoding: "utf8", env });
+  assert.notEqual(run.status, 0, "positive control: a run must reach the launch boundary");
+  assert.ok(
+    (run.stderr === null ? "" : run.stderr).includes(TRIPWIRE_ENV),
+    "positive control: the failure must name " + TRIPWIRE_ENV,
+  );
+  return 2;
+}
+
+try {
+  const declarations = runDeclarationCases();
+  const helpers = runHelperCases();
+  const controls = runTripwireControls();
+  process.stdout.write(
+    LABEL +
+      " rejected=" +
+      declarations +
+      " helpers=" +
+      helpers +
+      " tripwireControls=" +
+      controls +
+      "\n",
+  );
+  process.exitCode = 0;
+} catch (error) {
+  process.stderr.write(
+    LABEL + " " + (error instanceof Error ? error.message : String(error)) + "\n",
+  );
+  process.exitCode = 1;
+}
+

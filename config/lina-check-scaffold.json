@@ -171,5 +171,70 @@
     ".github/workflows/sweep.yml": ".github/workflows/sweep.yml.disabled",
     ".github/workflows/worker-records-ops.yml": ".github/workflows/worker-records-ops.yml.disabled"
   },
+  "derived": {
+    "note": "LINA Check changes beyond the preserved upstream tree. The permitted sets are literals in scripts/lina-check-derived-contract.mjs; this section records why each entry is allowed. Editing this file alone cannot widen them.",
+    "files": {
+      "scripts/lina-check-derived-contract.mjs": { "reason": "Owns the derived-change literals and validates this declaration." },
+      "scripts/lina-check-safe-tests.mjs": { "reason": "Runs or previews only the declared restored tests; no glob and no environment override." },
+      "scripts/lina-check-boundary-probe.mjs": { "reason": "Invokes the guarded automatic-action entrances to show they are closed; writes nothing to the tree." },
+      "scripts/lina-check-contract-selftest.mjs": { "reason": "Negative verification for every contract rejection path plus the two preview tripwire controls." },
+      "devlog/_plan/260917_jun135_part_a/000_plan.md": { "reason": "JUN-135 Part A plan of record: contract, acceptance criteria, consultation and audit history." },
+      "devlog/_plan/260917_jun135_part_a/010_validator_contract.md": { "reason": "Validator and declaration contract for this change." },
+      "devlog/_plan/260917_jun135_part_a/020_test_restoration.md": { "reason": "Safety determination that precedes restoring any upstream test." },
+      "devlog/_plan/260917_jun135_part_a/030_boundary_probe.md": { "reason": "Boundary-probe contract and the limits of what it proves." },
+      "devlog/_plan/260917_jun135_part_a/040_source_investigations.md": { "reason": "Two source investigations required before implementation starts." },
+      "devlog/_plan/260917_jun135_part_a/050_management_review_seams.md": { "reason": "Connection points for the management versus code-review boundary settled in JUN-63." },
+      "devlog/_plan/260917_jun135_part_a/060_results_original_vs_derived.md": { "reason": "Original-baseline results kept separate from results after the derived change." }
+    },
+    "scripts": {
+      "lina:test-safe": { "command": "node scripts/lina-check-safe-tests.mjs run", "reason": "Execute the declared restored upstream tests." },
+      "lina:test-safe:preview": { "command": "node scripts/lina-check-safe-tests.mjs preview", "reason": "List the declared targets without executing anything." },
+      "lina:boundary-probe": { "command": "node scripts/lina-check-boundary-probe.mjs", "reason": "Probe the automatic-action entrances and the parked workflow triggers." },
+      "lina:contract-selftest": { "command": "node scripts/lina-check-contract-selftest.mjs", "reason": "Prove the contract rejections and the preview tripwire still work." }
+    },
+    "safeTests": {
+      "note": "Upstream tests judged hermetic and compatible with the parked profile, restored for execution. Their bytes are unchanged; only their invocation is new.",
+      "files": [
+        { "path": "test/apply-close-policy-guards.test.ts", "reason": "Automatic-close guards. Imports built output only; no process or network use." },
+        { "path": "test/apply-label-sync.test.ts", "reason": "Automatic label synchronisation. Uses the mock gh binary from test/helpers.ts." },
+        { "path": "test/automerge-metrics.test.ts", "reason": "Automatic merge accounting. Uses an injected fetcher that throws on any unregistered URL." },
+        { "path": "test/check-dashboard-strict.test.ts", "reason": "Checker contract. Pure in-process assertions." },
+        { "path": "test/check-docs.test.ts", "reason": "Consumes the config manifests examined in this change. Runs git only inside a temporary directory." },
+        { "path": "test/close-reasons.test.ts", "reason": "Automatic-close reasons. Uses the mock gh binary." },
+        { "path": "test/label-mutation-batch.test.ts", "reason": "Label mutation batching. Spawns one local determinism proof script with no network use." },
+        { "path": "test/manual-publication-authority.test.ts", "reason": "Authorised-caller decision. Uses a fake curl on a temporary PATH." },
+        { "path": "test/manual-publication-policy.test.ts", "reason": "Manual publication policy. Pure." },
+        { "path": "test/parked-command-finalization.test.ts", "reason": "Parked command finalisation. In-process worker harness with a stubbed global fetch." },
+        { "path": "test/pr-label-policy.test.ts", "reason": "Label policy. Imports built output only." },
+        { "path": "test/repository-profiles.test.ts", "reason": "Target repository profiles. Contains no process, file or network call at all." },
+        { "path": "test/stable-json.test.ts", "reason": "Deterministic serialisation used by the checkers. Pure." }
+      ]
+    },
+    "excludedTests": {
+      "test/hosted-target-admission.test.ts": { "reason": "Hermetic but profile-incompatible: it reads .github/workflows/hosted-target-admission.yml, which is parked as .yml.disabled, so it fails with ENOENT. Recorded as lost coverage." },
+      "test/run-node-tests.test.ts": { "reason": "Hermetic but profile-incompatible: it asserts that the package test script composes the upstream build and test commands, and this fork replaces that script with the scaffold guard. Recorded as lost coverage." }
+    },
+    "boundaryProbes": {
+      "note": "Entrances to automatic code fix, close, merge and label mutation. The probe refuses to invoke a target whose package script is no longer the scaffold guard.",
+      "scripts": [
+        "repair:execute-fix",
+        "repair:apply-result",
+        "apply-decisions",
+        "repair:finalize-open-prs",
+        "e2e:automerge",
+        "repair:publish-main",
+        "repair:cleanup-replacement-labels",
+        "repair:tag-clawsweeper"
+      ],
+      "workflows": [
+        "automerge-e2e",
+        "clawsweeper-dispatch",
+        "repair-comment-router",
+        "repair-publish-results",
+        "sweep"
+      ]
+    },
+    "replacedUpstreamDocs": ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"]
+  },
   "note": "Declarative scaffold inventory. Workflow parking and package-script guards prevent accidental invocation; direct source commands are not sandboxed."
 }
