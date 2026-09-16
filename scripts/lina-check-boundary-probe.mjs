@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Definition: prove by actual execution that automatic code fix, automatic
- * close, automatic merge and automatic label mutation cannot run in this
- * initial profile. The point is not that the upstream code is gone - it is
- * preserved - but that every entrance to it is closed.
- *
- * Safety: each target is checked against the scaffold guard mapping BEFORE it is
- * invoked, so this probe can never become live fire in a checkout whose guards
- * were removed. The probe writes nothing into the repository and verifies that
- * the working tree is byte-identical before and after.
- *
+* Definition: prove by actual execution that automatic code fix, automatic
+ * close, automatic merge and automatic label mutation cannot be started through
+ * the declared package-script entrances in this initial profile. The point is
+ * not that the upstream code is gone - it is preserved - but that the entrances
+ * this probe declares are closed. It does not enumerate every possible entrance:
+ * direct node execution of built or source entrypoints bypasses these guards.
+*
+* Safety: each target is checked against the scaffold guard mapping BEFORE it is
+* invoked, so this probe can never become live fire in a checkout whose guards
+ * were removed. The probe writes nothing into the repository and compares the
+ * git porcelain status before and after. That comparison is not a byte-identical
+ * claim: it cannot see ignored-file writes or effects outside the repository.
+*
  * Exit codes: 0 every entrance closed, 1 an entrance was open or the tree moved.
  */
 
@@ -89,4 +92,3 @@ try {
   );
   process.exitCode = 1;
 }
-

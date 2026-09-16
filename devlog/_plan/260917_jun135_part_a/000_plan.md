@@ -248,7 +248,7 @@ v1 의 baseline 측정은 `명령 | tail; echo $?` 형태였고 그것은 `tail`
 `test/helpers.ts:1174` 의 `withMockGh`(`GH_BIN`/`GH_BIN_ARGS` 로 로컬 node 스크립트로 우회),
 `test/manual-publication-authority.test.ts:21` 의 임시 PATH 가짜 `curl`,
 `test/automerge-metrics.test.ts:292` 의 주입 `fetcher`(미등록 URL 은 예외),
-`test/dashboard-worker-harness.ts:842` 의 `globalThis.fetch` 교체와 `:965` 복원이다.
+`test/dashboard-worker-harness.ts:851` 의 `globalThis.fetch` 교체(원본 저장 `:842`, 복원 `:965`)다.
 
 | # | 경로 | 이 PR 과의 관련 | 판정 근거 |
 | -- | -- | -- | -- |
@@ -394,3 +394,25 @@ QA Convex 두 변수에 "이 저장소에 소비자가 없고 대상 저장소 �
 
 JUN-64 소유를 침범하지 않는다. 새 필드 이름, 라우팅 규칙, 프롬프트 분할 방식, 파서 패치 처방은
 구현하지 않아도 설계 처방이므로 적지 않는다. 기존 제약이 어디에 있는지만 적는다.
+
+## 부록 E · 인도 계획 (wp6)
+
+게이트 8항목을 최종 head 에서 다시 돌리고, 결과를 `070` 에 적고, push 하고 base=main 으로
+non-draft PR 을 연다. 그 PR 의 리뷰는 이 태스크 안의 독립 리뷰어 subagent 가 맡는다.
+
+### 권한 경계
+
+push 와 PR 개설은 위임됐다. 머지는 코디네이터가 하고 나는 하지 않는다. 릴리스·배포는 사용자
+권한이다. 외부 코드 리뷰 앱을 설치하거나 새 외부 리뷰를 요청하지 않는다. 호스티드 리뷰어가
+없다는 사실은 이용 불가로 기록하고 독립 리뷰로 대신한다.
+
+### PR 본문이 지켜야 할 것
+
+본문 초안은 `/var/tmp/lc-jun135/pr-body.md` 다. 과장 금지 목록은 부록 D 와 같다. 특히 빈 checks
+를 통과로 읽지 말라는 문장을 본문에 넣는다. 이 저장소에는 hosted required check 가 없고 기다려도
+생기지 않기 때문이다.
+
+### 리뷰 영수증
+
+지적마다 세 가지를 남긴다. 지적 본문, 그것을 처리한 커밋, 확인한 재검사. "리뷰 반영함" 같은
+요약은 증거가 아니다. 해당하지 않는 지적에는 이유를 달아 회신한다.

@@ -18,7 +18,7 @@
 | `gh` 대체 | `test/helpers.ts:1174` | `GH_BIN`/`GH_BIN_ARGS` 를 임시 디렉터리의 node 스크립트로 바꾼다. 실제 `gh` 가 돌지 않는다 |
 | `curl` 대체 | `test/manual-publication-authority.test.ts:21` | 임시 `bin` 에 가짜 `curl` 을 쓰고 `PATH` 앞에 붙인다 |
 | `fetch` 주입 | `test/automerge-metrics.test.ts:292` | 로컬 `fetcher` 를 넘긴다. 등록되지 않은 URL 은 예외로 떨어진다 |
-| `fetch` 전역 교체 | `test/dashboard-worker-harness.ts:842`, 복원 `:965` | Worker 하네스가 `globalThis.fetch` 를 스텁으로 바꾸고 끝나면 되돌린다 |
+| `fetch` 전역 교체 | 원본 저장 `test/dashboard-worker-harness.ts:842`, 교체 `:851`, 복원 `:965` | Worker 하네스가 `globalThis.fetch` 를 스텁으로 바꾸고 끝나면 되돌린다 |
 
 설치 훅은 없다. `test/repository-profiles.test.ts` 에 `pnpm install` 문자열이 있지만 프로필 픽스처
 데이터이고 실행되지 않는다. 그 파일에는 `spawnSync`·`execFile`·`fetch` 호출 자체가 없다.
