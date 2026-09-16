@@ -65,6 +65,21 @@ export function classifyBuildPair({ outputExists, sourceMtimeMs, outputMtimeMs }
 }
 
 /**
+ * Every disposition the runner may report for built output. Consumers validate
+ * against this set, so a malformed or tampered report is rejected instead of
+ * quietly taking a lenient branch.
+ */
+export const BUILD_DISPOSITIONS = Object.freeze([
+  "absent",
+  "empty",
+  "fresh",
+  "incomplete",
+  "orphaned",
+  "stale",
+  "unknown",
+]);
+
+/**
  * This project pins pnpm through Corepack (AGENTS.md). A probe that silently
  * accepted an arbitrary PATH pnpm would certify the guards under an unsupported
  * package manager, so the observed version must equal the pinned one.

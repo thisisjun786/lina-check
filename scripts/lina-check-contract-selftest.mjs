@@ -27,6 +27,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  BUILD_DISPOSITIONS,
   DerivedContractError,
   EXCLUDED_TESTS,
   GUARD_SHA256,
@@ -281,6 +282,14 @@ function runTripwireControls() {
   assert.equal(preview.status, 0, "negative control: preview must not reach the launch boundary");
   const report = JSON.parse(preview.stdout);
   assert.equal(report.executed, false);
+  // Validate the disposition before branching on it. Anything other than fresh
+  // takes the lenient path, so an invalid value would skip the positive control
+  // and still exit successfully.
+  assert.ok(
+    BUILD_DISPOSITIONS.includes(report.distDisposition),
+    "negative control: preview reported an invalid distDisposition " +
+      String(report.distDisposition),
+  );
   // The positive control needs the run to actually reach launchTests(), but the
   // built-output preflight refuses earlier when dist/ is unusable. Establish that
   // prerequisite from the preview report instead of failing a healthy contract,
