@@ -39,6 +39,7 @@ import {
   assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
+  distDisposition,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -223,7 +224,21 @@ function runHelperCases() {
     { code: "workflow-not-parked" },
   );
   assertWorkflowsParked([{ workflow: "sweep", active: false, parked: true }]);
-  return 11;
+  // Built-output freshness. Existence is not freshness: a dist/ older than the
+  // newest src/ change would let the restored tests validate superseded code.
+  assert.equal(distDisposition({ present: false, srcNewestMs: 1, distNewestMs: 2 }), "absent");
+  assert.equal(
+    distDisposition({ present: true, srcNewestMs: 1, distNewestMs: Number.NEGATIVE_INFINITY }),
+    "empty",
+  );
+  assert.equal(
+    distDisposition({ present: true, srcNewestMs: Number.NEGATIVE_INFINITY, distNewestMs: 2 }),
+    "unknown",
+  );
+  assert.equal(distDisposition({ present: true, srcNewestMs: 3, distNewestMs: 2 }), "stale");
+  assert.equal(distDisposition({ present: true, srcNewestMs: 2, distNewestMs: 2 }), "fresh");
+  assert.equal(distDisposition({ present: true, srcNewestMs: 1, distNewestMs: 2 }), "fresh");
+  return 17;
 }
 
 function runTripwireControls() {

@@ -50,9 +50,38 @@ tripwire 대조 2건.
 따라서 PR 의 checks 는 0건으로 예상된다. **빈 checks 를 통과로 읽지 않는다.** 인도 게이트는 위
 로컬 증거다.
 
-호스티드 코드 리뷰 제공자는 이 단계에서 이용 불가다. Devin·Codex 는 의도된 연동이고 구현돼 있지
-않으며, 이 과제는 외부 리뷰 앱 설치나 새 외부 리뷰 요청을 금지한다. 그래서 리뷰는 이 태스크 안의
-독립 리뷰어 subagent 로 수행했다. 이용 불가를 통과로 기록하지 않는다.
+### 정정: 호스티드 리뷰어가 있다
+
+계획 단계의 전제가 틀렸다. "호스티드 리뷰어 없음" 이라고 적었고 근거는 Actions 비활성·브랜치
+보호 없음·ruleset 없음이었다. 그 세 사실 자체는 여전히 맞지만 **GitHub App 리뷰는 그 셋 중
+어디에도 해당하지 않는다.** 이 저장소에는 Devin Review 와 Codex 코드리뷰가 둘 다 설치되어 있고
+PR #1 에서 실제로 돌았다.
+
+| 관측 | 값 |
+| -- | -- |
+| Actions 워크플로 check-runs | `total_count: 0`. Actions 가 꺼져 있고 활성 워크플로가 없으므로 예상대로다 |
+| commit status | `state: success`, 1건. `Devin Review` / `success` / `Completed analysis in 4m 1s` |
+| 제출된 리뷰 | `chatgpt-codex-connector[bot]` COMMENTED, `devin-ai-integration[bot]` COMMENTED |
+| 인라인 리뷰 코멘트 | 5건. Codex 2건(P1·P2), Devin 3건(bug 1 · analysis 2) |
+
+구분해서 읽어야 한다. **워크플로 검사는 0건이고 앞으로도 0건이다.** 그것과 별개로 App 리뷰는
+붙는다. 그래서 "빈 checks 를 통과로 읽지 않는다" 는 여전히 유효하지만 "호스티드 리뷰가 없다" 는
+틀렸다. 앞으로 이 저장소의 PR 에는 자동 리뷰가 붙는 것을 전제한다. 독립 리뷰어 subagent 는
+대체물이 아니라 추가 층으로 남는다.
+
+여전히 구현되지 않은 것은 다른 층이다. LINA Check 가 그 리뷰 결과를 **자기 관리 흐름으로 읽어
+들이는 것** 은 없다. `POLICY.md:5` 가 말하는 미구현은 이쪽이고, App 이 PR 에 리뷰를 남기는 능력을
+부정한 것이 아니다. 이 과제는 외부 리뷰 앱을 설치하지도, 새 외부 리뷰를 요청하지도 않았다.
+설치는 이미 되어 있었고 리뷰는 PR 개설로 자동 발생했다.
+
+### JUN-77 표본 확보에 주는 영향
+
+`022_external_review_signal_contract.md` 가 요구한 네 표본(완료·미해결·낡은 revision·접근 불가)을
+이제 이 저장소의 PR 로 모을 수 있다. 031 표의 "Devin·Codex 실제 신호와 완료 표시" 항목은 확인
+주체가 설치 운영자이고 단계가 JUN-77 수용 시험인데, 관측 장소가 확보됐다는 사실을 함께 적는다.
+이번 PR 이 이미 첫 표본을 냈다. 봇 로그인은 각각 `chatgpt-codex-connector[bot]` 과
+`devin-ai-integration[bot]` 이고, Devin 은 commit status 로 Codex 는 PR 리뷰로 신호를 낸다.
+두 제공자의 앱 숫자 ID 는 여기서 읽지 않았으므로 031 의 해당 항목은 열린 채로 둔다.
 
 ## push 와 PR
 
@@ -100,4 +129,3 @@ author·committer 가 `작성자의 비공개 주소` 이고, 이미 원격에 �
 - push 와 PR 개설. 위 이메일 선택을 기다린다.
 - 머지는 코디네이터가 한다. 이 태스크는 머지하지 않는다.
 - JUN-135 는 Done 으로 올리지 않는다. 이 브랜치는 Part A 만 인도한다.
-

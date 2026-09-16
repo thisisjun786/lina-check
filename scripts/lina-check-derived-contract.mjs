@@ -41,6 +41,21 @@ export const GUARD_SHA256 = "3ca3cf5b1fa79fa18b5f492e70415ccb19d44fbfcbed5fe099a
 /** GitHub reads both spellings, so parking only the .yml form proves nothing. */
 export const WORKFLOW_EXTENSIONS = Object.freeze([".yml", ".yaml"]);
 
+/**
+ * Decide whether built output may be trusted for a restored-test run.
+ *
+ * Existence is not freshness. The restored tests import from dist/, so a dist/
+ * built before the last src/ edit would let them validate superseded code and
+ * still report success. Kept pure so the self-test can cover every disposition
+ * without touching the filesystem.
+ */
+export function distDisposition({ present, srcNewestMs, distNewestMs }) {
+  if (!present) return "absent";
+  if (!Number.isFinite(distNewestMs)) return "empty";
+  if (!Number.isFinite(srcNewestMs)) return "unknown";
+  return srcNewestMs > distNewestMs ? "stale" : "fresh";
+}
+
 /** Upstream tests restored for execution: hermetic and compatible with the parked profile. */
 export const SAFE_TESTS = Object.freeze([
   "test/apply-close-policy-guards.test.ts",
