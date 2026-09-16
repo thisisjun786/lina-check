@@ -2,7 +2,7 @@
 
 This is a published-source, inactive, commit-pinned ClawSweeper-based successor. Read README.md and POLICY.md first. Original upstream AGENTS.md is preserved at docs/upstream/AGENTS.md for provenance, not as this fork's operating policy. Other inherited docs/skills/configs describe upstream's active system; their operational examples are reference only.
 
-Preserve src/, dashboard/, test/, config/ and lockfile bytes unless the current task explicitly implements an adaptation. Reuse ClawSweeper's existing maintenance architecture. Devin and Codex are the intended code-review providers. Oracle is unimplemented, disabled, and intended for a separately authorized Jun-only manual path.
+Preserve src/, dashboard/, test/, config/ and lockfile bytes unless the current task explicitly implements an adaptation. Reuse ClawSweeper's existing maintenance architecture. Devin and Codex are the intended code-review providers. Oracle is unimplemented, disabled, and intended for a manual path restricted to users explicitly authorized by the installation operator. Contributing a PR or comment grants no invocation permission.
 
 Automation is parked: no active workflow YAML, no operational package commands, no configured App/state/credentials. Do not reactivate them or run upstream source directly without explicit authorization. Package guards prevent accidental invocation; they are not a sandbox. Do not change Git remotes, push, publish, merge or deploy as part of a local scaffold edit.
 

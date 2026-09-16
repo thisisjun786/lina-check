@@ -119,7 +119,11 @@
     "crabbox:stop": "node scripts/scaffold-disabled.mjs crabbox:stop",
     "crabbox:warmup": "node scripts/scaffold-disabled.mjs crabbox:warmup",
     "repair:pr-intake": "node scripts/scaffold-disabled.mjs repair:pr-intake",
-    "check:scaffold": "node scripts/check-scaffold.mjs"
+    "check:scaffold": "node scripts/check-scaffold.mjs",
+    "lina:test-safe": "node scripts/lina-check-safe-tests.mjs run",
+    "lina:test-safe:preview": "node scripts/lina-check-safe-tests.mjs preview",
+    "lina:boundary-probe": "node scripts/lina-check-boundary-probe.mjs",
+    "lina:contract-selftest": "node scripts/lina-check-contract-selftest.mjs"
   },
   "dependencies": {
     "yaml": "^2.9.0",

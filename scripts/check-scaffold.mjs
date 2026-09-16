@@ -5,6 +5,12 @@ import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  SAFE_TESTS,
+  TRIPWIRE_ENV,
+  assertDerivedContract,
+} from "./lina-check-derived-contract.mjs";
+
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const pin = "1ed7bd4e13fb03334798e4d027ba3383ac9e5f01";
 const tree = "1e3d7197e537f91f821a5d6780a527e6d2a1975d";
@@ -61,7 +67,11 @@ assert.deepEqual(config.upstream, {
 assert.equal(config.automationEnabled, false);
 assert.equal(config.integrationsImplemented, false);
 assert.deepEqual(config.codeReviewProviders, ["Devin", "Codex"]);
-assert.deepEqual(config.oracle, { enabled: false, intendedCaller: "Jun", implemented: false });
+assert.deepEqual(config.oracle, {
+  enabled: false,
+  intendedCaller: "installation-authorized-user",
+  implemented: false,
+});
 assert.deepEqual(
   config.allowedScripts,
   Object.fromEntries(allowed.map((name) => [name, upstream.scripts[name]])),
@@ -83,13 +93,15 @@ expectedPackage.scripts = Object.fromEntries(
   ]),
 );
 expectedPackage.scripts["check:scaffold"] = "node scripts/check-scaffold.mjs";
+for (const [name, entry] of Object.entries(config.derived.scripts))
+  expectedPackage.scripts[name] = entry.command;
 assert.deepEqual(pkg, expectedPackage, "Package dependencies or script boundaries changed");
 assert(
   !readdirSync(join(root, ".github/workflows")).some((name) => /\.ya?ml$/i.test(name)),
   "Active workflow found",
 );
 
-const additions = new Set([
+const coreAdditions = new Set([
   "POLICY.md",
   "config/lina-check-scaffold.json",
   "scripts/scaffold-disabled.mjs",
@@ -97,6 +109,7 @@ const additions = new Set([
   ...docs.map((name) => `docs/upstream/${name}`),
   ...workflows.map((path) => `${path}.disabled`),
 ]);
+const additions = new Set([...coreAdditions, ...Object.keys(config.derived.files)]);
 const baseline = new Set(entries.map(({ path }) => path));
 for (const entry of entries) {
   if (["package.json", ".gitignore"].includes(entry.path)) continue;
@@ -123,12 +136,48 @@ assert.equal(
 );
 for (const path of additions)
   assert(existsSync(join(root, path)), `Missing scaffold file: ${path}`);
-for (const path of git("ls-files", "-c", "-o", "--exclude-standard", "-z")
+const present = git("ls-files", "-c", "-o", "--exclude-standard", "-z")
   .toString()
   .split("\0")
-  .filter(Boolean)) {
+  .filter(Boolean);
+for (const path of present)
   assert(baseline.has(path) || additions.has(path), `Unexpected source addition: ${path}`);
-}
+
+// Derived-change declaration. The permitted sets are literals owned by the
+// contract module; the configuration only records why each entry is allowed.
+const derivedSummary = assertDerivedContract({
+  config,
+  upstreamScripts: upstream.scripts,
+  packageScripts: pkg.scripts,
+  baselinePaths: baseline,
+  presentPaths: new Set(present),
+  coreAdditions,
+  docs,
+  readFile: (path) => read(path).toString(),
+  isRegularFile: (path) => lstatSync(join(root, path)).isFile(),
+});
+
+// Observe the preview at the test-launch boundary rather than trusting its own
+// report: the tripwire makes any spawn from the runner fail loudly, so a
+// successful preview means the boundary was never reached.
+const preview = spawnSync(
+  process.execPath,
+  [join(root, "scripts/lina-check-safe-tests.mjs"), "preview", "--json"],
+  {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 30000,
+    env: { ...process.env, [TRIPWIRE_ENV]: "1" },
+  },
+);
+assert.equal(preview.status, 0, "Safe-test preview failed under the spawn tripwire");
+const previewReport = JSON.parse(preview.stdout);
+assert.equal(previewReport.executed, false, "Safe-test preview claimed execution");
+assert.deepEqual(
+  previewReport.files,
+  [...SAFE_TESTS],
+  "Safe-test preview targets differ from the restored-test literal",
+);
 for (const name of Object.keys(blocked)) {
   const result = spawnSync(
     process.execPath,
@@ -143,4 +192,7 @@ console.log(
 );
 console.log(
   "Dormant scaffold only; live integrations, upstream full tests and direct-source isolation are not verified.",
+);
+console.log(
+  `Derived declarations validated: ${derivedSummary.files} files; ${derivedSummary.scripts} scripts; ${derivedSummary.safeTests} restored upstream tests; ${derivedSummary.probes} boundary-probe targets; preview observed non-executing under ${TRIPWIRE_ENV}.`,
 );
