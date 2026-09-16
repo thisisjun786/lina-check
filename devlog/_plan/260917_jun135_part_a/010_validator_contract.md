@@ -36,7 +36,7 @@ upstream pin·tree·바이트·모드 검사, `.gitignore` 꼬리, 가드 프로
 
 ## 수용
 
-`corepack pnpm run check:scaffold` exit 0. 그리고 `git diff f611316d -- scripts/check-scaffold.mjs`
+`corepack pnpm run check:scaffold` exit 0. 그리고 `git diff 1f36c10e -- scripts/check-scaffold.mjs`
 에서 단정 호출 수가 23 보다 크고, 기존 23건의 동작이 남아 있다.
 
 ## 결과

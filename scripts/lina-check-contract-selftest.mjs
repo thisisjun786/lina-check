@@ -43,7 +43,7 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
-const BASELINE_COMMIT = "f611316dab341b978a1ef073ee4f68aa63c02059";
+const BASELINE_COMMIT = "1f36c10eeea8d3c36c477e7f91e0d405781556b3";
 const BASELINE_ASSERTION_CALLS = 23;
 const ASSERTION_CALL = /^\s*assert(\.|\()/;
 const VALIDATOR = "scripts/check-scaffold.mjs";

@@ -51,7 +51,7 @@ tripwire 를 켠 상태에서 미리보기는 exit 0 이고, 같은 tripwire 에
 `LINA_CHECK_SPAWN_TRIPWIRE` 를 이름으로 든다. 두 대조를 `lina:contract-selftest` 이 함께 수행한다.
 
 복원은 upstream 테스트 바이트를 바꾼 것이 아니다. 바뀌지 않은 바이트를 새로 호출한 것이다.
-`git diff --quiet f611316d HEAD -- src dashboard test pnpm-lock.yaml` exit 0 이 그 근거다.
+`git diff --quiet 1f36c10e HEAD -- src dashboard test pnpm-lock.yaml` exit 0 이 그 근거다.
 
 상태별 대조와 측정 방법의 한계는 `060` 에 있다. 원본 기준의 종료 코드 일부는 파이프라인 뒤에서
 읽혀 신뢰할 수 없고, 그 사실을 `060` 이 항목마다 밝힌다.

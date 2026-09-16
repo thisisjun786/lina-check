@@ -4,7 +4,7 @@
 
 | 상태 | 무엇 |
 | -- | -- |
-| 원본 기준 | 깨끗한 `f611316d`. 이 과제의 파생 변경 전 |
+| 원본 기준 | 깨끗한 `1f36c10e`. 이 과제의 파생 변경 전 |
 | 중간 | 선언되지 않은 `devlog/` 파일이 있고 아직 선언 기능이 없던 상태 |
 | 파생 변경 후 | `44524653`. wp3 시점에 측정한 SHA |
 
@@ -25,7 +25,7 @@
 
 파생 상태에서 다시 돌린 결과가 원본 기준의 종료 코드를 증명하지는 않는다. 두 상태는 다른 트리다.
 
-## 원본 기준 (`f611316d`, 변경 전)
+## 원본 기준 (`1f36c10e`, 변경 전)
 
 | 항목 | 결과 | 방법 |
 | -- | -- | -- |
@@ -75,9 +75,9 @@ exit 1 을 확인했다(dispatch `jun135-audit-wp1-r2`, `jun135-audit-records-2`
 `lina:*` 네 명령은 원본 기준에 존재하지 않았으므로 두 상태를 같은 표로 비교할 수 없다.
 그래서 위를 따로 적었다.
 
-부수 확인. `git diff --quiet f611316d HEAD -- src dashboard test pnpm-lock.yaml` exit 0.
+부수 확인. `git diff --quiet 1f36c10e HEAD -- src dashboard test pnpm-lock.yaml` exit 0.
 `rg -c '^\s*assert(\.|\()' scripts/check-scaffold.mjs` 는 26, 삭제된 단정 줄은 0,
-`git diff --name-only f611316d -- src dashboard test pnpm-lock.yaml .github` 는 0줄이다.
+`git diff --name-only 1f36c10e -- src dashboard test pnpm-lock.yaml .github` 는 0줄이다.
 
 ## 이 표가 주장하지 않는 것
 

@@ -16,12 +16,12 @@
 | -- | -- |
 | worktree | `/home/jun/code-worktrees/lina-check/jun-135-fork-baseline` |
 | 브랜치 | `codex/jun-135-fork-baseline` |
-| baseline commit | `f611316dab341b978a1ef073ee4f68aa63c02059` |
+| baseline commit | `1f36c10eeea8d3c36c477e7f91e0d405781556b3` |
 | upstream pin | `1ed7bd4e13fb03334798e4d027ba3383ac9e5f01` (tree `1e3d7197`) |
 | origin/main | `c80ecac866cc12608442a0be0b1de4e24f7b1e13` |
 | Node / pnpm | 24.20.0 / 12.4.1 (Corepack) |
 
-`f611316d` 는 작업 checkout 의 HEAD 이고 `c80ecac8` 의 자손이다. 베이스를 다시 만들지 않는다.
+`1f36c10e` 는 작업 checkout 의 HEAD 이고 `c80ecac8` 의 자손이다. 베이스를 다시 만들지 않는다.
 
 ## 루프 사양 (HOTL)
 
@@ -74,7 +74,7 @@
 ## 수용 기준과 검증 명령
 
 각 명령은 계획에 적기 전에 실제로 돌렸다(PLAN-VERIFIER-REAL-01). 아래 exit code 는 baseline
-`f611316d` 에서 관측한 값이다.
+`1f36c10e` 에서 관측한 값이다.
 
 | # | 수용 기준 | 검증 명령 | baseline exit | 변경 대상을 읽는가 |
 | -- | -- | -- | -- | -- |
@@ -135,7 +135,7 @@ read-only architect 를 CXC 디스패치로 불렀다. handle `01a0ab08-cc3f-788
 
 ## 원본 기준 측정치
 
-baseline `f611316d`, 변경 전 상태에서 관측했다.
+baseline `1f36c10e`, 변경 전 상태에서 관측했다.
 
 - `check:scaffold` exit 0 — "upstream 1ed7bd4e...; 1646 original entries checked; 35 workflows parked; 104 commands blocked"
 - `build:all` exit 0, `lint` exit 0, `install --frozen-lockfile --ignore-scripts` exit 0
@@ -236,7 +236,7 @@ v1 의 baseline 측정은 `명령 | tail; echo $?` 형태였고 그것은 `tail`
 
 1~8 은 v1 과 같다. 아래를 추가한다.
 
-9. `git diff f611316d -- scripts/check-scaffold.mjs` 가 `additions` 리터럴 교체를 제외한 어떤
+9. `git diff 1f36c10e -- scripts/check-scaffold.mjs` 가 `additions` 리터럴 교체를 제외한 어떤
    `assert` 줄도 삭제하지 않는다. baseline assert 수는 24 이고 변경 후에는 그보다 많아야 한다.
 10. `corepack pnpm run lina:contract-selftest` 가 C1~C8 거부 경로 전부에서 거부를 관측하고 exit 0.
 11. tripwire 관측 2건: `LINA_CHECK_SPAWN_TRIPWIRE=1` 에서 미리보기 exit 0, `run` 은 0 이 아님.
@@ -298,12 +298,12 @@ v1 의 baseline 측정은 `명령 | tail; echo $?` 형태였고 그것은 `tail`
   13개 중 하나를 제외 대상으로 치환한 선언을 만들어 거부되는지 확인한다.
 
 **정정 2 · assert 기준 수가 틀렸다.** `grep -c assert` 는 `import` 줄까지 세어 24 를 준다. 실제 단정
-호출은 23 이다. `git show f611316d:scripts/check-scaffold.mjs | rg -c '^\s*assert(\.|\()'` 가 23 이고
+호출은 23 이다. `git show 1f36c10e:scripts/check-scaffold.mjs | rg -c '^\s*assert(\.|\()'` 가 23 이고
 `rg -c 'assert'` 가 24 다. 수용 기준 9 를 아래로 대체한다.
 
-- **수용 기준 9(정정)** baseline `f611316d` 의 단정 호출 수는 `^\s*assert(\.|\()` 기준 23 이다.
+- **수용 기준 9(정정)** baseline `1f36c10e` 의 단정 호출 수는 `^\s*assert(\.|\()` 기준 23 이다.
   변경 후 그 수는 23 보다 커야 한다. 그리고 개수만으로는 부족하므로,
-  `git diff f611316d -- scripts/check-scaffold.mjs` 를 읽어 기존 단정 23건 각각의 **동작**이
+  `git diff 1f36c10e -- scripts/check-scaffold.mjs` 를 읽어 기존 단정 23건 각각의 **동작**이
   남아 있는지 확인한다. 문자열이 남아 있는 것과 동작이 남아 있는 것은 다르다. 리뷰어가 2회전에서
   만든 23건 전수 표를 이 확인의 체크리스트로 쓴다.
 
@@ -343,7 +343,7 @@ ruleset 은 로컬 프로브의 관측 대상이 아니다. `src/` 에 해당 �
 
 | 상태 | 무엇 |
 | -- | -- |
-| 원본 기준 | 깨끗한 `f611316d`, 파생 변경 전 |
+| 원본 기준 | 깨끗한 `1f36c10e`, 파생 변경 전 |
 | 중간 | 선언되지 않은 `devlog/` 파일이 있고 아직 선언 기능이 없던 상태 |
 | 파생 변경 후 | 측정 시점의 실제 SHA. wp3 시점은 `44524653` 이다 |
 
@@ -356,7 +356,7 @@ ruleset 은 로컬 프로브의 관측 대상이 아니다. `src/` 에 해당 �
 ### D2 · 과장하지 않을 표현 (020·060)
 
 - 복원은 "upstream 테스트 바이트를 바꾼 것"이 아니라 "바뀌지 않은 바이트를 새로 호출한 것"이다.
-  근거: `git diff --quiet f611316d HEAD -- src dashboard test pnpm-lock.yaml` exit 0.
+  근거: `git diff --quiet 1f36c10e HEAD -- src dashboard test pnpm-lock.yaml` exit 0.
 - 미리보기의 "아무것도 실행하지 않는다"는 **테스트를 띄우지 않는다**는 뜻이다. 미리보기 자체는
   코드를 실행한다. 그래서 tripwire 양성 대조(`run` 이 이름을 들며 실패)와 반드시 함께 적는다.
 - `assertionCalls=23->26` 은 개수와 줄의 보존을 측정한다. 모든 단정의 **동작** 보존을 측정하지 않는다.

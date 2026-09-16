@@ -39,7 +39,7 @@ tripwire 대조 2건.
 - 양성 대조: `LINA_CHECK_SPAWN_TRIPWIRE=1` + `run` → 실패, 진단
   `[lina-check-safe-tests] LINA_CHECK_SPAWN_TRIPWIRE tripped: launchTests() was reached, so this was not a preview`
 
-보존 확인: `git diff --name-only f611316d HEAD -- src dashboard test config/target-repositories.json pnpm-lock.yaml .github` 0줄.
+보존 확인: `git diff --name-only 1f36c10e HEAD -- src dashboard test config/target-repositories.json pnpm-lock.yaml .github` 0줄.
 
 ## hosted check 상황
 
@@ -63,7 +63,7 @@ remote: error: GH007: Your push would publish a private email address.
  ! [remote rejected] codex/jun-135-fork-baseline (push declined due to email privacy restrictions)
 ```
 
-원인은 커밋 신원이다. 이 브랜치의 로컬 커밋 전부와 인계 baseline `f611316d` 의
+원인은 커밋 신원이다. 이 브랜치의 로컬 커밋 전부와 인계 baseline `1f36c10e` 의
 author·committer 가 `작성자의 비공개 주소` 이고, 이미 원격에 있는 `c80ecac8` 은
 `259586770+thisisjun786@users.noreply.github.com` 이다. 계정의 이메일 비공개 보호가 앞의 주소를
 막는다.
@@ -71,7 +71,7 @@ author·committer 가 `작성자의 비공개 주소` 이고, 이미 원격에 �
 이것은 코드 문제가 아니라 계정 설정 또는 이력 재작성 선택이다. 둘 중 하나가 필요하다.
 
 1. 계정에서 이메일 비공개 보호를 끄거나 해당 주소를 공개로 바꾼다. 이력은 손대지 않는다.
-2. 로컬 커밋들의 author·committer 이메일을 noreply 형태로 재작성한다. 이 경우 `f611316d` 의
+2. 로컬 커밋들의 author·committer 이메일을 noreply 형태로 재작성한다. 이 경우 `1f36c10e` 의
    tree 는 같아도 SHA 가 바뀌므로, 이 문서군의 baseline 표기와
    `scripts/lina-check-contract-selftest.mjs` 의 `BASELINE_COMMIT` 상수를 함께 고쳐야 한다.
 
