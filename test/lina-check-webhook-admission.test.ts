@@ -879,4 +879,3 @@ nodeTest("the same maintainer command is refused without a configured installati
   assert.equal(result.accepted, false, "an unconfigured installation admits no repository");
   assert.equal(result.reason, "repository not eligible");
 });
-

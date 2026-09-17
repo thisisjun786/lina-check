@@ -749,6 +749,17 @@ function runDerivedTestCases() {
       'const load = createRequire(import.meta.url);\nconst helper = load("./helpers/command-intake-fixture.mjs");\n',
       "an assigned createRequire loader",
     ],
+    [
+      'import { createRequire as makeRequire } from "node:module";\n' +
+        "const load = makeRequire(import.meta.url);\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "a createRequire imported under another name",
+    ],
+    [
+      'import { createRequire as makeRequire } from "node:module";\n' +
+        'const helper = makeRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
+      "an aliased immediate call",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -789,13 +800,37 @@ function runDerivedTestCases() {
   assert.throws(() => assertDerivedTestContract(opaque), {
     code: "derived-test-unresolvable-require",
   });
+  // A loader that is followed as far as its binding and then handed on is the
+  // same hole one step later, so it is refused too.
+  const passedOn = base();
+  const others = passedOn.readFile;
+  passedOn.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? "const load = createRequire(import.meta.url);\nhandOff(load);\n"
+      : others(path);
+  assert.throws(() => assertDerivedTestContract(passedOn), {
+    code: "derived-test-unresolvable-require",
+  });
+  // A loader called with something this scan cannot read as a specifier.
+  const computed = base();
+  const remaining = computed.readFile;
+  computed.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? "const load = createRequire(import.meta.url);\nload(chosenHelper);\n"
+      : remaining(path);
+  assert.throws(() => assertDerivedTestContract(computed), {
+    code: "derived-test-unresolvable-require",
+  });
+  observed += 2;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
   const rest = permitted.readFile;
   permitted.readFile = (path) =>
     path === DERIVED_TESTS[0]
-      ? 'import { createRequire } from "node:module";\nconst fs = createRequire(import.meta.url)("node:fs");\n'
+      ? 'import { createRequire, syncBuiltinESMExports } from "node:module";\n' +
+        'const nodeFs = createRequire(import.meta.url)("node:fs") as { readFileSync: unknown };\n' +
+        "nodeFs.readFileSync = () => 1;\nsyncBuiltinESMExports();\n"
       : rest(path);
   assertDerivedTestContract(permitted);
   observed += 2;

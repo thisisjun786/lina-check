@@ -690,47 +690,105 @@ export function resolveRelativeImport(fromPath, specifier) {
  */
 const IMPORT_SPECIFIER = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
 const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']/g;
-const CREATE_REQUIRE_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*createRequire\s*\(/g;
-const CREATE_REQUIRE_USE = /\bcreateRequire\b/g;
 const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
+const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']node:module["']/g;
+const escapeRegExp = (value) => value.replace(/[.*+?^=!:!{}()|[\]/\\$]/g, "\\$&");
 
-/**
- * Specifiers loaded through a require function held in a variable.
- *
- * Matching only the immediate createRequire(...)(...) call left the ordinary
- * two-step spelling invisible, which is the same hole one level further along.
- * Bindings are collected first, then calls of those bindings are read.
- */
-function aliasedRequireSpecifiers(source) {
-  const specifiers = [];
-  for (const binding of source.matchAll(CREATE_REQUIRE_BINDING)) {
-    const name = binding[1];
-    const calls = new RegExp("\\b" + name + "\\s*\\(\\s*[\"']([^\"']+)[\"']", "g");
-    for (const call of source.matchAll(calls)) specifiers.push(call[1]);
+/** Index just past the parenthesis group that starts at open. */
+function afterGroup(source, open) {
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === "(") depth += 1;
+    else if (source[index] === ")") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+    }
   }
-  return specifiers;
+  return -1;
 }
 
 /**
- * Refuse a require function this scan cannot follow.
+ * Names that stand for createRequire in this file, import alias included.
  *
- * Tracking bindings covers the two spellings that actually occur; it cannot
- * follow a loader passed as an argument, reassigned, or returned. Rather than
- * let that read as "nothing found", every createRequire use must be either an
- * immediate call or a plain binding declaration, and anything else is refused by
- * name. A scan that cannot see a load must not be mistaken for a clean one.
+ * An alias is not cosmetic here: importing it under another name defeated every
+ * pattern keyed to the literal spelling, which is the same bypass one rename
+ * further along.
  */
-function assertRequireFormsResolvable(path, source) {
-  for (const use of source.matchAll(CREATE_REQUIRE_USE)) {
-    const before = source.slice(Math.max(0, use.index - 80), use.index);
-    const after = source.slice(use.index);
-    const isBinding = /(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*$/.test(before);
-    const isImmediate = /^createRequire\s*\([^)]*\)\s*\(/.test(after);
-    // The import that brings the name in is not a use of it.
-    const isImport = /import[^;]*\{[^}]*$/.test(before);
-    if (!isBinding && !isImmediate && !isImport)
-      fail("derived-test-unresolvable-require", path + ": createRequire used in an unfollowable form");
+export function createRequireNames(source) {
+  const names = new Set(["createRequire"]);
+  for (const statement of source.matchAll(MODULE_NAMED_IMPORT))
+    for (const specifier of statement[1].split(",")) {
+      const parts = specifier.trim().split(/\s+as\s+/);
+      if (parts[0].trim() === "createRequire") names.add((parts[1] ?? parts[0]).trim());
+    }
+  return names;
+}
+
+/**
+ * Every CommonJS specifier this file loads through createRequire, and every use
+ * of it this scan cannot follow.
+ *
+ * Three forms are followed: the immediate call, a loader held in a binding and
+ * called with a literal, and either of those reached through an import alias.
+ * Anything else — a loader handed to another function, called with a computed
+ * specifier, reassigned — is reported as unfollowable rather than counted as
+ * nothing found. A scan that cannot see a load must not read as a clean one.
+ */
+export function analyseRequireUse(source) {
+  const specifiers = [];
+  const unfollowable = [];
+  const loaders = new Set();
+  for (const name of createRequireNames(source)) {
+    const pattern = new RegExp("\\b" + escapeRegExp(name) + "\\b", "g");
+    for (const use of source.matchAll(pattern)) {
+      const before = source.slice(Math.max(0, use.index - 120), use.index);
+      // The import specifier that brings the name in is not a use of it.
+      if (/import[^;]*\{[^}]*$/.test(before)) continue;
+      const rest = source.slice(use.index + name.length);
+      if (!/^\s*\(/.test(rest)) {
+        unfollowable.push(name);
+        continue;
+      }
+      const open = use.index + name.length + rest.indexOf("(");
+      const close = afterGroup(source, open);
+      if (close === -1) {
+        unfollowable.push(name);
+        continue;
+      }
+      const after = source.slice(close);
+      const immediate = /^\s*\(\s*(["'])([^"']*)\1/.exec(after);
+      if (immediate) {
+        specifiers.push(immediate[2]);
+        continue;
+      }
+      if (/^\s*\(/.test(after)) {
+        // Called, but with something this scan cannot read as a specifier.
+        unfollowable.push(name);
+        continue;
+      }
+      const declared = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*$/.exec(before);
+      if (!declared) {
+        unfollowable.push(name);
+        continue;
+      }
+      loaders.add(declared[1]);
+    }
   }
+  for (const loader of loaders) {
+    const pattern = new RegExp("\\b" + escapeRegExp(loader) + "\\b", "g");
+    for (const use of source.matchAll(pattern)) {
+      const before = source.slice(Math.max(0, use.index - 60), use.index);
+      if (/(?:const|let|var)\s+$/.test(before)) continue;
+      const rest = source.slice(use.index + loader.length);
+      const literal = /^\s*\(\s*(["'])([^"']*)\1\s*\)/.exec(rest);
+      if (literal) {
+        specifiers.push(literal[2]);
+        continue;
+      }
+      unfollowable.push(loader);
+    }
+  }
+  return { specifiers, unfollowable };
 }
 
 /**
@@ -770,8 +828,13 @@ export function derivedTestClosure(entry, readFile) {
         queue.push(resolved);
       }
     }
-    assertRequireFormsResolvable(path, source);
-    for (const specifier of aliasedRequireSpecifiers(source)) {
+    const required = analyseRequireUse(source);
+    if (required.unfollowable.length > 0)
+      fail(
+        "derived-test-unresolvable-require",
+        path + ": " + [...new Set(required.unfollowable)].join(", ") + " used in an unfollowable form",
+      );
+    for (const specifier of required.specifiers) {
       const resolved = resolveRelativeImport(path, specifier);
       if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
       if (!FOLLOWABLE.test(resolved)) continue;
