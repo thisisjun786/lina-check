@@ -285,6 +285,12 @@ export function launchTests(paths, concurrency, options = {}) {
  */
 export function main(argv, deps = {}) {
   const probeDist = deps.distState ?? distState;
+  // Injectable so the self-test can drive the launch sequence itself. The
+  // ordering rule this function has to keep — reap a timed-out group before the
+  // next launch, and before any cleanup — is not observable from outside.
+  const launch = deps.launchTests ?? launchTests;
+  const fixture = deps.makeFixture ?? makeUpstreamFixture;
+  const reap = deps.reap ?? ((outcome) => reapLaunchGroup(outcome, (pid, signal) => process.kill(pid, signal)));
   const mode = argv[0];
   if (mode !== "run" && mode !== "preview") {
     process.stderr.write(USAGE + "\n");
@@ -373,26 +379,15 @@ export function main(argv, deps = {}) {
   // That is the point of them: the fixture lane exists for upstream assertions
   // about upstream bytes, and these assert what this fork actually does.
   const rootPaths = [...paths.filter((value) => !UPSTREAM_FIXTURE_TESTS[value]), ...derived.paths];
-  const outcomes = [];
-  if (rootPaths.length > 0) outcomes.push(launchTests(rootPaths, concurrency));
-  for (const name of fixtureNames) {
-    const directory = makeUpstreamFixture(name, declaration.pin);
-    process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
-    try {
-      // Absolute path: the test resolves imports relative to its own file, while
-      // its two direct reads follow the working directory into the fixture.
-      outcomes.push(launchTests([join(root, name)], 1, { cwd: directory }));
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  }
-  for (const outcome of outcomes) {
+  // Judge each launch the moment it returns. Collecting every outcome first and
+  // judging afterwards left a real hole: the first failure returned, so a later
+  // launch stopped at the bound was never reaped and its descendants outlived
+  // the lane. A fixture cleanup that threw skipped the same step.
+  const failures = [];
+  const settle = (outcome) => {
     const verdict = describeLaunchOutcome(outcome, LANE_TIMEOUT_MS);
-    if (verdict.kind === "ok") continue;
-    if (verdict.kind === "unstarted")
-      throw new Error("could not start the node test runner", { cause: outcome.error });
     if (verdict.kind === "timeout") {
-      const reaped = reapLaunchGroup(outcome, (pid, signal) => process.kill(pid, signal));
+      const reaped = reap(outcome);
       process.stderr.write(
         LABEL +
           " reaping the launch group: " +
@@ -400,10 +395,27 @@ export function main(argv, deps = {}) {
           "\n",
       );
     }
-    process.stderr.write(LABEL + " " + verdict.detail + "\n");
-    return verdict.exitCode;
+    if (verdict.kind !== "ok") failures.push({ verdict, outcome });
+    return verdict;
+  };
+  if (rootPaths.length > 0) settle(launch(rootPaths, concurrency));
+  for (const name of fixtureNames) {
+    const directory = fixture(name, declaration.pin);
+    process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
+    try {
+      // Absolute path: the test resolves imports relative to its own file, while
+      // its declared reads follow the working directory into the fixture.
+      settle(launch([join(root, name)], 1, { cwd: directory }));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
-  return 0;
+  const first = failures[0];
+  if (first === undefined) return 0;
+  if (first.verdict.kind === "unstarted")
+    throw new Error("could not start the node test runner", { cause: first.outcome.error });
+  process.stderr.write(LABEL + " " + first.verdict.detail + "\n");
+  return first.verdict.exitCode;
 }
 
 /**

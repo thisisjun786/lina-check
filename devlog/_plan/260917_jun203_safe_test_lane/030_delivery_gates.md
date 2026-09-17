@@ -20,8 +20,8 @@
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
 | 2 | `corepack pnpm run build:all` | 0 | 0.97 | tsc 3개 프로젝트 무오류 |
 | 3 | `corepack pnpm run check:scaffold` | 0 | 2.18 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.44 | oxlint 4개 스크립트 전부 Done |
-| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.26 | `rejected=30 helpers=18 laneShape=22 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 4 | `corepack pnpm run lint` | 0 | 0.42 | oxlint 4개 스크립트 전부 Done |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.25 | `rejected=30 helpers=18 laneShape=26 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
 | 6 | `corepack pnpm run lina:test-safe` | 0 | 134.97 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
@@ -118,6 +118,12 @@ PR 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다. 둘 다 `95dd
 | 11 | Devin(bug)·Codex(P2), 같은 건 | 시간 초과가 러너만 죽인다. `spawnSync` 의 timeout 신호는 자기가 띄운 프로세스에만 가고, 이 레인에는 node·git·curl·로컬 서버를 띄우는 테스트가 있으므로 자손이 포트를 쥔 채 남을 수 있다 | 실행을 자기 프로세스 그룹으로 띄우고(`detached: true`), 시간 초과로 판정되면 `reapLaunchGroup` 이 그룹 전체에 SIGKILL 을 보낸다. kill 을 주입받는 순수 함수라 자기시험이 모든 갈래를 확인한다. 대가는 적어 뒀다: 대화형 Ctrl-C 가 더 이상 테스트에 닿지 않는다 | `laneShape` 14 → 22 |
 | 12 | Devin(analysis) | README 가 아직 13개 레인이라고 안내한다 | 206개로 고치고, 그중 23개가 고정 pin 바이트 위에서 도는 사실을 함께 적었다 | `README.md` |
 | 13 | Devin(analysis) | 복원한 테스트가 임시 디렉터리를 정리하지 않고 남긴다 | 이미 이 문서의 실행 경계 관측에 적혀 있던 사실이다. 보이는 자리에서도 보이도록 해당 테스트의 선언 사유에 옮겨 적었다 | `config/lina-check-scaffold.json` 의 `test/repair/gitcrawl-cluster-history.test.ts` |
+
+4라운드 감사가 그 수정의 순서 결함을 잡았다.
+
+| # | 출처 | 지적 | 처리 | 확인 |
+| -- | -- | -- | -- | -- |
+| 14 | 4라운드 (blocker) | 러너가 모든 실행을 마친 뒤에 판정하고 첫 실패에서 반환한다. 그래서 앞에서 실패가 나면 뒤에서 시간 초과로 멈춘 실행은 수확되지 않고 자손이 레인보다 오래 산다. 픽스처 정리가 예외를 내도 같은 자리를 건너뛴다 | 판정을 실행 직후로 옮겼다. 시간 초과면 그 자리에서 그룹을 수확하고, 다음 실행과 정리보다 먼저 한다. 첫 실패가 종료 코드를 정하는 동작은 그대로다 | `laneShape` 22 → 26. 자기시험이 실제 순서를 주입 실행으로 몰아 본다. 앞선 실패 뒤의 시간 초과가 수확되고, 남은 실행이 계속되고, 픽스처 디렉터리가 전부 지워지는지 확인한다 |
 
 감사가 통과로 확인한 것도 적는다. 가드 완화 없음(`allowedScripts` 동일, 제품 코드·워크플로·가드
 바이트 불변), 기존 거부 경로 약화 없음, 실패하는 레인이 exit 0 으로 새는 경로 없음, 변경한 네

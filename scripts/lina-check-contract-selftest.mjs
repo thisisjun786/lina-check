@@ -21,7 +21,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -377,6 +378,46 @@ function runLaneShapeCases() {
   });
   assert.deepEqual(failing, { reaped: false, reason: "ESRCH" });
   observed += 2;
+
+  // Ordering, which is the part reapLaunchGroup cannot check about itself. The
+  // first version judged every launch after all of them had run and returned on
+  // the first failure, so a later launch stopped at the bound kept its
+  // descendants. Drive the real sequence with an early failure in front of a
+  // timeout and watch for the reap.
+  const boundedOut = {
+    pid: 5150,
+    status: null,
+    signal: "SIGTERM",
+    error: Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" }),
+  };
+  const reaped = [];
+  const launched = [];
+  const directories = [];
+  const exitCode = runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: (paths) => {
+      launched.push(paths.length);
+      // The root batch fails first; the first fixture launch then times out.
+      if (launched.length === 1) return { pid: 4141, status: 3 };
+      if (launched.length === 2) return boundedOut;
+      return { pid: 4242, status: 0 };
+    },
+    makeFixture: () => {
+      const directory = mkdtempSync(join(tmpdir(), "lina-check-selftest-"));
+      directories.push(directory);
+      return directory;
+    },
+    reap: (outcome) => {
+      reaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(exitCode, 3, "the first failure still decides the exit code");
+  assert.deepEqual(reaped, [boundedOut], "a timeout after an earlier failure must still be reaped");
+  assert.ok(launched.length > 2, "an earlier failure must not stop the remaining launches");
+  for (const directory of directories)
+    assert.equal(existsSync(directory), false, "every fixture directory must be removed");
+  observed += 4;
   return observed;
 }
 
