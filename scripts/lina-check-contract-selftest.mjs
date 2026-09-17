@@ -797,6 +797,11 @@ function runDerivedTestCases() {
         'const helper = load("./helpers/command-intake-fixture.mjs");\n',
       "createRequire reached through a default import",
     ],
+    [
+      "const load = require;\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "the ambient require under another name",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -870,7 +875,25 @@ function runDerivedTestCases() {
   assert.throws(() => assertDerivedTestContract(untracked), {
     code: "derived-test-unresolvable-require",
   });
-  observed += 3;
+  // The ambient require handed to something else is the same hole as an
+  // assigned createRequire loader, one function earlier.
+  const handedRequire = base();
+  const others3 = handedRequire.readFile;
+  handedRequire.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? "handOff(require);\n" : others3(path);
+  assert.throws(() => assertDerivedTestContract(handedRequire), {
+    code: "derived-test-unresolvable-require",
+  });
+  // ...and the word in prose is not a use of it. Without this the rule would
+  // refuse any comment that happens to contain the word.
+  const prose = base();
+  const others4 = prose.readFile;
+  prose.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? "// these cases require a configured installation\nconst value = 1;\n"
+      : others4(path);
+  assertDerivedTestContract(prose);
+  observed += 5;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

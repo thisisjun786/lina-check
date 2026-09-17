@@ -703,6 +703,71 @@ const MODULE_NAMESPACE_IMPORT =
 const MODULE_DEFAULT_IMPORT =
   /import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["'](?:node:)?module["']/g;
 /**
+ * The ambient CommonJS require is itself a loader that can be renamed:
+ * const load = require; load("./helper"). Following only require("./x") reads
+ * the alias as an ordinary assignment and the load disappears.
+ */
+const REQUIRE_ALIAS_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*(?![\s]*\()/g;
+const AMBIENT_REQUIRE_USE = /\brequire\b/g;
+
+/**
+ * Source with comment and string contents blanked out, positions preserved.
+ *
+ * The ambient-require rule asks whether a mention is a call, and prose is full
+ * of the word: a comment reading "these tests require a configured
+ * installation" would otherwise be refused as an unfollowable loader. Only this
+ * rule uses it; the specifier scan needs string contents intact.
+ */
+export function codeOnly(source) {
+  let out = "";
+  let index = 0;
+  let quote = null;
+  while (index < source.length) {
+    const two = source.slice(index, index + 2);
+    const character = source[index];
+    if (quote) {
+      if (character === "\\") {
+        out += "  ";
+        index += 2;
+        continue;
+      }
+      if (character === quote) {
+        quote = null;
+        out += character;
+      } else {
+        out += character === "\n" ? "\n" : " ";
+      }
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "\u0060") {
+      quote = character;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (two === "//") {
+      while (index < source.length && source[index] !== "\n") {
+        out += " ";
+        index += 1;
+      }
+      continue;
+    }
+    if (two === "/*") {
+      while (index < source.length && source.slice(index, index + 2) !== "*/") {
+        out += source[index] === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    out += character;
+    index += 1;
+  }
+  return out;
+}
+/**
  * Candidates CommonJS resolution would try for a specifier with no extension.
  * Dropping such a specifier silently is how an extensionless helper escapes.
  */
@@ -770,6 +835,19 @@ export function analyseRequireUse(source) {
   const specifiers = [];
   const unfollowable = [];
   const loaders = new Set();
+  for (const binding of source.matchAll(REQUIRE_ALIAS_BINDING)) loaders.add(binding[1]);
+  // Every other mention of the ambient require must be a call; handing the
+  // function itself to something else is a load this scan cannot follow.
+  const code = codeOnly(source);
+  for (const use of code.matchAll(AMBIENT_REQUIRE_USE)) {
+    const before = code.slice(Math.max(0, use.index - 60), use.index);
+    const rest = code.slice(use.index + "require".length);
+    if (/^\s*\(/.test(rest)) continue;
+    if (/(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*$/.test(before)) continue;
+    if (/import[^;]*\{[^}]*$/.test(before)) continue;
+    if (/\.\s*$/.test(before)) continue;
+    unfollowable.push("require");
+  }
   const names = [...createRequireNames(source)];
   // Longest first: a dotted name contains the bare one, and matching the bare
   // one inside it would read a namespace call as an untracked use.
