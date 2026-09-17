@@ -59,6 +59,7 @@ import {
   classifyBuildPair,
   describeLaunchOutcome,
   reapLaunchGroup,
+  interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 
@@ -379,6 +380,16 @@ function runLaneShapeCases() {
   assert.deepEqual(failing, { reaped: false, reason: "ESRCH" });
   observed += 2;
 
+  // Windows has no signalable process group, so the reap must say that rather
+  // than report a swallowed throw, which reads like "nothing left to reap".
+  const onWindows = reapLaunchGroup({ pid: 4242 }, () => {
+    throw new Error("the kill must not be attempted on win32");
+  }, "win32");
+  assert.equal(onWindows.reaped, false);
+  assert.match(onWindows.reason, /win32/);
+  assert.equal(reapLaunchGroup({ pid: 4242 }, spy, "linux").reaped, true);
+  observed += 3;
+
   // Ordering, which is the part reapLaunchGroup cannot check about itself. The
   // first version judged every launch after all of them had run and returned on
   // the first failure, so a later launch stopped at the bound kept its
@@ -466,6 +477,34 @@ function runLaneShapeCases() {
   assert.equal(quietExit, 2, "an ordinary failure keeps its exit code");
   assert.deepEqual(quietReaped, [], "an ordinary failure must not reap anything");
   observed += 4;
+
+  // An interrupt aimed at the lane does not reach a detached launch, so the
+  // lane defers its exit until the launch in flight returns and reaps that
+  // group on the way out. Anything else leaves the tests running.
+  assert.equal(interruptExitCode("SIGINT"), 130);
+  assert.equal(interruptExitCode("SIGTERM"), 143);
+  assert.equal(interruptExitCode("SIGHUP"), 1);
+  const stopReaped = [];
+  const stopLaunched = [];
+  let stopAfterFirst = null;
+  const stopExit = runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => {
+      stopLaunched.push(1);
+      stopAfterFirst = "SIGINT";
+      return { pid: 7070, status: 0 };
+    },
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      stopReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+    interrupted: () => stopAfterFirst,
+  });
+  assert.equal(stopExit, 130, "an interrupted lane reports the interrupt, not success");
+  assert.equal(stopLaunched.length, 1, "an interrupt must stop the remaining launches");
+  assert.equal(stopReaped.length, 1, "the launch in flight must be reaped on the way out");
+  observed += 6;
   return observed;
 }
 

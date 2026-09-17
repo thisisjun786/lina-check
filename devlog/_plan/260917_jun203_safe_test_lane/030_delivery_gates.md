@@ -18,11 +18,11 @@
 | # | 명령 | exit | 초 | 결과 요약 |
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
-| 2 | `corepack pnpm run build:all` | 0 | 0.99 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.18 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.58 | oxlint 4개 스크립트 전부 Done |
-| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.26 | `rejected=30 helpers=18 laneShape=32 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 140.94 | 통과 2579건, fail 0, skip 0 |
+| 2 | `corepack pnpm run build:all` | 0 | 0.98 | tsc 3개 프로젝트 무오류 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.16 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.46 | oxlint 4개 스크립트 전부 Done |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.26 | `rejected=30 helpers=18 laneShape=41 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 135.64 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,7 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 140.9초 |
+| 게이트 6 전체 | 207 | | 135.6초 |
 
 구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
 실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
@@ -132,6 +132,14 @@ PR 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다. 둘 다 `95dd
 | 15 | 5라운드 (nit) | 회귀 테스트가 "언젠가 수확됐다" 만 확인한다. 순서를 강제하지 않으므로 수확을 맨 뒤로 미뤄도 통과한다 | 수확 시점의 실행 횟수와 해당 픽스처 디렉터리의 존재 여부를 같이 기록해, 다음 실행 전이고 정리 전임을 단정한다 | `laneShape` 26 → 28 |
 | 16 | 5라운드 (nit) | "exit 0 이니 계측이 결과를 바꾸지 않았다" 는 과장이다. 통과·실패가 같다는 것이지 실행이 동일하다는 뜻은 아니다 | 문장을 그 구분대로 고쳤다 | `020_fixture_lane.md` |
 | 17 | 5라운드 (관측 메모) | 시간 초과가 아닌 시그널 종료는 수확하지 않는다. 이 변경 이전부터 그랬고 차단은 아니라고 적혀 있었다 | 정리 규칙의 대상은 "실행 그룹" 이므로 시그널로 끝난 경우에도 수확한다. 운영자 인터럽트나 OOM kill 도 같은 잔해를 남긴다 | `laneShape` 28 → 32. 시그널 종료가 24개 실행 전부에서 수확되고, 평범한 실패는 아무것도 수확하지 않으며 종료 코드를 유지하는지 확인한다 |
+
+PR #4 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다.
+
+| # | 출처 | 지적 | 처리 | 확인 |
+| -- | -- | -- | -- | -- |
+| 18 | Devin(bug) | 레인에 `SIGINT`·`SIGTERM` 이 오면 분리된 테스트 그룹이 남는다. 이 PR 이 만든 회귀다 | 러너가 두 시그널을 직접 받는다. `spawnSync` 가 루프를 막는 동안에는 핸들러가 못 도므로 진행 중인 실행이 반환한 직후에 반영되고, 그 그룹을 수확한 뒤 남은 실행을 시작하지 않고 128+시그널로 끝난다 | `laneShape` 32 → 41. `interruptExitCode` 세 갈래와, 인터럽트가 남은 실행을 멈추고 진행 중이던 실행을 수확하는지 확인한다 |
+| 19 | Devin(bug)·Codex(P2), 같은 건 | Windows 에는 신호를 보낼 수 있는 프로세스 그룹이 없다. 음수 pid 는 예외를 내고 그 예외를 삼키면 "정리할 게 없었다" 로 읽힌다 | `win32` 에서는 시도하지 않고 자손이 남을 수 있다는 사유를 돌려준다. 조용한 거짓 대신 적힌 한계다 | 자기시험이 `win32` 에서 kill 을 아예 부르지 않는지, 다른 플랫폼에서는 부르는지 확인한다 |
+| 20 | Codex(P2) | 평상 패스가 preload 를 자식에게 넘기지 않으므로 손자 실행을 못 본다. 그래서 스텁 `trufflehog` 가 목록에서 빠졌다 | 명령 목록을 두 패스의 합집합으로 바꿨다. "무엇이 끝까지 실행됐나" 는 평상 패스에서, "무엇이 기동됐나" 는 양쪽에서 읽는다. 기동 기록은 실패보다 앞서 남는다 | 증명 스위트 6개와 `codex-app-server-output` 의 선언에 스텁이 돌아왔다 |
 
 4라운드 이후의 세 커밋은 PR #3 머지 시점 뒤에 생겼다. 같은 이슈의 후속 PR #4 로 올렸고,
 머지 판단은 조정자에게 남긴다.

@@ -74,6 +74,7 @@ import {
   describeLaunchOutcome,
   resolveFixtureFiles,
   reapLaunchGroup,
+  interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -81,6 +82,8 @@ const LABEL = "[lina-check-safe-tests]";
 const USAGE = "usage: node scripts/lina-check-safe-tests.mjs <run|preview> [--json]";
 const SECRETISH = /TOKEN|SECRET|_KEY$|^GH_|^GITHUB_/;
 const MAX_CONCURRENCY = 8;
+/** Set by the stop handlers installed around the launch sequence. */
+let pendingInterrupt = null;
 
 function declaredTests() {
   const path = join(root, "config", "lina-check-scaffold.json");
@@ -291,6 +294,12 @@ export function main(argv, deps = {}) {
   const launch = deps.launchTests ?? launchTests;
   const fixture = deps.makeFixture ?? makeUpstreamFixture;
   const reap = deps.reap ?? ((outcome) => reapLaunchGroup(outcome, (pid, signal) => process.kill(pid, signal)));
+  // A launch runs in its own process group, so an interrupt aimed at the lane
+  // does not reach it. Without this the lane would die and leave the group
+  // behind. Handling the signal instead defers the exit until the launch in
+  // flight returns — spawnSync blocks the loop, so a handler cannot run sooner
+  // — and reaps that group before leaving.
+  const interruptedBy = deps.interrupted ?? (() => pendingInterrupt);
   const mode = argv[0];
   if (mode !== "run" && mode !== "preview") {
     process.stderr.write(USAGE + "\n");
@@ -390,7 +399,7 @@ export function main(argv, deps = {}) {
     // interrupt or an out-of-memory kill stops the runner while the processes
     // its tests started keep their ports. The cleanup rule is the launch group,
     // so it applies wherever the group can still be alive.
-    if (verdict.kind === "timeout" || verdict.kind === "signal") {
+    if (verdict.kind === "timeout" || verdict.kind === "signal" || interruptedBy()) {
       const reaped = reap(outcome);
       process.stderr.write(
         LABEL +
@@ -402,17 +411,32 @@ export function main(argv, deps = {}) {
     if (verdict.kind !== "ok") failures.push({ verdict, outcome });
     return verdict;
   };
-  if (rootPaths.length > 0) settle(launch(rootPaths, concurrency));
-  for (const name of fixtureNames) {
-    const directory = fixture(name, declaration.pin);
-    process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
-    try {
-      // Absolute path: the test resolves imports relative to its own file, while
-      // its declared reads follow the working directory into the fixture.
-      settle(launch([join(root, name)], 1, { cwd: directory }));
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
+  const stopSignals = ["SIGINT", "SIGTERM"];
+  const onStop = (signal) => {
+    pendingInterrupt = signal;
+  };
+  for (const signal of stopSignals) process.on(signal, onStop);
+  try {
+    if (rootPaths.length > 0) settle(launch(rootPaths, concurrency));
+    for (const name of fixtureNames) {
+      if (interruptedBy()) break;
+      const directory = fixture(name, declaration.pin);
+      process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
+      try {
+        // Absolute path: the test resolves imports relative to its own file, while
+        // its declared reads follow the working directory into the fixture.
+        settle(launch([join(root, name)], 1, { cwd: directory }));
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
+  } finally {
+    for (const signal of stopSignals) process.off(signal, onStop);
+  }
+  const stopped = interruptedBy();
+  if (stopped) {
+    process.stderr.write(LABEL + " stopped by " + stopped + " after the launch in flight returned\n");
+    return interruptExitCode(stopped);
   }
   const first = failures[0];
   if (first === undefined) return 0;

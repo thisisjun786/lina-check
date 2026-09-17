@@ -60,14 +60,19 @@
 | 패스 | 무엇을 보나 | 어떻게 |
 | -- | -- | -- |
 | 평상 패스 | 테스트 프로세스가 띄우는 모든 프로세스와 여는 소켓 | `node:child_process` 7개 진입점·`net.Server.prototype.listen`·`fetch`·`Socket.connect` 를 감싸고 `syncBuiltinESMExports()` 로 ESM 바인딩까지 바꾼다. 계측은 자기 자신을 `process.env` 에서 지워서 자식에게 상속되지 않는다 |
-| 자식 패스 | 자식 안에서 여는 소켓 | 같은 계측을 자식의 `env`·`execArgv` 에 다시 심는다. `fork` 가 `execArgv: []` 로 preload 를 떨어뜨리는 경우까지 따라간다 |
+| 자식 패스 | 자식과 손자가 띄우는 프로세스와 여는 소켓 | 같은 계측을 자식의 `env`·`execArgv` 에 다시 심는다. `fork` 가 `execArgv: []` 로 preload 를 떨어뜨리는 경우까지 따라간다 |
 
-선언 문장은 평상 패스에서 나온다. 그 패스에서 207개가 전부 exit 0 이다. 이건 계측이
+판정은 두 패스를 합쳐서 한다. 통과·실패에 영향받는 판정(무엇이 실행됐나)은 평상 패스를
+기준으로 하고, 명령 목록은 두 패스의 합집합이다. 자식 패스에서만 보이는 손자 실행이 있기
+때문이다. `dist/clawsweeper.js` 를 `node` 로 띄우고 그 안에서 스텁 `trufflehog` 를 부르는
+증명 스위트가 그렇다. 평상 패스는 preload 를 자식에게 넘기지 않으므로 그 손자를 보지 못한다.
+
+평상 패스에서 207개가 전부 exit 0 이다. 이건 계측이
 통과·실패 결과를 바꾸지 않았다는 뜻이고, 실행이 계측 없는 실행과 한 바이트까지 같다는
 뜻은 아니다. 다만 3번 실패처럼 계측이 실행을 바꾸면 그 결과가 exit 코드로 드러나므로,
-"그런 일이 이 패스에서는 없었다" 까지가 확인된 사실이다. 자식 패스는 소켓만 보탠다.
-자식 패스에서 6개가 exit 1 인데, 그것이 바로 3번 실패의 흔적이고, 그래서 선언 문장을
-거기서 뽑지 않는다.
+"그런 일이 이 패스에서는 없었다" 까지가 확인된 사실이다. 자식 패스에서는 6개가 exit 1 인데,
+그것이 바로 3번 실패의 흔적이다. 그래서 "무엇이 끝까지 실행됐나" 는 거기서 읽지 않고,
+거기서 읽는 것은 "무엇이 기동됐나" 뿐이다. 기동 기록은 실패보다 앞서 남는다.
 
 시도 시점에 기록하므로 예외를 삼켜도 남는다. 테스트 바이트는 고치지 않고, 계측은 저장소에
 남기지 않는다.
@@ -77,8 +82,8 @@
 - 자식 프로세스를 띄우는 파일 35개
 - loopback HTTP 서버를 여는 파일 5개. 그중 하나는 fork 한 자식이 연다
 - 관측된 명령은 `node`, `git`, `curl`, `command-intake-fixture.mjs`, 그리고 테스트가 임시
-  디렉터리에 직접 써 넣는 `trufflehog` 스텁이다. 실제 `trufflehog` 는 이 호스트에 설치돼
-  있지도 않다
+  디렉터리에 직접 써 넣는 `trufflehog`·`codex` 스텁이다. 실제 `trufflehog` 는 이 호스트에
+  설치돼 있지도 않다
 - 목적지로 나온 URL 은 전부 `127.0.0.1` 이다. 예외 두 개는 둘 다 JUN-135 때부터 있던 13개
   안에 있다. `test/manual-publication-authority.test.ts` 는 `https://authority` 를 테스트가
   임시 `PATH` 에 만든 가짜 `curl` 에 넘기고, `test/automerge-metrics.test.ts` 는 GitHub URL 을
@@ -105,15 +110,15 @@
 | `test/apply-live-state.test.ts` | node |
 | `test/apply-managed-locale-pr.test.ts` | node |
 | `test/apply-obsolete-fix-pr-policy.test.ts` | node |
-| `test/apply-pr-coverage-proof-close.test.ts` | node |
-| `test/apply-pr-coverage-proof-recheck.test.ts` | node |
-| `test/apply-pr-duplicate-proof.test.ts` | node |
-| `test/apply-pr-duplicate-ref-proof.test.ts` | node |
+| `test/apply-pr-coverage-proof-close.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
+| `test/apply-pr-coverage-proof-recheck.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
+| `test/apply-pr-duplicate-proof.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
+| `test/apply-pr-duplicate-ref-proof.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
 | `test/apply-pr-promotion.test.ts` | node |
 | `test/apply-pr-supersession-promotion.test.ts` | node |
 | `test/apply-pr-supersession-safety.test.ts` | node |
 | `test/apply-product-direction-policy.test.ts` | node |
-| `test/apply-same-author-pair-close.test.ts` | node |
+| `test/apply-same-author-pair-close.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
 | `test/apply-stale-version-bug-policy.test.ts` | node |
 | `test/apply-stalled-pr-policies.test.ts` | node |
 | `test/apply-unsponsored-feature-policy.test.ts` | node |
@@ -121,9 +126,9 @@
 | `test/automerge-metrics.test.ts` | node |
 | `test/check-docs.test.ts` | git |
 | `test/close-reasons.test.ts` | node |
-| `test/codex-app-server-output.test.ts` | node |
+| `test/codex-app-server-output.test.ts` | a stub codex the test writes to a temporary directory, node |
 | `test/label-mutation-batch.test.ts` | node |
-| `test/manual-publication-authority.test.ts` | node |
+| `test/manual-publication-authority.test.ts` | curl, node |
 | `test/pr-close-coverage-proof.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
 | `test/repair/comment-router-config.test.ts` | git |
 | `test/repair/comment-router-utils.test.ts` | git |
@@ -145,6 +150,20 @@
 - 계측이 얹히기 전에 함수 참조를 붙잡아 둔 코드, 그리고 감싼 함수를 다시 덮어쓰는 코드는
   빠져나간다. 이건 적대적 코드에 대한 방어가 아니라 고정된 upstream pin 의 관측이다
 - `fetch` 를 쓰지 않는 HTTP 는 `Socket.connect` 로만 보이고, 경로가 아니라 호스트·포트만 남는다
+
+### 레인을 멈출 때
+
+실행은 자기 프로세스 그룹에서 돈다. 시간 초과나 시그널로 끝난 실행의 자손을 한꺼번에
+정리하려면 그래야 하지만, 대가로 터미널의 Ctrl-C 가 테스트에 닿지 않는다. 그냥 두면 레인만
+죽고 테스트 그룹이 남는다. 그래서 러너가 `SIGINT`·`SIGTERM` 을 직접 받는다.
+
+`spawnSync` 가 루프를 막는 동안에는 핸들러가 돌 수 없으므로, 인터럽트는 진행 중인 실행이
+반환한 직후에 반영된다. 그 시점에 그 그룹을 수확하고, 남은 실행을 시작하지 않고, 128+시그널
+번호로 끝난다. 즉 멈추는 데 최대 한 번의 실행만큼 걸리지만 자손이 남지는 않는다.
+
+Windows 에는 신호를 보낼 수 있는 프로세스 그룹이 없다. 음수 pid 로 부르면 예외가 나고, 그걸
+삼키면 "정리할 게 없었다" 와 구분이 안 된다. 그래서 `win32` 에서는 시도하지 않고 자손이 남을
+수 있다고 사유에 적어 돌려준다. 이 저장소는 Linux 에서 개발하지만 공개돼 있으므로 적어 둔다.
 
 ### 임시 파일
 
