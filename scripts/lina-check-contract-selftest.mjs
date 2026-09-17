@@ -21,7 +21,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -57,6 +58,8 @@ import {
   blockedNodeTargets,
   classifyBuildPair,
   describeLaunchOutcome,
+  reapLaunchGroup,
+  interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 
@@ -297,7 +300,7 @@ function runHelperCases() {
  * was to break the module; growing the lane from 13 tests to 206 made that cost real.
  * Both invariants are now functions, and every refusal is fed a case here.
  */
-function runLaneShapeCases() {
+async function runLaneShapeCases() {
   let observed = 0;
   // Clean control first: a checker that refuses everything would satisfy every
   // rejection below and prove nothing.
@@ -357,10 +360,218 @@ function runLaneShapeCases() {
     "a real spawnSync timeout must be classified as one",
   );
   observed += 1;
+
+  // The bound stops the runner; the tests it started can still be alive. The
+  // reap is driven with an injected kill so this walks every branch without
+  // signalling anything.
+  const signalled = [];
+  const spy = (pid, signal) => signalled.push([pid, signal]);
+  assert.deepEqual(reapLaunchGroup({ pid: 4242 }, spy), { reaped: true, group: -4242 });
+  assert.deepEqual(signalled, [[-4242, "SIGKILL"]]);
+  for (const outcome of [null, {}, { pid: 1 }, { pid: 0 }, { pid: -3 }, { pid: 1.5 }]) {
+    const result = reapLaunchGroup(outcome, spy);
+    assert.equal(result.reaped, false, "must refuse " + JSON.stringify(outcome));
+    observed += 1;
+  }
+  assert.equal(signalled.length, 1, "a refused reap must signal nothing");
+  const failing = reapLaunchGroup({ pid: 4242 }, () => {
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  });
+  assert.deepEqual(failing, { reaped: false, reason: "ESRCH" });
+  observed += 2;
+
+  // Windows has no signalable process group, so the reap must say that rather
+  // than report a swallowed throw, which reads like "nothing left to reap".
+  const onWindows = reapLaunchGroup({ pid: 4242 }, () => {
+    throw new Error("the kill must not be attempted on win32");
+  }, "win32");
+  assert.equal(onWindows.reaped, false);
+  assert.match(onWindows.reason, /win32/);
+  assert.equal(reapLaunchGroup({ pid: 4242 }, spy, "linux").reaped, true);
+  observed += 3;
+
+  // Ordering, which is the part reapLaunchGroup cannot check about itself. The
+  // first version judged every launch after all of them had run and returned on
+  // the first failure, so a later launch stopped at the bound kept its
+  // descendants. Drive the real sequence with an early failure in front of a
+  // timeout and watch for the reap.
+  const boundedOut = {
+    pid: 5150,
+    status: null,
+    signal: "SIGTERM",
+    error: Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" }),
+  };
+  const reaped = [];
+  const launched = [];
+  const directories = [];
+  const exitCode = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: (paths) => {
+      launched.push(paths.length);
+      // The root batch fails first; the first fixture launch then times out.
+      if (launched.length === 1) return { pid: 4141, status: 3 };
+      if (launched.length === 2) return boundedOut;
+      return { pid: 4242, status: 0 };
+    },
+    makeFixture: () => {
+      const directory = mkdtempSync(join(tmpdir(), "lina-check-selftest-"));
+      directories.push(directory);
+      return directory;
+    },
+    reap: (outcome) => {
+      // Record where in the sequence the reap happened, not just that it did.
+      // "Reaped eventually" is exactly the property the broken version also had.
+      reaped.push({
+        outcome,
+        launchesSoFar: launched.length,
+        fixtureStillPresent: existsSync(directories[directories.length - 1]),
+      });
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(exitCode, 3, "the first failure still decides the exit code");
+  assert.equal(reaped.length, 1, "a timeout after an earlier failure must still be reaped");
+  assert.equal(reaped[0].outcome, boundedOut, "the reaped outcome must be the timed-out launch");
+  assert.equal(
+    reaped[0].launchesSoFar,
+    2,
+    "the reap must happen before the next launch, not after the run",
+  );
+  assert.equal(
+    reaped[0].fixtureStillPresent,
+    true,
+    "the reap must happen before that launch's fixture directory is removed",
+  );
+  assert.ok(launched.length > 2, "an earlier failure must not stop the remaining launches");
+  for (const directory of directories)
+    assert.equal(existsSync(directory), false, "every fixture directory must be removed");
+  observed += 6;
+
+  // A signalled end is not a timeout, but it leaves the same group behind. An
+  // operator interrupt or an out-of-memory kill stops the runner while the
+  // processes its tests started keep running, so this path reaps too.
+  const signalled2 = { pid: 6260, status: null, signal: "SIGKILL" };
+  const signalReaped = [];
+  const signalExit = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => signalled2,
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      signalReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(signalExit, 1, "a signalled launch exits 1");
+  assert.equal(signalReaped.length, 24, "every signalled launch must be reaped");
+  // An ordinary failure has no group left to reap and must not be signalled.
+  const quietReaped = [];
+  const quietExit = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => ({ pid: 6261, status: 2 }),
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      quietReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(quietExit, 2, "an ordinary failure keeps its exit code");
+  assert.deepEqual(quietReaped, [], "an ordinary failure must not reap anything");
+  observed += 4;
+
+  // An interrupt aimed at the lane does not reach a detached launch, so the
+  // lane defers its exit until the launch in flight returns and reaps that
+  // group on the way out. Anything else leaves the tests running.
+  assert.equal(interruptExitCode("SIGINT"), 130);
+  assert.equal(interruptExitCode("SIGTERM"), 143);
+  assert.equal(interruptExitCode("SIGHUP"), 1);
+  const stopReaped = [];
+  const stopLaunched = [];
+  let stopAfterFirst = null;
+  const stopExit = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => {
+      stopLaunched.push(1);
+      stopAfterFirst = "SIGINT";
+      return { pid: 7070, status: 0 };
+    },
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      stopReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+    interrupted: () => stopAfterFirst,
+  });
+  assert.equal(stopExit, 130, "an interrupted lane reports the interrupt, not success");
+  assert.equal(stopLaunched.length, 1, "an interrupt must stop the remaining launches");
+  assert.equal(stopReaped.length, 1, "the launch in flight must be reaped on the way out");
+  observed += 6;
+
+  // The injected form above proves the decision, not the delivery. A handler is
+  // a libuv callback and cannot run while this module holds the stack, so the
+  // claim only means something against a real signal. Send one in a child.
+  const runner = join(root, "scripts/lina-check-safe-tests.mjs");
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      [
+        "import { mkdtempSync } from 'node:fs';",
+        "import { tmpdir } from 'node:os';",
+        "import { join } from 'node:path';",
+        "import { main } from " + JSON.stringify(runner) + ";",
+        "let sent = false;",
+        "const code = await main(['run'], {",
+        "  distState: () => ({ present: true, disposition: 'fresh', detail: null, pairs: 1 }),",
+        "  launchTests: () => {",
+        "    if (!sent) { sent = true; process.kill(process.pid, 'SIGINT'); }",
+        "    return { pid: 9090, status: 0 };",
+        "  },",
+        "  makeFixture: () => mkdtempSync(join(tmpdir(), 'lina-check-signal-')),",
+        "  reap: () => ({ reaped: true, group: -9090 }),",
+        "});",
+        "process.stdout.write('LANE_EXIT=' + code + '\\n');",
+      ].join("\n"),
+    ],
+    { cwd: root, encoding: "utf8", timeout: 60000 },
+  );
+  assert.equal(child.status, 0, "the signal probe must finish: " + String(child.stderr).slice(-400));
+  assert.match(
+    child.stdout,
+    /LANE_EXIT=130/,
+    "a real SIGINT during a launch must stop the lane and report 130, saw: " + child.stdout,
+  );
+  observed += 2;
+
+  // A stop that lands while the fixture is being built must not still start
+  // that fixture's test. The gap between the loop's check and the launch is the
+  // fixture build, which is where this one arrives.
+  const lateLaunched = [];
+  let lateStop = null;
+  const lateExit = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => {
+      lateLaunched.push(1);
+      return { pid: 8080, status: 0 };
+    },
+    makeFixture: () => {
+      lateStop = "SIGTERM";
+      return mkdtempSync(join(tmpdir(), "lina-check-selftest-"));
+    },
+    reap: () => ({ reaped: true, group: -8080 }),
+    interrupted: () => lateStop,
+  });
+  assert.equal(lateExit, 143, "a stop during the fixture build still reports the interrupt");
+  assert.equal(
+    lateLaunched.length,
+    1,
+    "only the root batch may have launched; the fixture's test must not start",
+  );
+  observed += 2;
   return observed;
 }
 
-function runTripwireControls() {
+async function runTripwireControls() {
   const env = { ...process.env, [TRIPWIRE_ENV]: "1" };
   const script = "scripts/lina-check-safe-tests.mjs";
   const preview = spawnSync(process.execPath, [script, "preview", "--json"], {
@@ -408,7 +619,7 @@ function runTripwireControls() {
   process.env[TRIPWIRE_ENV] = "1";
   let routed = null;
   try {
-    runnerMain(["run"], {
+    await runnerMain(["run"], {
       distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     });
   } catch (error) {
@@ -852,10 +1063,10 @@ function runAssertionIntegrityInner() {
 try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
-  const laneShape = runLaneShapeCases();
+  const laneShape = await runLaneShapeCases();
   const installation = await runInstallationCases();
   const upstream = runModifiedUpstreamCases();
-  const controls = runTripwireControls();
+  const controls = await runTripwireControls();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +

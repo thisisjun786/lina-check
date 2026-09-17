@@ -348,7 +348,7 @@
       "lina:contract-selftest": { "command": "node scripts/lina-check-contract-selftest.mjs", "reason": "Prove the contract rejections and the preview tripwire still work." }
     },
     "safeTests": {
-      "note": "Upstream tests judged hermetic and compatible with the parked profile, restored for execution. Their bytes are unchanged; only their invocation is new. JUN-203 grew this list from 13 to 206; the entries that run against pinned bytes instead of this fork's files are named in upstreamFixtureTests. Every execution-boundary sentence below is an observation rather than a reading: each file was run once with node:child_process and net.Server.prototype.listen instrumented, with the instrumentation re-injected into forked children, and the recorded launches and binds are what these sentences report.",
+      "note": "Upstream tests judged hermetic and compatible with the parked profile, restored for execution. Their bytes are unchanged; only their invocation is new. JUN-203 grew this list from 13 to 206; the entries that run against pinned bytes instead of this fork's files are named in upstreamFixtureTests. Every execution-boundary sentence below is an observation rather than a reading: each file was run with the seven node:child_process entrances, net.Server.prototype.listen, fetch and Socket.connect instrumented, once with the instrumentation kept out of the child environment so the run it describes is the ordinary one, and once re-injected into children so a descendant's executables and sockets are seen too. The command list is the union of both. What the method cannot see is written down in devlog/_plan/260917_jun203_safe_test_lane/020_fixture_lane.md.",
       "files": [
         { "path": "test/actions-checkout-v7.test.ts", "reason": "Actions checkout v7. Starts no child process and opens no socket. Runs against pinned upstream bytes because its working-directory reads land on files this fork parks or replaces: the complete pinned .github tree." },
         { "path": "test/agent-input-scan-fixtures.test.ts", "reason": "Agent input scan fixtures. Starts no child process and opens no socket." },
@@ -373,7 +373,7 @@
         { "path": "test/apply-stale-version-bug-policy.test.ts", "reason": "Apply stale version bug policy. Runs local child processes (node)." },
         { "path": "test/apply-stalled-pr-policies.test.ts", "reason": "Apply stalled PR policies. Runs local child processes (node)." },
         { "path": "test/apply-unsponsored-feature-policy.test.ts", "reason": "Apply unsponsored feature policy. Runs local child processes (node)." },
-        { "path": "test/assist-artifact.test.ts", "reason": "Assist artifact. Runs local child processes (a stub trufflehog the test writes to a temporary directory). Runs against pinned upstream bytes because its working-directory reads land on files this fork parks or replaces: the complete pinned .github tree plus src/clawsweeper-assist.ts." },
+        { "path": "test/assist-artifact.test.ts", "reason": "Assist artifact. Runs local child processes (a stub trufflehog the test writes to a temporary directory, node). Runs against pinned upstream bytes because its working-directory reads land on files this fork parks or replaces: the complete pinned .github tree plus src/clawsweeper-assist.ts." },
         { "path": "test/audit-health-roundtrip.test.ts", "reason": "Audit health roundtrip. Starts no child process and opens no socket." },
         { "path": "test/automerge-metrics.test.ts", "reason": "Automatic merge accounting. Uses an injected fetcher that throws on any unregistered URL." },
         { "path": "test/automerge-workflow-scheduler.test.ts", "reason": "Automerge workflow scheduler. Starts no child process and opens no socket." },
@@ -419,7 +419,7 @@
         { "path": "test/pages-workflow.test.ts", "reason": "Pages workflow. Starts no child process and opens no socket. Runs against pinned upstream bytes because its working-directory reads land on files this fork parks or replaces: the complete pinned .github tree." },
         { "path": "test/parked-command-finalization.test.ts", "reason": "Parked command finalisation. In-process worker harness with a stubbed global fetch." },
         { "path": "test/pr-admission-input.test.ts", "reason": "PR admission input. Starts no child process and opens no socket." },
-        { "path": "test/pr-close-coverage-proof.test.ts", "reason": "PR close coverage proof. Runs local child processes (a stub trufflehog the test writes to a temporary directory)." },
+        { "path": "test/pr-close-coverage-proof.test.ts", "reason": "PR close coverage proof. Runs local child processes (a stub trufflehog the test writes to a temporary directory, node)." },
         { "path": "test/pr-comment-activity-revision.test.ts", "reason": "PR comment activity revision. Starts no child process and opens no socket." },
         { "path": "test/pr-hydration-snapshot.test.ts", "reason": "PR hydration snapshot. Starts no child process and opens no socket." },
         { "path": "test/pr-label-policy.test.ts", "reason": "Label policy. Imports built output only." },

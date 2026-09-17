@@ -19,10 +19,10 @@ corepack pnpm run lint
 
 `check:scaffold`는 원본 출처, 보존 파일, 비활성 워크플로와 차단 명령을 확인한다. 원본의 전체 테스트와 `check`는 활성 워크플로 경로를 전제로 하므로 이 단계에서는 차단돼 있다. 위 검증이 실제 서비스 연동이나 운영 준비 완료를 뜻하지 않는다.
 
-원본 테스트 중 외부 호출·설치 훅·게시 부작용이 없다고 판정한 13개는 복원해 돌릴 수 있다. 다음 네 명령이 그 표면이다.
+원본 테스트 중 외부 서비스 통신과 실자격증명 사용이 없다고 관측한 206개는 복원해 돌릴 수 있다. 그중 23개는 이 포크가 parked·교체한 파일을 읽으므로 고정 pin 의 바이트를 임시 작업 디렉터리에 만들어 그 안에서 돌린다. 다음 네 명령이 그 표면이다.
 
 ```sh
-corepack pnpm run lina:test-safe           # 복원한 원본 테스트 13개 실행
+corepack pnpm run lina:test-safe           # 복원한 원본 테스트 206개 실행
 corepack pnpm run lina:test-safe:preview   # 대상만 출력하고 테스트를 띄우지 않는다
 corepack pnpm run lina:boundary-probe      # 자동 수정·종료·머지·라벨 입구가 닫혀 있는지 실제 호출로 확인
 corepack pnpm run lina:contract-selftest   # 위 선언 검사의 거부 경로가 실제로 거부하는지 확인

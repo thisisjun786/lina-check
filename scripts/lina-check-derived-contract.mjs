@@ -538,6 +538,17 @@ export function resolveFixtureFiles(name, paths) {
 export const LANE_TIMEOUT_MS = 15 * 60 * 1000;
 
 /**
+ * The exit code a lane stopped by an operator reports. 128 plus the signal
+ * number is the shell convention, and reporting it is how an interrupted lane
+ * is told apart from a lane whose tests failed.
+ */
+export function interruptExitCode(signal) {
+  if (signal === "SIGINT") return 130;
+  if (signal === "SIGTERM") return 143;
+  return 1;
+}
+
+/**
  * Turn one spawnSync result into the lane's verdict. Pure, so the self-test can
  * walk every branch; the interesting ones are the launch that never started and
  * the launch stopped at the bound, which a bare status check reads as success.
@@ -573,6 +584,36 @@ export function describeLaunchOutcome(outcome, timeoutMs = LANE_TIMEOUT_MS) {
     detail: "the test runner exited " + String(outcome.status),
     exitCode: outcome.status === null ? 1 : outcome.status,
   };
+}
+
+/**
+ * Kill what a timed-out launch left behind.
+ *
+ * spawnSync's own timeout signals the process it started and nothing else, and
+ * the restored lane contains tests that start node, git, curl and local
+ * servers. A runner stopped at the bound can therefore exit while a descendant
+ * of one of its tests is still holding a port. The launch runs in its own
+ * process group so the whole group can be signalled here; the kill is injected
+ * so the self-test can walk this without killing anything.
+ */
+export function reapLaunchGroup(outcome, kill, platform = process.platform) {
+  const pid = outcome === null || typeof outcome !== "object" ? undefined : outcome.pid;
+  // A pid of 0 or 1 would address this process's own group or init.
+  if (!Number.isInteger(pid) || pid <= 1) return { reaped: false, reason: "no usable process group" };
+  // A negative pid addresses a process group on POSIX and nothing on Windows,
+  // where the call throws and would otherwise be swallowed as "already gone".
+  // Saying so is the point: a silent false here reads exactly like the ordinary
+  // case where every descendant already exited.
+  if (platform === "win32")
+    return { reaped: false, reason: "process groups are not signalable on win32; descendants may survive" };
+  try {
+    kill(-pid, "SIGKILL");
+    return { reaped: true, group: -pid };
+  } catch (error) {
+    // The group is already gone when every descendant exited with the runner,
+    // which is the ordinary case and not a failure.
+    return { reaped: false, reason: error?.code ?? String(error) };
+  }
 }
 
 /**

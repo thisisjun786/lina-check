@@ -73,6 +73,8 @@ import {
   classifyBuildPair,
   describeLaunchOutcome,
   resolveFixtureFiles,
+  reapLaunchGroup,
+  interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -80,6 +82,8 @@ const LABEL = "[lina-check-safe-tests]";
 const USAGE = "usage: node scripts/lina-check-safe-tests.mjs <run|preview> [--json]";
 const SECRETISH = /TOKEN|SECRET|_KEY$|^GH_|^GITHUB_/;
 const MAX_CONCURRENCY = 8;
+/** Set by the stop handlers installed around the launch sequence. */
+let pendingInterrupt = null;
 
 function declaredTests() {
   const path = join(root, "config", "lina-check-scaffold.json");
@@ -268,6 +272,12 @@ export function launchTests(paths, concurrency, options = {}) {
     // have hung it instead of failing it, which is the one result a lane must
     // never produce, because nobody can tell it apart from work in progress.
     timeout: LANE_TIMEOUT_MS,
+    // Its own process group, so a launch stopped at the bound can be reaped
+    // whole. Restored tests start node, git, curl and local servers, and the
+    // timeout signal reaches only the process spawnSync started. The cost is
+    // that an interactive interrupt no longer reaches the tests: Ctrl-C stops
+    // the lane and leaves the group behind.
+    detached: true,
   });
 }
 
@@ -276,8 +286,26 @@ export function launchTests(paths, concurrency, options = {}) {
  * exercise this function, not just the launch helper, without needing a build.
  * Production callers pass nothing and get the real probe.
  */
-export function main(argv, deps = {}) {
+export async function main(argv, deps = {}) {
   const probeDist = deps.distState ?? distState;
+  // Injectable so the self-test can drive the launch sequence itself. The
+  // ordering rule this function has to keep — reap a timed-out group before the
+  // next launch, and before any cleanup — is not observable from outside.
+  const launch = deps.launchTests ?? launchTests;
+  const fixture = deps.makeFixture ?? makeUpstreamFixture;
+  const reap = deps.reap ?? ((outcome) => reapLaunchGroup(outcome, (pid, signal) => process.kill(pid, signal)));
+  // A launch runs in its own process group, so an interrupt aimed at the lane
+  // does not reach it. Without this the lane would die and leave the group
+  // behind. Handling the signal instead defers the exit until the launch in
+  // flight returns — spawnSync blocks the loop, so a handler cannot run sooner
+  // — and reaps that group before leaving.
+  const interruptedBy = deps.interrupted ?? (() => pendingInterrupt);
+  // A signal handler is a libuv callback, so it cannot run while this function
+  // holds the stack. spawnSync blocks, and without a turn of the loop between
+  // launches the handler would only run after the last one, which is the same
+  // as not handling the signal at all. Yielding here is what makes the stop
+  // observable at the only point it can be acted on.
+  const yieldToLoop = deps.yieldToLoop ?? (() => new Promise((resolve) => setImmediate(resolve)));
   const mode = argv[0];
   if (mode !== "run" && mode !== "preview") {
     process.stderr.write(USAGE + "\n");
@@ -366,28 +394,78 @@ export function main(argv, deps = {}) {
   // That is the point of them: the fixture lane exists for upstream assertions
   // about upstream bytes, and these assert what this fork actually does.
   const rootPaths = [...paths.filter((value) => !UPSTREAM_FIXTURE_TESTS[value]), ...derived.paths];
-  const outcomes = [];
-  if (rootPaths.length > 0) outcomes.push(launchTests(rootPaths, concurrency));
-  for (const name of fixtureNames) {
-    const directory = makeUpstreamFixture(name, declaration.pin);
-    process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
-    try {
-      // Absolute path: the test resolves imports relative to its own file, while
-      // its two direct reads follow the working directory into the fixture.
-      outcomes.push(launchTests([join(root, name)], 1, { cwd: directory }));
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  }
-  for (const outcome of outcomes) {
+  // Judge each launch the moment it returns. Collecting every outcome first and
+  // judging afterwards left a real hole: the first failure returned, so a later
+  // launch stopped at the bound was never reaped and its descendants outlived
+  // the lane. A fixture cleanup that threw skipped the same step.
+  const failures = [];
+  const settle = (outcome) => {
     const verdict = describeLaunchOutcome(outcome, LANE_TIMEOUT_MS);
-    if (verdict.kind === "ok") continue;
-    if (verdict.kind === "unstarted")
-      throw new Error("could not start the node test runner", { cause: outcome.error });
-    process.stderr.write(LABEL + " " + verdict.detail + "\n");
-    return verdict.exitCode;
+    // Any signalled end leaves the same mess, not only the bound: an operator
+    // interrupt or an out-of-memory kill stops the runner while the processes
+    // its tests started keep their ports. The cleanup rule is the launch group,
+    // so it applies wherever the group can still be alive.
+    if (verdict.kind === "timeout" || verdict.kind === "signal" || interruptedBy()) {
+      const reaped = reap(outcome);
+      process.stderr.write(
+        LABEL +
+          " reaping the launch group: " +
+          (reaped.reaped ? String(reaped.group) : "nothing to reap (" + reaped.reason + ")") +
+          "\n",
+      );
+    }
+    if (verdict.kind !== "ok") failures.push({ verdict, outcome });
+    return verdict;
+  };
+  const stopSignals = ["SIGINT", "SIGTERM"];
+  const onStop = (signal) => {
+    pendingInterrupt = signal;
+  };
+  // A stop belongs to one run. Left set, it would make every later call in this
+  // process reap its first launch and quit before the second.
+  pendingInterrupt = null;
+  for (const signal of stopSignals) process.on(signal, onStop);
+  try {
+    if (rootPaths.length > 0) {
+      const outcome = launch(rootPaths, concurrency);
+      await yieldToLoop();
+      settle(outcome);
+    }
+    for (const name of fixtureNames) {
+      if (interruptedBy()) break;
+      const directory = fixture(name, declaration.pin);
+      process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
+      try {
+        // Building the fixture is the longest gap between the check above and
+        // the launch below, and it is synchronous, so a signal delivered during
+        // it is still queued. Turn the loop first, then read: checking without
+        // the turn reads a flag the handler has not been allowed to set.
+        // Breaking here still runs the cleanup in finally.
+        await yieldToLoop();
+        if (interruptedBy()) break;
+        // Absolute path: the test resolves imports relative to its own file, while
+        // its declared reads follow the working directory into the fixture.
+        const outcome = launch([join(root, name)], 1, { cwd: directory });
+        await yieldToLoop();
+        settle(outcome);
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    for (const signal of stopSignals) process.off(signal, onStop);
   }
-  return 0;
+  const stopped = interruptedBy();
+  if (stopped) {
+    process.stderr.write(LABEL + " stopped by " + stopped + " after the launch in flight returned\n");
+    return interruptExitCode(stopped);
+  }
+  const first = failures[0];
+  if (first === undefined) return 0;
+  if (first.verdict.kind === "unstarted")
+    throw new Error("could not start the node test runner", { cause: first.outcome.error });
+  process.stderr.write(LABEL + " " + first.verdict.detail + "\n");
+  return first.verdict.exitCode;
 }
 
 /**
@@ -408,7 +486,7 @@ function startedDirectly() {
 
 if (startedDirectly()) {
   try {
-    process.exitCode = main(process.argv.slice(2));
+    process.exitCode = await main(process.argv.slice(2));
   } catch (error) {
     process.stderr.write(
       LABEL + " " + (error instanceof Error ? error.message : String(error)) + "\n",

@@ -41,45 +41,53 @@
 
 금지선은 "프로세스를 안 띄운다" 가 아니라 외부 서비스 통신과 실자격증명 사용 금지다.
 
-### 읽어서 판정하지 않고 관측했다
+### 세 번 틀리고 나서 정한 방법
 
-처음에는 테스트와 헬퍼의 import 를 훑어 토큰으로 분류했다. 독립 감사가 그 분류에서 거짓을
-찾아냈다. `test/repair/replacement-branch-head.test.ts` 를 "프로세스를 띄우지 않는다" 로
-적었는데, 이 테스트는 `docs/proof/replacement-branch-head/run-proof.mjs` 를 거쳐 `git` 을
-돌린다. 스캔 범위가 `test/` 안쪽에 머물러 있었던 탓이다.
+독립 감사 세 라운드가 이 절의 판정 방법을 세 번 깨뜨렸다. 순서대로 적는다.
 
-두 번째 시도는 Node 권한 모델이었다. 자식 프로세스를 막고 돌려서 `ERR_ACCESS_DENIED` 가
-나면 프로세스를 띄우는 것으로 봤다. 2라운드 감사가 이것도 깨뜨렸다.
-`src/repair/project-repo.ts` 가 `git config --get remote.origin.url` 의 실패를 삼키기 때문에,
-거부당하고도 통과하는 파일이 있다. 거부가 안 났다는 것은 시도가 없었다는 뜻이 아니다.
+1. import 를 훑어 토큰으로 분류했다. 스캔이 `test/` 안쪽에 머물러서,
+   `docs/proof/replacement-branch-head/run-proof.mjs` 를 거쳐 `git` 을 돌리는 테스트를
+   "프로세스를 안 띄운다" 로 적었다.
+2. Node 권한 모델로 바꿔 자식 프로세스를 막고 돌렸다. 이건 시도가 아니라 거부를 센다.
+   `src/repair/project-repo.ts` 가 `git config --get remote.origin.url` 의 실패를 삼켜서,
+   `git` 을 돌리고도 통과한 파일이 세 개 있었다.
+3. `node:child_process` 를 감싸 시도를 셌다. 그런데 계측을 자식 환경에 심는 바람에
+   스캐너가 환경을 검사하는 테스트가 중간에 죽었고, 죽은 뒤의 기동은 기록되지 않았다.
+   `test/assist-artifact.test.ts` 의 `node` 기동이 그렇게 빠져 있었다.
 
-지금 쓰는 방법은 거부가 아니라 시도를 센다.
+지금은 두 번 돌린다.
 
-| 질문 | 관측 방법 |
-| -- | -- |
-| 어떤 프로세스를 띄우는가 | `node:child_process` 의 7개 진입점을 감싸 호출 시점에 argv 를 기록하고 `syncBuiltinESMExports()` 로 ESM 이름 바인딩까지 바꾼다. 예외를 삼켜도 시도는 남는다 |
-| 소켓을 여는가 | `net.Server.prototype.listen` 을 감싼다 |
-| 밖으로 나가는 요청이 있는가 | `globalThis.fetch` 와 `net.Socket.prototype.connect` 를 감싸고, 프로세스 argv 에 들어간 URL 도 같이 본다 |
-| 자식 안에서 벌어지는 일은 | 감싼 진입점이 자식의 `env` 와 `execArgv` 에 계측을 다시 심는다. `fork` 가 `execArgv: []` 로 preload 를 떨어뜨리는 경우까지 따라간다 |
+| 패스 | 무엇을 보나 | 어떻게 |
+| -- | -- | -- |
+| 평상 패스 | 테스트 프로세스가 띄우는 모든 프로세스와 여는 소켓 | `node:child_process` 7개 진입점·`net.Server.prototype.listen`·`fetch`·`Socket.connect` 를 감싸고 `syncBuiltinESMExports()` 로 ESM 바인딩까지 바꾼다. 계측은 자기 자신을 `process.env` 에서 지워서 자식에게 상속되지 않는다 |
+| 자식 패스 | 자식과 손자가 띄우는 프로세스와 여는 소켓 | 같은 계측을 자식의 `env`·`execArgv` 에 다시 심는다. `fork` 가 `execArgv: []` 로 preload 를 떨어뜨리는 경우까지 따라간다 |
 
-`test/helpers/command-intake-fixture.mjs` 가 그 마지막 칸의 이유다. 이 헬퍼는
-`execArgv: []` 와 교체된 환경으로 `fork` 하고, 서버는 그 자식이 연다. 부모만 보면 소켓이
-없는 것처럼 보인다.
+판정은 두 패스를 합쳐서 한다. 통과·실패에 영향받는 판정(무엇이 실행됐나)은 평상 패스를
+기준으로 하고, 명령 목록은 두 패스의 합집합이다. 자식 패스에서만 보이는 손자 실행이 있기
+때문이다. `dist/clawsweeper.js` 를 `node` 로 띄우고 그 안에서 스텁 `trufflehog` 를 부르는
+증명 스위트가 그렇다. 평상 패스는 preload 를 자식에게 넘기지 않으므로 그 손자를 보지 못한다.
 
-테스트 바이트는 고치지 않는다. 계측은 실행할 때만 얹고 저장소에 남기지 않는다.
+평상 패스에서 207개가 전부 exit 0 이다. 이건 계측이
+통과·실패 결과를 바꾸지 않았다는 뜻이고, 실행이 계측 없는 실행과 한 바이트까지 같다는
+뜻은 아니다. 다만 3번 실패처럼 계측이 실행을 바꾸면 그 결과가 exit 코드로 드러나므로,
+"그런 일이 이 패스에서는 없었다" 까지가 확인된 사실이다. 자식 패스에서는 6개가 exit 1 인데,
+그것이 바로 3번 실패의 흔적이다. 그래서 "무엇이 끝까지 실행됐나" 는 거기서 읽지 않고,
+거기서 읽는 것은 "무엇이 기동됐나" 뿐이다. 기동 기록은 실패보다 앞서 남는다.
+
+시도 시점에 기록하므로 예외를 삼켜도 남는다. 테스트 바이트는 고치지 않고, 계측은 저장소에
+남기지 않는다.
 
 ### 관측 결과
 
 - 자식 프로세스를 띄우는 파일 35개
 - loopback HTTP 서버를 여는 파일 5개. 그중 하나는 fork 한 자식이 연다
-- 관측된 명령은 `node`, `git`, `curl`, 그리고 테스트가 임시 디렉터리에 직접 써 넣는
-  `trufflehog`·`codex` 스텁이다. 실제 `trufflehog` 는 이 호스트에 설치돼 있지도 않다
-- URL 이 오간 파일에서 목적지는 전부 `127.0.0.1` 이다. 예외가 하나 있다.
-  `test/manual-publication-authority.test.ts` 는 `https://authority` 를 `curl` 에 넘기는데,
-  그 `curl` 은 테스트가 임시 디렉터리에 만들어 `PATH` 앞에 붙인 가짜다. JUN-135 때의 선언이
-  이미 그렇게 적고 있다
-
-각 파일의 선언 문장은 이 관측에서 나왔다. 토큰 분류가 아니다.
+- 관측된 명령은 `node`, `git`, `curl`, `command-intake-fixture.mjs`, 그리고 테스트가 임시
+  디렉터리에 직접 써 넣는 `trufflehog`·`codex` 스텁이다. 실제 `trufflehog` 는 이 호스트에
+  설치돼 있지도 않다
+- 목적지로 나온 URL 은 전부 `127.0.0.1` 이다. 예외 두 개는 둘 다 JUN-135 때부터 있던 13개
+  안에 있다. `test/manual-publication-authority.test.ts` 는 `https://authority` 를 테스트가
+  임시 `PATH` 에 만든 가짜 `curl` 에 넘기고, `test/automerge-metrics.test.ts` 는 GitHub URL 을
+  로컬 `node` mock 의 인자로 넘긴다. 자식 패스에서 그 mock 은 아무 네트워크 호출도 하지 않았다
 
 #### loopback 서버 5개
 
@@ -114,14 +122,14 @@
 | `test/apply-stale-version-bug-policy.test.ts` | node |
 | `test/apply-stalled-pr-policies.test.ts` | node |
 | `test/apply-unsponsored-feature-policy.test.ts` | node |
-| `test/assist-artifact.test.ts` | a stub trufflehog the test writes to a temporary directory |
+| `test/assist-artifact.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
 | `test/automerge-metrics.test.ts` | node |
 | `test/check-docs.test.ts` | git |
 | `test/close-reasons.test.ts` | node |
 | `test/codex-app-server-output.test.ts` | a stub codex the test writes to a temporary directory, node |
 | `test/label-mutation-batch.test.ts` | node |
 | `test/manual-publication-authority.test.ts` | curl, node |
-| `test/pr-close-coverage-proof.test.ts` | a stub trufflehog the test writes to a temporary directory |
+| `test/pr-close-coverage-proof.test.ts` | a stub trufflehog the test writes to a temporary directory, node |
 | `test/repair/comment-router-config.test.ts` | git |
 | `test/repair/comment-router-utils.test.ts` | git |
 | `test/repair/exact-review-command-queue.test.ts` | command-intake-fixture.mjs, curl |
@@ -131,18 +139,40 @@
 | `test/review-preparation.test.ts` | node |
 | `test/review-prompt-policy.test.ts` | node |
 
-### 이 관측이 증명하지 않는 것
+### 이 관측이 보지 못하는 것
 
-계측은 Node 안쪽에서 건다. 자식이 Node 가 아니면(`curl`, 스텁 바이너리) 그 안에서 무엇을
-하는지는 argv 로만 본다. `curl` 에 넘어간 URL 이 전부 `127.0.0.1` 이라는 사실이 그래서
-중요하다. 그리고 계측을 얹으면 자식 환경이 달라지므로, 스텁 바이너리를 쓰는 6개 파일은
-관측 실행에서 exit 1 을 냈다. 게이트 기록은 계측 없는 `lina:test-safe` 실행이다.
+계측은 Node 안쪽에서 건다. 아래는 원리상 빠지는 자리이고, 선언 문장은 그만큼만 주장한다.
+
+- 자식이 Node 가 아니면(`curl`, 스텁 바이너리) 그 안에서 무엇을 하는지는 argv 로만 본다.
+  `curl` 에 넘어간 URL 이 전부 `127.0.0.1` 이라는 사실이 그래서 중요하다
+- `worker_threads` 와 `dgram` 은 감싸지 않았다. 복원한 테스트에도, `src/` 와 `dashboard/` 에도
+  두 모듈을 쓰는 곳이 없다(`rg -l 'node:worker_threads|node:dgram'` 가 0건)
+- 계측이 얹히기 전에 함수 참조를 붙잡아 둔 코드, 그리고 감싼 함수를 다시 덮어쓰는 코드는
+  빠져나간다. 이건 적대적 코드에 대한 방어가 아니라 고정된 upstream pin 의 관측이다
+- `fetch` 를 쓰지 않는 HTTP 는 `Socket.connect` 로만 보이고, 경로가 아니라 호스트·포트만 남는다
+
+### 레인을 멈출 때
+
+실행은 자기 프로세스 그룹에서 돈다. 시간 초과나 시그널로 끝난 실행의 자손을 한꺼번에
+정리하려면 그래야 하지만, 대가로 터미널의 Ctrl-C 가 테스트에 닿지 않는다. 그냥 두면 레인만
+죽고 테스트 그룹이 남는다. 그래서 러너가 `SIGINT`·`SIGTERM` 을 직접 받는다.
+
+`spawnSync` 가 루프를 막는 동안에는 핸들러가 돌 수 없으므로, `main` 은 async 로 두고 실행이
+반환할 때마다 루프를 한 번 넘겨준다. 인터럽트는 그 자리에서 반영된다. 그 그룹을 수확하고,
+남은 실행을 시작하지 않고, 128+시그널 번호로 끝난다.
+
+대가는 응답 시간이다. 진행 중인 실행이 반환해야 반영되므로, 최악의 경우 `LANE_TIMEOUT_MS`
+전부인 15분을 기다린다. 자손을 남기지 않는 것과 즉시 멈추는 것 중 앞쪽을 골랐고, 그 대가를
+여기 적는다.
+
+Windows 에는 신호를 보낼 수 있는 프로세스 그룹이 없다. 음수 pid 로 부르면 예외가 나고, 그걸
+삼키면 "정리할 게 없었다" 와 구분이 안 된다. 그래서 `win32` 에서는 시도하지 않고 자손이 남을
+수 있다고 사유에 적어 돌려준다. 이 저장소는 Linux 에서 개발하지만 공개돼 있으므로 적어 둔다.
 
 ### 임시 파일
 
-토큰으로 센 "임시 디렉터리에 쓰는 파일 개수" 는 믿을 수 없어서 적지 않는다. 확인 가능한
-사실만 남긴다. 레인 실행 전후로 `git status --porcelain` 에 upstream 추적 파일 변경이 없다.
-정리하지 않고 남기는 테스트는 `030` 에 실측으로 적는다.
+레인 실행 전후로 `git status --porcelain` 에 upstream 추적 파일 변경이 없다. 정리하지 않고
+남기는 테스트는 `030` 에 실측으로 적는다.
 
 ### credential 필터
 
