@@ -281,5 +281,5 @@ console.log(
   `${fixtureSummary.tests} restored test(s) run against pinned upstream bytes rather than this installation; the fork's own settings are asserted here, not there.`,
 );
 console.log(
-  `Derived tests declared: ${derivedTestSummary.tests}, covering the admission decision the excluded upstream suite cannot reach.`,
+  `Derived tests declared: ${derivedTestSummary.tests}; ${derivedTestSummary.scanned} file(s) scanned across their test-tree import closures for the process-starting surface.`,
 );

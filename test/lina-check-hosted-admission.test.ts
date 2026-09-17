@@ -249,10 +249,7 @@ test("scheduled, manual, target-sweep, and comment workflows admit targets befor
   assert.match(admission, /value: \$\{\{ jobs\.admit\.outputs\.outcome \}\}/);
   assert.match(admission, /outcome: \$\{\{ steps\.probe\.outputs\.outcome \}\}/);
   assert.match(admission, /registry_ref:\s+required: false\s+type: string\s+default: main/);
-  assert.match(
-    admission,
-    /https:\/\/raw\.githubusercontent\.com\/openclaw\/clawsweeper\/\$\{registryRef\}\/config\/target-repositories\.json/,
-  );
+  assert.match(admission, upstreamRegistryReference);
   assert.match(admission, /entry\.deny_repositories/);
   assert.match(admission, /fallback\.denyRepositories\.includes\(target\)/);
   assert.match(admission, /\/\^\(openclaw\|steipete\)\$\/\.test\(owner\)/);

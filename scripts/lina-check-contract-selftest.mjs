@@ -21,16 +21,17 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   BUILD_DISPOSITIONS,
   BOUNDARY_PROBE_SCRIPTS,
   DerivedContractError,
+  DERIVED_TESTS,
   EXCLUDED_TESTS,
   FORBIDDEN_INSTALLATION_LITERALS,
   GUARD_SHA256,
@@ -43,6 +44,7 @@ import {
   UPSTREAM_FIXTURE_TEST_NAMES,
   WRANGLER_PATH,
   assertDerivedContract,
+  assertDerivedTestContract,
   assertFixtureTestContract,
   assertGuardIntact,
   assertModifiedUpstreamContract,
@@ -58,7 +60,9 @@ import {
   blockedNodeTargets,
   classifyBuildPair,
   describeLaunchOutcome,
+  derivedTestClosure,
   reapLaunchGroup,
+  resolveRelativeImport,
   interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
@@ -640,6 +644,211 @@ function countAssertionCalls(source) {
   return source.split("\n").filter((line) => ASSERTION_CALL.test(line)).length;
 }
 
+/**
+ * The derived-test contract, which nothing in this self-test used to exercise.
+ *
+ * That gap mattered more than a missing negative case usually does: the contract
+ * is the only thing standing between a derived test and the process-starting
+ * surface, and it was never run here, so its rejections were assumptions. The
+ * closure control below is the one that would have caught the real hole, where a
+ * declared test's own body is clean and a helper it imports starts a process.
+ */
+const INTAKE_HELPER = "test/helpers/command-intake-fixture.mjs";
+
+function runDerivedTestCases() {
+  const readFile = (path) => readFileSync(join(root, path), "utf8");
+  const base = () => ({
+    declared: structuredClone(config.derived.derivedTests),
+    baselinePaths: new Set([...SAFE_TESTS, ...EXCLUDED_TESTS]),
+    presentPaths: new Set(DERIVED_TESTS),
+    readFile,
+  });
+  let observed = 0;
+
+  // Clean control against the real declaration and the real files. Without it
+  // every rejection below would also pass against a contract that refused
+  // everything, which would prove nothing about this repository.
+  const summary = assertDerivedTestContract(base());
+  assert.equal(summary.tests, DERIVED_TESTS.length);
+  assert.ok(
+    summary.scanned >= DERIVED_TESTS.length,
+    "the closure scan must read at least the declared files",
+  );
+
+  const cases = [
+    ["derived-test-set", (i) => delete i.declared[DERIVED_TESTS[0]]],
+    [
+      "derived-test-set",
+      (i) => (i.declared["test/lina-check-invented.test.ts"] = { reason: "sneaking one in" }),
+    ],
+    ["derived-test-reason", (i) => (i.declared[DERIVED_TESTS[0]] = { reason: "  " })],
+    ["derived-test-missing", (i) => i.presentPaths.delete(DERIVED_TESTS[0])],
+    ["derived-test-upstream-collision", (i) => i.baselinePaths.add(DERIVED_TESTS[0])],
+    [
+      "derived-test-spawns",
+      (i) => {
+        const real = i.readFile;
+        i.readFile = (path) =>
+          path === DERIVED_TESTS[0] ? "import { spawnSync } from 'x';" : real(path);
+      },
+    ],
+  ];
+  for (const [code, mutate] of cases) {
+    const input = base();
+    mutate(input);
+    assert.throws(() => assertDerivedTestContract(input), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // Positive control for the closure scan, run against the real helper bytes.
+  // The fixture body carries no denied token of its own; the only way this can
+  // be refused is by following the import into test/helpers and reading what is
+  // actually there. A scan that stopped at the declared file would accept it.
+  const closureInput = base();
+  const realRead = closureInput.readFile;
+  closureInput.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import { startIntakeFixture } from "./helpers/command-intake-fixture.mjs";\n'
+      : realRead(path);
+  let refused = null;
+  try {
+    assertDerivedTestContract(closureInput);
+  } catch (error) {
+    refused = error;
+  }
+  assert.ok(refused, "positive control: an imported process-starting helper must be refused");
+  assert.equal(refused.code, "derived-test-spawns");
+  assert.match(
+    refused.message,
+    new RegExp(INTAKE_HELPER.split(".").join("\\.")),
+    "the refusal must name the helper, not just the declared file",
+  );
+  assert.match(refused.message, /fork\(|child_process/);
+  observed += 3;
+
+  // The helper is real and still carries what the control depends on. If it is
+  // ever cleaned up, the control above would silently stop proving anything.
+  assert.ok(
+    readFile(INTAKE_HELPER).includes("fork("),
+    INTAKE_HELPER + " no longer carries the surface this control depends on",
+  );
+  const closure = derivedTestClosure(DERIVED_TESTS[0], readFile);
+  assert.equal(closure[0], DERIVED_TESTS[0], "the entry is part of its own closure");
+  assert.equal(
+    resolveRelativeImport("test/a.test.ts", "./helpers/command-intake-fixture.mjs"),
+    INTAKE_HELPER,
+  );
+  assert.equal(resolveRelativeImport("test/a.test.ts", "../dist/x.js"), "dist/x.js");
+  assert.equal(resolveRelativeImport("test/a.test.ts", "node:fs"), null);
+  observed += 5;
+  return observed;
+}
+
+/**
+ * Runtime observation: the declared derived tests, run in one process with the
+ * process-starting surface instrumented, must start nothing.
+ *
+ * A static scan cannot see through a product module, so this is the half that
+ * covers everything outside the test tree. The positive control runs first and
+ * on the same hook: a zero from an instrument that was never proven to record
+ * anything is not evidence.
+ */
+const LAUNCH_LOG_ENV = "LINA_CHECK_LAUNCH_LOG";
+const DERIVED_TEST_CASE_FLOOR = 140;
+const PRELOAD_SOURCE = [
+  'import { appendFileSync } from "node:fs";',
+  'import { createRequire, syncBuiltinESMExports } from "node:module";',
+  "",
+  "const log = process.env." + LAUNCH_LOG_ENV + ";",
+  'if (!log) throw new Error("' + LAUNCH_LOG_ENV + ' must name the observation file");',
+  'const started = createRequire(import.meta.url)("node:child_process");',
+  'for (const name of ["spawn", "spawnSync", "exec", "execFile", "execFileSync", "execSync", "fork"]) {',
+  "  const original = started[name];",
+  "  started[name] = function observed(...args) {",
+  "    // Recorded at the attempt, so a swallowed failure still leaves a mark.",
+  '    appendFileSync(log, JSON.stringify({ name, command: String(args[0]) }) + "\\n");',
+  "    return original.apply(this, args);",
+  "  };",
+  "}",
+  "syncBuiltinESMExports();",
+  "",
+].join("\n");
+const SENTINEL_SOURCE = [
+  'import test from "node:test";',
+  'import { spawnSync } from "node:child_process";',
+  "",
+  'test("sentinel starts one harmless process", () => {',
+  '  spawnSync(process.execPath, ["-e", ""], { encoding: "utf8" });',
+  "});",
+  "",
+].join("\n");
+
+function runDerivedTestObservation() {
+  const directory = mkdtempSync(join(tmpdir(), "lina-check-launch-"));
+  const preload = join(directory, "preload.mjs");
+  const sentinel = join(directory, "sentinel.test.mjs");
+  writeFileSync(preload, PRELOAD_SOURCE);
+  writeFileSync(sentinel, SENTINEL_SOURCE);
+  const observe = (name, source) => {
+    const log = join(directory, name + ".jsonl");
+    writeFileSync(log, "");
+    const result = spawnSync(
+      process.execPath,
+      ["--import", pathToFileURL(preload).href, "--input-type=module", "-e", source],
+      {
+        cwd: root,
+        encoding: "utf8",
+        timeout: 600_000,
+        env: { ...process.env, [LAUNCH_LOG_ENV]: log },
+      },
+    );
+    const launches = readFileSync(log, "utf8").split("\n").filter(Boolean).map(JSON.parse);
+    return { result, launches };
+  };
+
+  const control = observe("control", "await import(" + JSON.stringify(sentinel) + ");");
+  assert.equal(
+    control.result.status,
+    0,
+    "positive control: the sentinel must run: " + String(control.result.stderr).slice(-400),
+  );
+  assert.ok(
+    control.launches.length >= 1,
+    "positive control: the hook recorded nothing, so a zero elsewhere means nothing",
+  );
+  assert.ok(
+    control.launches.some((entry) => entry.name === "spawnSync"),
+    "positive control: the sentinel's launch must be recorded by name",
+  );
+
+  const imports = DERIVED_TESTS.map(
+    (path) => "await import(" + JSON.stringify(join(root, path)) + ");",
+  ).join("\n");
+  const observed = observe("derived", imports);
+  assert.equal(
+    observed.result.status,
+    0,
+    "the derived tests must pass under observation: " + String(observed.result.stderr).slice(-600),
+  );
+  const passed = /pass (\d+)/.exec(observed.result.stdout);
+  assert.ok(passed, "could not read a pass count from the observed run");
+  assert.ok(
+    Number(passed[1]) >= DERIVED_TEST_CASE_FLOOR,
+    "observed " + passed[1] + " derived cases, below the floor of " + DERIVED_TEST_CASE_FLOOR,
+  );
+  assert.match(observed.result.stdout, /fail 0/, "the observed run reported failures");
+  assert.deepEqual(
+    observed.launches,
+    [],
+    "a derived test started a process: " + JSON.stringify(observed.launches),
+  );
+  return {
+    cases: Number(passed[1]),
+    launches: observed.launches.length,
+    control: control.launches.length,
+  };
+}
+
 function runAssertionIntegrity() {
   return runAssertionIntegrityInner();
 }
@@ -1067,6 +1276,8 @@ try {
   const installation = await runInstallationCases();
   const upstream = runModifiedUpstreamCases();
   const controls = await runTripwireControls();
+  const derivedTests = runDerivedTestCases();
+  const observation = runDerivedTestObservation();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +
@@ -1084,6 +1295,14 @@ try {
       controls.ran +
       " routing=" +
       controls.routing +
+      " derivedTestContract=" +
+      derivedTests +
+      " derivedCases=" +
+      observation.cases +
+      " derivedLaunches=" +
+      observation.launches +
+      " launchControl=" +
+      observation.control +
       " assertionCalls=" +
       integrity.baseline +
       "->" +

@@ -15,13 +15,19 @@ export const TRIPWIRE_ENV = "LINA_CHECK_SPAWN_TRIPWIRE";
 export const PLAN_UNIT = "devlog/_plan/260917_jun135_part_a";
 export const PLAN_UNIT_JUN198 = "devlog/_plan/260917_jun198_install_profile";
 export const PLAN_UNIT_JUN203 = "devlog/_plan/260917_jun203_safe_test_lane";
+export const PLAN_UNIT_JUN223 = "devlog/_plan/260917_jun223_lost_coverage";
 
 /**
  * Plan units whose documents may be declared as derived files. Listing them here
  * rather than widening the pattern to all of devlog/_plan keeps a new directory
  * name from silently becoming an accepted location.
  */
-export const PLAN_UNITS = Object.freeze([PLAN_UNIT, PLAN_UNIT_JUN198, PLAN_UNIT_JUN203]);
+export const PLAN_UNITS = Object.freeze([
+  PLAN_UNIT,
+  PLAN_UNIT_JUN198,
+  PLAN_UNIT_JUN203,
+  PLAN_UNIT_JUN223,
+]);
 
 export const DERIVED_SCRIPT_NAMES = Object.freeze([
   "lina:boundary-probe",
@@ -623,7 +629,19 @@ export function reapLaunchGroup(outcome, kill, platform = process.platform) {
  * .github/workflows/hosted-target-admission.yml, and every workflow here is
  * parked, so that file does not exist.
  */
-export const DERIVED_TESTS = Object.freeze(["test/lina-check-admission.test.ts"]);
+export const DERIVED_TESTS = Object.freeze([
+  "test/lina-check-action-ledger.test.ts",
+  "test/lina-check-actions-runtime.test.ts",
+  "test/lina-check-admission.test.ts",
+  "test/lina-check-close-policy.test.ts",
+  "test/lina-check-failure-telemetry.test.ts",
+  "test/lina-check-github-api.test.ts",
+  "test/lina-check-hosted-admission.test.ts",
+  "test/lina-check-node-test-runner.test.ts",
+  "test/lina-check-response-deadlines.test.ts",
+  "test/lina-check-scheduled-review.test.ts",
+  "test/lina-check-webhook-admission.test.ts",
+]);
 
 /**
  * A derived test may import a blocked entrypoint to inspect its behaviour, which
@@ -640,20 +658,79 @@ const SPAWN_SURFACE = Object.freeze([
   "fork(",
 ]);
 
+/**
+ * Resolve a relative import the way the loader would, without node:path, so the
+ * self-test can drive it on invented paths. A bare or absolute specifier returns
+ * null: those are packages and built output, not files this repository owns
+ * inside the test tree.
+ */
+export function resolveRelativeImport(fromPath, specifier) {
+  if (typeof specifier !== "string" || !specifier.startsWith(".")) return null;
+  const stack = [];
+  for (const part of [...fromPath.split("/").slice(0, -1), ...specifier.split("/")]) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (stack.length === 0) return null;
+      stack.pop();
+      continue;
+    }
+    stack.push(part);
+  }
+  return stack.join("/");
+}
+
+const IMPORT_SPECIFIER = /(?:from|import)\s*\(?\s*["']([^"']+)["']/g;
+
+/**
+ * Every file inside the test tree a derived test can reach, entry included.
+ *
+ * The token scan used to read the declared file and stop there, which is exactly
+ * one level short of the thing it was written to prevent: test/helpers holds a
+ * module that starts a process from inside a helper, so a declared test could
+ * import it and still show a clean body. Imports that leave the test tree are not
+ * followed, because product modules legitimately carry that surface and are
+ * covered instead by the runtime observation the self-test performs.
+ */
+export function derivedTestClosure(entry, readFile) {
+  const seen = new Set([entry]);
+  const queue = [entry];
+  const visited = [];
+  while (queue.length > 0) {
+    const path = queue.shift();
+    visited.push(path);
+    const source = String(readFile(path));
+    for (const match of source.matchAll(IMPORT_SPECIFIER)) {
+      const resolved = resolveRelativeImport(path, match[1]);
+      if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
+      seen.add(resolved);
+      queue.push(resolved);
+    }
+  }
+  return visited;
+}
+
 export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
   const names = Object.keys(declared ?? {}).sort();
   if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));
+  let scanned = 0;
   for (const path of names) {
     if (!nonEmptyReason(declared[path])) fail("derived-test-reason", path);
     if (baselinePaths.has(path)) fail("derived-test-upstream-collision", path);
     if (!presentPaths.has(path)) fail("derived-test-missing", path);
     if (SAFE_TESTS.includes(path) || EXCLUDED_TESTS.includes(path))
       fail("derived-test-upstream-collision", path);
-    const source = readFile(path);
-    for (const token of SPAWN_SURFACE)
-      if (source.includes(token)) fail("derived-test-spawns", path + " -> " + token);
+    for (const member of derivedTestClosure(path, readFile)) {
+      const source = String(readFile(member));
+      scanned += 1;
+      for (const token of SPAWN_SURFACE)
+        if (source.includes(token))
+          fail(
+            "derived-test-spawns",
+            (member === path ? path : path + " -> " + member) + " -> " + token,
+          );
+    }
   }
-  return { tests: names.length };
+  return { tests: names.length, scanned };
 }
 
 export function assertFixtureTestContract(declared, baselinePaths) {

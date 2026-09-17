@@ -1,0 +1,1229 @@
+{
+  "generated_for": "LINA-1 (JUN-223)",
+  "total_records": 144,
+  "top_level_records": 141,
+  "nested_records": 3,
+  "distinct_case_ids": 144,
+  "duplicate_case_ids": [],
+  "counts": {
+    "recovered": 122,
+    "lost": 13,
+    "partial": 9
+  },
+  "per_file": {
+    "test/actions-runtime.test.ts": {
+      "total": 3,
+      "recovered": 3,
+      "partial": 0,
+      "lost": 0
+    },
+    "test/clawsweeper-action-ledger.test.ts": {
+      "total": 26,
+      "recovered": 19,
+      "partial": 0,
+      "lost": 7
+    },
+    "test/dashboard-github-api.test.ts": {
+      "total": 3,
+      "recovered": 3,
+      "partial": 0,
+      "lost": 0
+    },
+    "test/exact-review-failure-telemetry.test.ts": {
+      "total": 12,
+      "recovered": 12,
+      "partial": 0,
+      "lost": 0
+    },
+    "test/github-response-deadlines.test.ts": {
+      "total": 8,
+      "recovered": 8,
+      "partial": 0,
+      "lost": 0
+    },
+    "test/hosted-target-admission.test.ts": {
+      "total": 7,
+      "recovered": 6,
+      "partial": 0,
+      "lost": 1
+    },
+    "test/repair/comment-webhook.test.ts": {
+      "total": 38,
+      "recovered": 26,
+      "partial": 8,
+      "lost": 4
+    },
+    "test/review-close-policy.test.ts": {
+      "total": 33,
+      "recovered": 33,
+      "partial": 0,
+      "lost": 0
+    },
+    "test/run-node-tests.test.ts": {
+      "total": 7,
+      "recovered": 6,
+      "partial": 1,
+      "lost": 0
+    },
+    "test/scheduled-review-noop.test.ts": {
+      "total": 7,
+      "recovered": 6,
+      "partial": 0,
+      "lost": 1
+    }
+  },
+  "records": [
+    {
+      "original": "test/actions-runtime.test.ts",
+      "case": "GitHub App token creation uses the approved immutable action pin everywhere",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-actions-runtime.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/actions-runtime.test.ts",
+      "case": "GitHub App token owner inputs do not consume the multi-owner repair policy",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-actions-runtime.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/actions-runtime.test.ts",
+      "case": "cache actions use one runtime generation everywhere",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-actions-runtime.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "primary command success survives best-effort action ledger flush failure",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "primary command failure is not masked by action ledger flush failure",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "explicit action ledger finalization keeps flush failure strict",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "action event import rejects an invalid expected producer run ID",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "action event import rejects an invalid maximum producer run attempt",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "action event import keeps exact and maximum producer attempts mutually exclusive",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "action event import rejects an invalid expected producer SHA",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Calls main([\"check\"]), which resolves the repository root from the module location and requires .github/workflows/sweep.yml. Every workflow here is parked, so the command ends at \"Missing workflow\" before the assertion."
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "review and apply outcome classifiers cover terminal and resumable states",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "failed-review retry events distinguish dispatch, exhaustion, and backpressure",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "action event publication accepts only sorted canonical event and binding paths",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "apply and retry business idempotency ignore batch order but bind source revision",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "lane instrumentation uses stable slots with explicit parent and phase ordering",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "review candidates start lazily and deferred items cannot remain active",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "apply receipts start per item and persist mutation observation before finalization",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "apply mutation receipts bind every GitHub request attempt and preserve no-op truth",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "GitHub throttles abort apply lease checks and preserve durable lease ownership",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "runtime yields bind the active item and terminal Codex failures preserve retryability",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "blocked exact close publication discards staged labels before writing the report",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "retry dispatch outcomes distinguish definite rejection, ambiguity, and acceptance",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "untrusted Codex processes cannot inherit action-ledger producer authority",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "apply failure finalization survives report publication errors",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "apply report publication uses digest evidence without a durable record path",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "retry and review publication lanes finalize unexpected failures",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "sweep publishes complete immutable shards for every review and apply producer",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "comment router publishes immutable command receipts for initial and retry invocations",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/clawsweeper-action-ledger.test.ts",
+      "case": "the ledger distinguishes a blocked fallback from ordinary kept-open comment work",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-action-ledger.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/dashboard-github-api.test.ts",
+      "case": "GitHub API URL uses the production origin by default",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-github-api.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/dashboard-github-api.test.ts",
+      "case": "GitHub API URL honors a validated loopback override",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-github-api.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/dashboard-github-api.test.ts",
+      "case": "GitHub API URL rejects non-default remote or non-origin overrides",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-github-api.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry validates only closed sanitized classifications",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry validates terminal status receipts",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "terminal status receipts accept explicit null nullable fields",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "terminal status delivery failures alert without changing attempt identity",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "unavailable terminal status does not raise a delivery failure incident",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure fingerprints are synchronous, stable, and source-sensitive",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure source fingerprints distinguish PR base revisions",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry deduplicates attempts and detects repeated source failures",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry does not join failures across source revisions",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry repairs schema readiness after an outer rollback",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry enforces retention without stats polling",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/exact-review-failure-telemetry.test.ts",
+      "case": "review failure telemetry persists and expires dropped-attempt health",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-failure-telemetry.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "queue bounds a stalled 200 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "queue bounds a stalled 503 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "queue bounds a stalled 429 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "app bounds a stalled 200 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "app bounds a stalled 503 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "app bounds a stalled 429 body and preserves its error class",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "queue preserves JSON parse failures after a successful body read",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/github-response-deadlines.test.ts",
+      "case": "app preserves JSON parse failures after a successful body read",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-response-deadlines.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted target eligibility is configured profiles plus owner fallbacks",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted target eligibility reads configured profiles and fallback deny policy together",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted target registry lookup stays inside queue caller deadlines",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted target metadata classification is authenticated, fresh, and fail-closed",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted target metadata retry hints honor bounded GitHub quota headers",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "hosted admission heredocs execute as ESM without network access",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Extracts two heredoc scripts from the workflow and runs each as a separate process. A derived test starts nothing."
+    },
+    {
+      "original": "test/hosted-target-admission.test.ts",
+      "case": "scheduled, manual, target-sweep, and comment workflows admit targets before privileged jobs",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-hosted-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook accepts maintainer ClawSweeper commands",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook ignores ClawSweeper proof-nudge comments",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook ignores command-bearing assist and visual publications before ack or dispatch",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "handleGitHubWebhook with durable intake. The command classification it turns on is restored by the accepted and ignored classifier cases; the intake and ack sequencing is not."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "standalone webhook terminal admission blocks delayed private and missing targets",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "Standalone HTTP handler plus target probing. The admission verdicts are restored through the classifier and the hosted metadata probe; the HTTP path and the delayed-probe ordering are not."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "standalone webhook retryable admission defers without intake or target effects",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "Same handler. The retryable classification is restored in the hosted metadata probe cases; the deferral's effect on intake is not."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "standalone webhook admits public targets before durable command intake",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "Same handler. Admission is restored as a decision; its ordering against durable intake is not."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook rejects inline ClawSweeper mentions before visible ack",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook accepts ClawSweeper mention commands on their own line",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook rejects contributor commands before visible ack",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook accepts author read-only re-review commands",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook rejects stale re-review commands on closed PRs before fast ack",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook still accepts post-close re-review commands for router response",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook rejects malformed and unconfigured repository commands before probing",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook accepts an explicitly configured external-owner repository",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook rejects non-author read-only re-review commands",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook accepts eligible issue events for public OpenClaw repositories",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "fallback issue events carry the hosted source revision material",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook accepts eligible pull request events for configured steipete repositories",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "fallback PR lifecycle events carry the hosted source revision material",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook carries the semantic tuple through edited pull request fallback intake",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "adaptive Codex timeout preserves the default for small non-media PRs",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "adaptive Codex timeout scales for large PRs",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "adaptive Codex timeout stays capped separately from media preprocessing",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "pull request webhooks dispatch adaptive Codex timeout payload",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "The timeout values are restored by the three adaptive-timeout cases; carrying them through a dispatched payload is not."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook preserves valid repository default branch for item dispatch",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook falls back to main for invalid repository default branch",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook rejects private target repositories and accepts generic public repositories",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook requeues unlocked and close-guard removal events",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook rejects label additions and unrelated removals from exact-review intake",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "fast ack comment carries source comment marker",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "concurrent duplicate command webhooks converge on one fast ack comment",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "Needs concurrent handler invocations against a durable store. The ack marker itself is restored by the fast-ack rendering case."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "comment webhook settles duplicate fast ack comments after dispatch",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "Settlement is a property of repeated handler runs against a store, not of a classification."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook signature verification uses sha256 body hmac",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-webhook-admission.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook GitHub requests have a deadline through the response body",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-webhook-admission.test.ts (in part)",
+      "note": "The body deadline is restored against both read paths in the recovered deadline suite; driving it through the webhook needs a loopback server."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "standalone HTTP webhook preserves intake failure classification",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Reaches test/helpers/command-intake-fixture.mjs, which starts a process from inside the helper. Out of bounds for a derived test."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook GitHub requests have a deadline through the response body > success",
+      "nested": true,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Subtest of the loopback-server case; it exists only inside that server run."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook GitHub requests have a deadline through the response body > headers",
+      "nested": true,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Subtest of the loopback-server case; it exists only inside that server run."
+    },
+    {
+      "original": "test/repair/comment-webhook.test.ts",
+      "case": "webhook GitHub requests have a deadline through the response body > body",
+      "nested": true,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "Subtest of the loopback-server case; it exists only inside that server run."
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review prompt documents gated backlog close policies",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review prompt closes independently disproven nonexistent-source bug reports",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "external desktop-product bugs close without inventing upstream maintainer work",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "close-first triage keeps actionable upstream work and invites better reports",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "all exact-review publication paths inherit the shared automatic-close policy",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "unsponsored feature issue proposals emit source-bound trusted close markers",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "protected labels are normalized and only maintainer-only items stay plannable",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "parseGhJson adds gh command context to malformed JSON errors",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "parseGhJsonLines adds line number and command context to malformed JSONL errors",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "parseGhJsonWithRetry reloads malformed successful responses",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "commit review parses co-authored-by trailers",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "protected labels block close proposals even for otherwise valid decisions",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "PR close-exemption labels produce a distinct guarded-open action",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "verified fixed maintainer items can become close proposals",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "maintainer items stay protected for non-fixed close reasons",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review actions only propose valid closes and never apply directly",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review actions render deterministic close comments when model close comment is empty",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "close comments reference high-confidence merged fixing PRs",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "implemented-on-main closure fails closed without a GitHub-verified fixing PR",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "PR implementation provenance accepts only explicit same-repository closing issues",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "PR implementation provenance caps linked issue references",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "PR implementation provenance accepts only the current GitHub issue-closing PR",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "commit PR lookup selects the newest merged pull request",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "commit PR lookup rejects unrelated closing references at the claimed fixed SHA",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "commit PR lookup accepts an exact closing reference in the fixed commit message",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "commit PR lookup rejects closing references on a non-default branch",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "report-rendered close comments keep merged fixing PR provenance",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "close comments suppress duplicate best solution text",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review details show applied AGENTS.md policy status",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "review details show missing AGENTS.md policy status",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "skill-only OpenClaw PRs can close through ClawHub with upload guidance",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "ClawHub policy requires verified fixing provenance before main-implemented PR closure",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/review-close-policy.test.ts",
+      "case": "ClawSweeper policy requires verified fixing provenance before self PR closure",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-close-policy.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner caps adaptive concurrency at sixteen",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner environment override is validated and CLI choice takes precedence",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner expands named targets with sorted de-duplicated files",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner parses CLI concurrency overrides and forwarded Node options",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "composed no-build scripts preserve standalone build contracts",
+      "nested": false,
+      "disposition": "partial",
+      "covered_by": "test/lina-check-node-test-runner.test.ts (in part)",
+      "note": "Cannot hold as written: this fork replaced every composed test command with the scaffold guard. Replaced by the guards-not-builds case, which asserts the changed contract instead."
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner fails clearly when a target has no files",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/run-node-tests.test.ts",
+      "case": "test runner preserves child arguments, exit codes, and terminating signals",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-node-test-runner.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time classifier accepts trusted owned activity through timestamp settling",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time semantic identity matches the review runtime",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time classifier preserves human and mixed source changes",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time classifier preserves protected and human-owned label changes",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time classifier is conservative for source drift and missing receipts",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "claim-time classifier requires an exact durable pull request head",
+      "nested": false,
+      "disposition": "recovered",
+      "covered_by": "test/lina-check-scheduled-review.test.ts",
+      "note": ""
+    },
+    {
+      "original": "test/scheduled-review-noop.test.ts",
+      "case": "live admission skips inapplicable no-op reads while preserving hot and terminal paths",
+      "nested": false,
+      "disposition": "lost",
+      "covered_by": "",
+      "note": "runReadScopeProof() runs a real shell against the parked workflow. Out of bounds for a derived test."
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "purpose": "Each recovered expectation is replaced with a wrong one; a suite that cannot detect it is not carrying coverage.",
+  "mutations": 7,
+  "detected": 7,
+  "undetected": [],
+  "results": [
+    {
+      "file": "test/lina-check-actions-runtime.test.ts",
+      "mutation": "expect a cache action generation the tree does not use",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-actions-runtime.test.ts",
+      "mutation": "drop the parked workflows from the traversal, the way the excluded suite does",
+      "exit_code": 1,
+      "failing_cases": 2,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-failure-telemetry.test.ts",
+      "mutation": "unpin the clock reading again",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-webhook-admission.test.ts",
+      "mutation": "claim an unconfigured installation admits the command",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-github-api.test.ts",
+      "mutation": "accept a remote override the validator refuses",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-close-policy.test.ts",
+      "mutation": "read the unparked workflow spelling again",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-action-ledger.test.ts",
+      "mutation": "read the unparked workflow spelling again",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    }
+  ]
+}
