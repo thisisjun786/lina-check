@@ -144,6 +144,46 @@ export const UPSTREAM_FIXTURE_TESTS = Object.freeze({
 
 export const UPSTREAM_FIXTURE_TEST_NAMES = Object.freeze(Object.keys(UPSTREAM_FIXTURE_TESTS).sort());
 
+/**
+ * Tests this fork wrote, kept separate from the restored upstream set so a
+ * report never blurs the two. These cover the admission decision, which the
+ * upstream suite for it cannot: test/hosted-target-admission.test.ts opens
+ * .github/workflows/hosted-target-admission.yml, and every workflow here is
+ * parked, so that file does not exist.
+ */
+export const DERIVED_TESTS = Object.freeze(["test/lina-check-admission.test.ts"]);
+
+/**
+ * A derived test may import a blocked entrypoint to inspect its behaviour, which
+ * a derived script may not. That difference is only safe while the test cannot
+ * start anything, so the process-spawning surface is denied by name. Without
+ * this, the .mjs blocked-target rule would simply move to a .ts file.
+ */
+const SPAWN_SURFACE = Object.freeze([
+  "node:child_process",
+  "child_process",
+  "spawnSync",
+  "execFileSync",
+  "execSync",
+  "fork(",
+]);
+
+export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
+  const names = Object.keys(declared ?? {}).sort();
+  if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));
+  for (const path of names) {
+    if (!nonEmptyReason(declared[path])) fail("derived-test-reason", path);
+    if (baselinePaths.has(path)) fail("derived-test-upstream-collision", path);
+    if (!presentPaths.has(path)) fail("derived-test-missing", path);
+    if (SAFE_TESTS.includes(path) || EXCLUDED_TESTS.includes(path))
+      fail("derived-test-upstream-collision", path);
+    const source = readFile(path);
+    for (const token of SPAWN_SURFACE)
+      if (source.includes(token)) fail("derived-test-spawns", path + " -> " + token);
+  }
+  return { tests: names.length };
+}
+
 export function assertFixtureTestContract(declared, baselinePaths) {
   const names = Object.keys(declared ?? {}).sort();
   if (!sameList(names, [...UPSTREAM_FIXTURE_TEST_NAMES])) fail("fixture-test-set", names.join(","));
@@ -371,6 +411,7 @@ const DERIVED_FILE_PATTERNS = Object.freeze([
   /^config\/lina-check-[a-z-]+\.json$/,
   /^schema\/lina-check-[a-z-]+\.schema\.json$/,
   /^docs\/lina-check\/[a-z0-9-]+\.md$/,
+  /^test\/lina-check-[a-z-]+\.test\.ts$/,
 ]);
 const DERIVED_SCRIPT_COMMAND = /^node (scripts\/lina-check-[a-z-]+\.mjs)(?: [a-z-]+)*$/;
 const BLOCKED_NODE_TARGET = /\bnode ([\w./-]+\.(?:js|mjs|cjs|ts|mts))\b/g;

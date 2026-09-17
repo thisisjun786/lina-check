@@ -3,7 +3,7 @@ import {
   githubResponseRateLimited,
   type GitHubRateLimitHint,
 } from "../src/hosted-target-admission.ts";
-import { githubTransportAllowed } from "../src/lina-check-installation-contract.ts";
+import { githubTransportPermitted } from "../src/lina-check-installation-contract.ts";
 
 export {
   githubResponseRateLimitHint,
@@ -90,7 +90,7 @@ export function githubApiUrl(env: GithubApiEnv, path: string): string {
     throw new Error(
       "GitHub API path has an empty segment: refusing a request assembled from unset configuration",
     );
-  if (!githubTransportAllowed(env))
+  if (!githubTransportPermitted(env))
     throw new Error(
       "refusing a GitHub request: this installation is unconfigured and carries no GitHub credential",
     );

@@ -668,7 +668,12 @@ export async function admitSelectedRepositories<RepositoryT extends SelectedRepo
   const admissions = await Promise.all(
     eligible.map(
       async (repository) =>
-        [repository, await probeHostedPublicTarget(repository.targetRepo, token, reader)] as const,
+        [
+          repository,
+          await probeHostedPublicTarget(repository.targetRepo, token, reader, {
+            installation: options.policy.installation,
+          }),
+        ] as const,
     ),
   );
   const retryable = admissions.find(([, admission]) => admission.outcome === "retryable");

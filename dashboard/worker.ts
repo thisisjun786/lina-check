@@ -3465,7 +3465,7 @@ function refreshStatus(request, env) {
     dashboardWorkflowSource(env),
     env.TARGET_REPOS || "",
     env.PUBLIC_BAY_REPOS || "",
-    env.CLAWSWEEPER_STATE_REPO || "",
+    env.EXACT_REVIEW_STATE_REPO || "",
     env.WORKER_BUDGET || "",
     env.WORKER_DETAIL_RUN_LIMIT || "",
     env.INCLUDE_CI_STATUS || "",
@@ -4148,6 +4148,7 @@ async function workerHostedTargetVisibilityAdmission(
     const token = await exactReviewRepositoryToken(env, { metadata: "read" });
     return probeHostedPublicTarget(targetRepo, token, fetch, {
       apiUrl: (path) => githubApiUrl(env, path),
+      installation: installationFromEnv(env as Record<string, unknown>),
     });
   } catch (error) {
     return hostedTargetRetryableAdmission(error);
@@ -10949,8 +10950,8 @@ async function readApplyHealthMarker(
   targetRepo,
   github: GithubJsonReader = (path) => githubJson(env, path),
 ) {
-  const stateRepo = String(env.CLAWSWEEPER_STATE_REPO || "");
-  const stateRef = String(env.CLAWSWEEPER_STATE_REF || "");
+  const stateRepo = String(env.EXACT_REVIEW_STATE_REPO || "");
+  const stateRef = String(env.EXACT_REVIEW_STATE_REF || "");
   const repoSlug = String(targetRepo || "").replace(/\//g, "-");
   const statusPath = `results/sweep-status/${repoSlug}.json`;
   try {
@@ -11169,8 +11170,8 @@ async function readClusterRepairMarker(
   targetRepo,
   github: GithubJsonReader = (path) => githubJson(env, path),
 ) {
-  const stateRepo = String(env.CLAWSWEEPER_STATE_REPO || "");
-  const stateRef = String(env.CLAWSWEEPER_STATE_REF || "");
+  const stateRepo = String(env.EXACT_REVIEW_STATE_REPO || "");
+  const stateRef = String(env.EXACT_REVIEW_STATE_REF || "");
   const repoSlug = String(targetRepo || "").replace(/\//g, "-");
   const markerPath = `results/cluster-repair-intake/${repoSlug}.json`;
   try {

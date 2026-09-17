@@ -163,7 +163,9 @@ export async function handleGitHubWebhook({
       repositories: [repoName(REVIEW_REPO)],
       permissions: { metadata: "read" },
     });
-    admission = await probeHostedPublicTarget(accepted.targetRepo, metadataToken, fetch);
+    admission = await probeHostedPublicTarget(accepted.targetRepo, metadataToken, fetch, {
+      installation: installationProfile(),
+    });
   } catch (error) {
     admission = hostedTargetRetryableAdmission(error);
   }

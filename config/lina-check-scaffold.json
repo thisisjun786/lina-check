@@ -203,6 +203,11 @@
       "src/lina-check-installation.ts": { "reason": "Node-side loader for the installation profile. Kept out of the Worker import graph because it reads the filesystem." }
       ,
       "docs/lina-check/github-app-permissions.md": { "reason": "GitHub App permission scope derived from the calls this source actually makes, staged so a dormant install grants nothing." }
+      ,
+      "test/lina-check-admission.test.ts": { "reason": "Admission coverage on all four deciding paths. The upstream suite for this cannot run here because it opens a workflow file that parking removed." }
+    },
+    "derivedTests": {
+      "test/lina-check-admission.test.ts": { "reason": "Covers the shared Worker and queue decision, the Node webhook classifier and target fanout, including that an unconfigured installation admits nothing and that transport permission is not the admission gate." }
     },
     "modifiedUpstreamFiles": {
       "dashboard/exact-review-queue.ts": { "reason": "Resolved hosted eligibility on its own without installation input, so gating only the Worker would have left this path granting." },

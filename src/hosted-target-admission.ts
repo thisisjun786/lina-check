@@ -55,15 +55,16 @@ export function isHostedTargetEligible(targetRepo: string, policy: HostedTargetP
   // The installation grants; the registry only describes. An unconfigured
   // installation admits nothing, including a repository the registry lists.
   if (!installationConfigured(policy.installation)) return false;
-  if (installationAdmitsRepository(policy.installation, normalized)) {
-    // Named by the installation and described by the registry. Both are needed:
-    // without a registry entry there is no profile to act with.
-    for (const configured of policy.configuredRepositories) {
-      if (normalizeTargetRepo(configured) === normalized) return true;
-    }
-  }
+  // An explicit grant stands on its own. Requiring a registry entry as well made
+  // the two admission paths disagree: the Worker reads a registry and the Node
+  // paths read a preserved local inventory, so the same installation could admit
+  // a target in one and refuse it in the other. Whether a profile describing the
+  // target exists is a separate question, answered where the profile is used.
+  if (installationAdmitsRepository(policy.installation, normalized)) return true;
   const [owner, repoName] = normalized.split("/");
   if (!owner || !repoName) return false;
+  // A fallback owner is a pattern, not a name, and the pattern comes from the
+  // registry. The installation still decides which owners may be matched at all.
   if (!installationAdmitsFallbackOwner(policy.installation, owner)) return false;
   const fallback = policy.genericFallbacks.find((candidate) => candidate.owner === owner);
   return Boolean(
@@ -86,7 +87,15 @@ export async function resolveHostedTargetEligibility(
   const normalized = normalizeTargetRepo(targetRepo);
   if (!normalized) return { outcome: "terminal" };
   const installation = options.installation ?? UNCONFIGURED_INSTALLATION;
+  // Dependency-injection seam, inherited from upstream and kept deliberately.
+  // A caller that supplies a predicate has already decided for itself, which is
+  // the same trust level as the caller that built this env object. It is not a
+  // configuration surface: Cloudflare vars and secrets are strings, so no
+  // deployment setting can produce a function here, and typeof is checked at
+  // every call site. lina:contract-selftest asserts that a string, boolean or
+  // object under the same name grants nothing.
   if (options.predicate) {
+    if (typeof options.predicate !== "function") return { outcome: "terminal" };
     try {
       return (await options.predicate(normalized))
         ? { outcome: "eligible" }
@@ -196,6 +205,7 @@ export async function probeHostedPublicTarget(
   reader: typeof fetch = fetch,
   options: {
     apiUrl?: (path: string) => string;
+    installation?: InstallationProfile;
   } = {},
 ): Promise<HostedTargetAdmission> {
   const normalized = targetRepo.trim().toLowerCase();
@@ -209,7 +219,7 @@ export async function probeHostedPublicTarget(
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${token}`,
         "Cache-Control": "no-store",
-        "User-Agent": brandedUserAgent(null, "public-target-probe"),
+        "User-Agent": brandedUserAgent(options.installation ?? null, "public-target-probe"),
       },
       cache: "no-store",
       redirect: "manual",

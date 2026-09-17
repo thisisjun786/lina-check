@@ -47,7 +47,11 @@ corepack pnpm run lina:contract-selftest   # 위 선언 검사의 거부 경로�
 
 관리 대상과 브랜딩, 상태 저장소, GitHub App 값이 들어갈 자리는 [config/lina-check-installation.json](config/lina-check-installation.json)이다. 형식은 [스키마](schema/lina-check-installation.schema.json)에 있다.
 
-규칙은 한 문장이다. **레지스트리는 대상을 서술하고 설치 설정이 허가한다.** 설정이 비어 있으면 원본 프로필에 적혀 있는 저장소도 통과하지 못한다. 대상 하나가 실제로 동작하려면 설치 설정의 허가와 그것을 서술하는 프로필이 둘 다 있어야 한다.
+규칙은 한 문장이다. **레지스트리는 대상을 서술하고 설치 설정이 허가한다.** 설정이 비어 있으면 원본 프로필에 적혀 있는 저장소도 통과하지 못한다.
+
+허가 방식은 두 가지다. `targets.repositories`에 이름을 적으면 그것만으로 허가된다. `targets.fallback_owners`는 소유자 단위 패턴이고 그 패턴은 레지스트리에서 읽으므로 `targets.registry_url`이 함께 필요하다. 소유자만 적고 레지스트리를 비워두면 설정 자체가 거부된다.
+
+허가된 대상을 어떤 설정으로 다룰지는 별도 문제이고 프로필 인벤토리가 답한다. 허가와 서술을 섞지 않는다.
 
 `check:scaffold`는 이 파일이 비어 있는 채로 유지되는지 확인한다. 값이 채워진 설정이 저장소에 들어오면 통과하지 않는다. 거부 경로가 실제로 거부하는지는 `lina:contract-selftest`이 확인한다. 설정은 프로세스당 한 번 읽으므로 바꾸면 재시작이 필요하다.
 

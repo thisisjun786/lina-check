@@ -9466,7 +9466,10 @@ export class ExactReviewQueue {
           targetRepo,
           await hostedTargetMetadataToken(),
           (input, init) => fetch(input, init),
-          { apiUrl: (path) => githubApiUrl(this.env, path) },
+          {
+            apiUrl: (path) => githubApiUrl(this.env, path),
+            installation: installationFromEnv(this.env as Record<string, unknown>),
+          },
         );
       } catch (error) {
         admission = hostedTargetRetryableAdmission(error);

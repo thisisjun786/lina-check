@@ -61,6 +61,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   SAFE_TESTS,
   TRIPWIRE_ENV,
+  DERIVED_TESTS,
   UPSTREAM_FIXTURE_TESTS,
   UPSTREAM_FIXTURE_TEST_NAMES,
   classifyBuildPair,
@@ -100,6 +101,29 @@ function declaredTests() {
     return { error: "declaration is missing a usable upstream.commit" };
   }
   return { paths, pin };
+}
+
+/**
+ * Tests this fork wrote, kept in their own list so a report never blurs them
+ * with the restored upstream set. Same rule as everywhere else here: the code
+ * literal fixes the membership and the declaration only records why.
+ */
+function declaredDerivedTests() {
+  const path = join(root, "config", "lina-check-scaffold.json");
+  let declared;
+  try {
+    declared = JSON.parse(readFileSync(path, "utf8")).derived.derivedTests;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { error: "derived-test declaration could not be read: " + detail };
+  }
+  const names = Object.keys(declared ?? {}).sort();
+  if (names.length !== DERIVED_TESTS.length || names.some((v, i) => v !== DERIVED_TESTS[i]))
+    return { error: "declared derived tests differ from the DERIVED_TESTS literal" };
+  const missing = names.filter((value) => !existsSync(join(root, value)));
+  if (missing.length > 0)
+    return { error: "declared derived test is absent: " + missing.join(", ") };
+  return { paths: names };
 }
 
 function childEnv() {
@@ -220,6 +244,11 @@ export function main(argv, deps = {}) {
     return 2;
   }
   const paths = declaration.paths;
+  const derived = declaredDerivedTests();
+  if (derived.error) {
+    process.stderr.write(LABEL + " " + derived.error + "\n");
+    return 2;
+  }
   const dist = probeDist();
   const concurrency = Math.min(availableParallelism(), MAX_CONCURRENCY);
   const command = ["node", "--test", "--test-concurrency=" + concurrency, ...paths];
@@ -234,6 +263,7 @@ export function main(argv, deps = {}) {
       command,
       upstreamTarget: "unit-subset",
       upstreamFixtureTests: [...UPSTREAM_FIXTURE_TEST_NAMES],
+      derivedTests: [...derived.paths],
     };
     if (json) {
       process.stdout.write(JSON.stringify(report) + "\n");
@@ -242,6 +272,10 @@ export function main(argv, deps = {}) {
         LABEL + " preview: " + paths.length + " declared tests, nothing executed\n",
       );
       for (const value of paths) process.stdout.write("  " + value + "\n");
+      process.stdout.write(
+        LABEL + " preview: " + derived.paths.length + " derived tests, nothing executed\n",
+      );
+      for (const value of derived.paths) process.stdout.write("  " + value + "\n");
       process.stdout.write(LABEL + " built output: " + dist.disposition + "\n");
     }
     return 0;
@@ -264,12 +298,24 @@ export function main(argv, deps = {}) {
     );
     return 3;
   }
-  process.stderr.write(LABEL + " files=" + paths.length + " concurrency=" + concurrency + "\n");
+  process.stderr.write(
+    LABEL +
+      " files=" +
+      paths.length +
+      " derived=" +
+      derived.paths.length +
+      " concurrency=" +
+      concurrency +
+      "\n",
+  );
   // Most tests run at the repository root. A declared fixture test runs against
   // pinned upstream bytes instead, because it asserts upstream operational
   // values this fork deliberately no longer carries.
   const fixtureNames = paths.filter((value) => Boolean(UPSTREAM_FIXTURE_TESTS[value]));
-  const rootPaths = paths.filter((value) => !UPSTREAM_FIXTURE_TESTS[value]);
+  // Derived tests run at the repository root against this fork's real files.
+  // That is the point of them: the fixture lane exists for upstream assertions
+  // about upstream bytes, and these assert what this fork actually does.
+  const rootPaths = [...paths.filter((value) => !UPSTREAM_FIXTURE_TESTS[value]), ...derived.paths];
   const outcomes = [];
   if (rootPaths.length > 0) outcomes.push(launchTests(rootPaths, concurrency));
   for (const name of fixtureNames) {

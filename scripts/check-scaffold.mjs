@@ -14,6 +14,7 @@ import {
   WRANGLER_PATH,
   assertFixtureTestContract,
   assertModifiedUpstreamContract,
+  assertDerivedTestContract,
   assertNoForbiddenInstallationLiterals,
   assertShippedInstallationEmpty,
   assertWranglerUnconfigured,
@@ -214,6 +215,16 @@ const wranglerSummary = assertWranglerUnconfigured(read(WRANGLER_PATH).toString(
 // runs against this fork. The mapping that decides which is which is checked here.
 const fixtureSummary = assertFixtureTestContract(config.derived.upstreamFixtureTests, baseline);
 
+// Tests this fork wrote. A derived test may import a blocked entrypoint to
+// inspect it, which a derived script may not, so the contract also denies the
+// process-spawning surface by name; otherwise the .mjs rule would just move here.
+const derivedTestSummary = assertDerivedTestContract({
+  declared: config.derived.derivedTests,
+  baselinePaths: baseline,
+  presentPaths: new Set(present),
+  readFile: (path) => read(path).toString(),
+});
+
 // Values this fork removed must not reappear in the files it owns. Scoped to
 // behaviour-carrying paths; the reasoning is in the contract module.
 assertNoForbiddenInstallationLiterals(
@@ -268,4 +279,7 @@ console.log(
 );
 console.log(
   `${fixtureSummary.tests} restored test(s) run against pinned upstream bytes rather than this installation; the fork's own settings are asserted here, not there.`,
+);
+console.log(
+  `Derived tests declared: ${derivedTestSummary.tests}, covering the admission decision the excluded upstream suite cannot reach.`,
 );

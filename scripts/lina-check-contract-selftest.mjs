@@ -547,7 +547,14 @@ async function runInstallationCases() {
     ],
     [
       "installation-owner-duplicate",
-      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["dup", "DUP"] } },
+      {
+        ...shipped,
+        targets: {
+          ...shipped.targets,
+          fallback_owners: ["dup", "dup"],
+          registry_url: "https://example.invalid/t.json",
+        },
+      },
     ],
     [
       "installation-repository-shape",
@@ -555,7 +562,36 @@ async function runInstallationCases() {
     ],
     [
       "installation-repository-duplicate",
-      { ...shipped, targets: { ...shipped.targets, repositories: ["a/b", "A/B"] } },
+      { ...shipped, targets: { ...shipped.targets, repositories: ["a/b", "a/b"] } },
+    ],
+    // Case is not folded. The schema patterns are lowercase-only, so a parser
+    // that lowercased first would accept what the published contract rejects.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["MixedCase"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["Acme/Tool"] } },
+    ],
+    // additionalProperties:false in every schema object. The dangerous direction
+    // is a dropped restriction: a deny list written under a name this build does
+    // not know would be ignored while the grant beside it stood.
+    ["installation-unknown-field", { ...shipped, surprise: 1 }],
+    [
+      "installation-unknown-field",
+      { ...shipped, targets: { ...shipped.targets, deny_repositories: ["a/b"] } },
+    ],
+    ["installation-unknown-field", { ...shipped, branding: { ...shipped.branding, theme: "x" } }],
+    // Owners are patterns and the patterns live in the registry. Naming owners
+    // with nowhere to read their rules parses clean and then refuses everything.
+    [
+      "installation-inoperable",
+      {
+        ...shipped,
+        configured: true,
+        targets: { fallback_owners: ["acme"], repositories: [], registry_url: "" },
+      },
     ],
     [
       "installation-registry-shape",

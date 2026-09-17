@@ -28,6 +28,8 @@ export type InstallationDenialCode =
   | "installation-repository-shape"
   | "installation-repository-duplicate"
   | "installation-field-shape"
+  | "installation-unknown-field"
+  | "installation-inoperable"
   | "installation-registry-shape";
 
 export type InstallationBranding = {
@@ -66,6 +68,39 @@ export type InstallationParse = {
 
 const OWNER = /^[a-z0-9_.-]+$/;
 const TARGET_REPO = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/;
+
+/**
+ * The keys the published schema declares, per section. Every object in
+ * schema/lina-check-installation.schema.json sets additionalProperties:false, so
+ * a parser that quietly ignored an unknown key would accept documents the schema
+ * rejects. That gap is dangerous in one direction in particular: a restriction
+ * an operator believes they wrote, such as a deny list under a name this build
+ * does not know, would be dropped in silence while the grant beside it stood.
+ */
+const ROOT_KEYS = Object.freeze([
+  "note",
+  "schema_version",
+  "configured",
+  "branding",
+  "targets",
+  "state",
+  "github_app",
+]);
+const SECTION_KEYS = Object.freeze({
+  branding: Object.freeze(["product_name", "short_name", "user_agent", "dashboard_host"]),
+  targets: Object.freeze(["fallback_owners", "repositories", "registry_url"]),
+  state: Object.freeze(["state_repo", "state_ref"]),
+  github_app: Object.freeze(["client_id", "bot_login"]),
+});
+
+function unknownKey(
+  section: Record<string, unknown>,
+  allowed: readonly string[],
+  label: string,
+): string | null {
+  for (const key of Object.keys(section)) if (!allowed.includes(key)) return label + key;
+  return null;
+}
 
 /**
  * Neutral fallback branding. Deliberately not the upstream product name: an
@@ -133,7 +168,10 @@ function readList(
   const list: string[] = [];
   for (const entry of raw) {
     if (typeof entry !== "string") return refuse(shapeCode, label + " entry is not a string");
-    const normalized = entry.trim().toLowerCase();
+    // Test the value as written, not a lowercased copy. The schema patterns are
+    // lowercase-only, so silently folding case here would accept configuration
+    // the published contract rejects.
+    const normalized = entry.trim();
     if (!pattern.test(normalized)) return refuse(shapeCode, label + " entry is malformed: " + entry);
     if (list.includes(normalized)) return refuse(duplicateCode, label + " repeats " + normalized);
     list.push(normalized);
@@ -151,6 +189,9 @@ function readList(
 export function parseInstallationProfile(value: unknown): InstallationParse {
   const root = asRecord(value);
   if (!root) return deny("installation-shape", "installation profile must be an object");
+  const unknownRoot = unknownKey(root, ROOT_KEYS, "");
+  if (unknownRoot !== null)
+    return deny("installation-unknown-field", "undeclared field: " + unknownRoot);
   if (root.schema_version !== LINA_CHECK_INSTALLATION_SCHEMA_VERSION)
     return deny("installation-schema", "unsupported schema_version: " + String(root.schema_version));
   if (typeof root.configured !== "boolean")
@@ -162,6 +203,14 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
   const appRecord = asRecord(root.github_app);
   if (!brandingRecord || !targetsRecord || !stateRecord || !appRecord)
     return deny("installation-shape", "branding, targets, state and github_app must all be objects");
+
+  const unknownSection =
+    unknownKey(brandingRecord, SECTION_KEYS.branding, "branding.") ??
+    unknownKey(targetsRecord, SECTION_KEYS.targets, "targets.") ??
+    unknownKey(stateRecord, SECTION_KEYS.state, "state.") ??
+    unknownKey(appRecord, SECTION_KEYS.github_app, "github_app.");
+  if (unknownSection !== null)
+    return deny("installation-unknown-field", "undeclared field: " + unknownSection);
 
   const missing =
     missingStringField(
@@ -198,6 +247,16 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
 
   if (root.configured && owners.list.length === 0 && repositories.list.length === 0)
     return deny("installation-empty", "a configured installation must name at least one owner or repository");
+
+  // A fallback owner is a pattern, and the pattern lives in the registry. Naming
+  // owners with nowhere to read their rules from parses cleanly and then refuses
+  // every target at run time, which reads as a broken deployment rather than a
+  // rejected configuration. Refuse it here instead.
+  if (root.configured && owners.list.length > 0 && registryUrl === "")
+    return deny(
+      "installation-inoperable",
+      "targets.fallback_owners needs targets.registry_url to supply the fallback rules",
+    );
 
   const branding: InstallationBranding = {
     productName: asString(brandingRecord.product_name) || NEUTRAL_BRANDING.productName,
@@ -288,19 +347,22 @@ export function hasGithubCredential(env: Record<string, unknown>): boolean {
 }
 
 /**
- * Whether a GitHub request may be built at all.
+ * Whether a GitHub URL may be built at all. This is an inertness check, and it
+ * is NOT the admission gate. Read that sentence before using it as one.
  *
- * Emptying configuration does not stop a request; it only makes the request
- * useless. An installation with neither configuration nor any credential has
- * nothing to ask and no way to authenticate, so the request is refused before
- * it is constructed rather than sent and failed.
+ * It answers a narrow question: does this deployment have anything to say to
+ * GitHub? An installation with neither configuration nor any credential has no
+ * target and no way to authenticate, so the request is refused before it is
+ * constructed instead of sent and failed. A deployment that carries credentials
+ * passes this check whether or not it is configured.
  *
- * This is narrower than refusing on configuration alone, and the narrower claim
- * is the one recorded in the plan. A deployment carrying credentials can still
- * reach GitHub; what it cannot do is act on a target, because admission is
- * gated separately and denies without an installation profile.
+ * That is deliberate and it is why the name says transport. Admission is decided
+ * by isHostedTargetEligible from the installation profile, and it denies every
+ * target without one, credentials or not. A deployment check that treated a
+ * transport refusal as proof of the admission gate would be reading a weaker
+ * fact than it needs; lina:contract-selftest asserts the two are independent.
  */
-export function githubTransportAllowed(env: Record<string, unknown>): boolean {
+export function githubTransportPermitted(env: Record<string, unknown>): boolean {
   return installationConfigured(installationFromEnv(env)) || hasGithubCredential(env);
 }
 
@@ -326,6 +388,9 @@ export function installationFromEnv(env: Record<string, unknown>): InstallationP
   const list = (raw: unknown): string[] =>
     envString(raw)
       .split(",")
+      // Worker configuration has no schema to match, and a rejected list would
+      // surface as a silently unconfigured installation rather than an error, so
+      // case is folded here. The JSON entry point is held to the schema exactly.
       .map((value) => value.trim().toLowerCase())
       .filter((value) => value !== "");
   return parseInstallationProfile({
