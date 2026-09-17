@@ -19,10 +19,10 @@
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
 | 2 | `corepack pnpm run build:all` | 0 | 0.97 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.10 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.48 | oxlint 4개 스크립트 전부 Done |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.16 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.73 | oxlint 4개 스크립트 전부 Done |
 | 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.25 | `rejected=30 helpers=18 laneShape=14 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 134.68 | 통과 2579건, fail 0, skip 0 |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 133.77 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,10 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 134.7초 |
+| 게이트 6 전체 | 207 | | 133.8초 |
+
+구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
+실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
 
 측정 중 이 호스트에서 다른 작업의 테스트 실행이 함께 돌고 있었다. 레인 시간은 그만큼 위쪽으로
 편향돼 있다. 같은 구성의 후보 171개만 한가한 구간에서 돌렸을 때는 45.7초였다.
@@ -55,10 +58,10 @@
 
 ## 실행 경계 관측
 
-- 편입한 206개의 실행 경계는 읽어서가 아니라 관측해서 정했다. 파일마다 자식 프로세스를 막은
-  권한 모델 아래에서 한 번, 소켓 bind 와 나가는 요청을 기록하는 프로브 아래에서 한 번 돌렸다.
-  결과는 자식 프로세스 33개, loopback 서버 4개, loopback 밖으로 나간 요청 0건이다.
-  방법과 파일 목록은 `020_fixture_lane.md`
+- 편입한 206개의 실행 경계는 읽어서가 아니라 관측해서 정했다. `node:child_process` 의 7개
+  진입점과 `net.Server.prototype.listen`·`fetch`·`connect` 를 감싸고, 계측을 자식에도 다시
+  심어 `fork` 너머까지 따라간다. 결과는 자식 프로세스 35개, loopback 서버 5개(하나는 fork 한
+  자식이 연다), 목적지는 전부 `127.0.0.1` 이다. 방법·한계·파일 목록은 `020_fixture_lane.md`
 - 레인 실행 전후로 `git status --porcelain` 에 upstream 추적 파일 변경이 없다. 픽스처
   디렉터리는 시스템 임시 경로에 만들고 실행 후 지운다. 남은 `lina-check-upstream-*` 0건
 - credential 필터가 이 호스트에서 지운 이름 4개: `EXA_API_KEY`, `GEMINI_API_KEY`,
@@ -89,6 +92,15 @@ PR 을 올리기 전에 독립 리뷰어(다른 모델, 읽기 전용)에게 감
 | 3 | 사전 독립 감사 (should-fix) | `test/github-response-deadlines.test.ts` 제외 사유가 부정확. 단순한 미종료가 아니라 미설정 거부 때문에 promise 가 안 풀리는 것 | 사유를 실측(3초 제한 강제 시 exit 1, 실패 2·취소 6)으로 다시 썼다 | `config/lina-check-scaffold.json` 의 해당 항목 |
 | 4 | 사전 독립 감사 (should-fix) | `test/actions-runtime.test.ts` 제외 사유의 665개는 과장. 확장자 필터에 걸리는 것은 244개 | 665개 중 244개가 필터에 걸린다고 고쳤다 | 같은 파일, `010` 표 |
 | 5 | 사전 독립 감사 (should-fix) | `assertFixtureTestContract` 가 `files` 누락·`null` 을 빈 배열로 받아준다 | `Array.isArray` 를 요구하고, 추가 읽기가 없는 항목에 대해 누락·`null` 두 경우를 음성 케이스로 넣었다 | `modifiedUpstream` 20 → 22 |
+
+2라운드도 FAIL 이었다. 1라운드의 수정 다섯 개는 전부 유지된다고 확인했지만, 관측 방법 자체에
+구멍 두 개를 더 찾았다.
+
+| # | 출처 | 지적 | 처리 | 확인 |
+| -- | -- | -- | -- | -- |
+| 6 | 2라운드 (blocker) | 권한 모델은 시도가 아니라 거부를 센다. `src/repair/project-repo.ts` 가 `git config` 실패를 삼켜서, `git` 을 돌리고도 "프로세스를 안 띄운다" 로 통과한 파일이 3개 있었다 | 거부가 아니라 시도를 세도록 바꿨다. `node:child_process` 7개 진입점을 감싸고 `syncBuiltinESMExports()` 로 ESM 바인딩까지 교체해 argv 를 호출 시점에 기록한다 | 자식 프로세스 파일이 33개 → 35개. `comment-router-config`, `issue-worker-recovery`, `live-worker-capacity` 가 `git` 으로 정정됐다 |
+| 7 | 2라운드 (blocker) | 프로브가 자식 안을 못 본다. `test/helpers/command-intake-fixture.mjs` 는 `execArgv: []` 와 교체된 환경으로 `fork` 해서 preload 를 떨어뜨리고, 서버는 그 자식이 연다. `curl` 같은 non-Node 자식은 `globalThis.fetch` 바깥이다 | 감싼 진입점이 자식의 `env` 와 `execArgv` 에 계측을 다시 심는다. non-Node 자식은 argv 의 URL 로 본다는 한계를 `020` 에 명시했다 | loopback 서버 4개 → 5개. `exact-review-command-queue` 가 fork 한 자식에서 서버를 열고 `curl` 로 `127.0.0.1` 에 붙는 것이 기록됐다 |
+| 8 | 2라운드 (nit) | `020_fixture_lane.md` 끝에 빈 줄이 남아 `git diff --check` 가 2를 냈다 | 계획 단위 문서 전부에서 끝 빈 줄을 정리했다 | `git diff --check 67119afa` exit 0 |
 
 감사가 통과로 확인한 것도 적는다. 가드 완화 없음(`allowedScripts` 동일, 제품 코드·워크플로·가드
 바이트 불변), 기존 거부 경로 약화 없음, 실패하는 레인이 exit 0 으로 새는 경로 없음, 변경한 네
