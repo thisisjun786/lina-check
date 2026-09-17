@@ -953,6 +953,30 @@ const PERMITTED_MODULE = Object.freeze([
 const IMPORT_META_PROPERTY = Object.freeze(["url"]);
 const IMPORT_META = /import\s*\.\s*meta\s*(?:\.\s*([A-Za-z_$][\w$]*))?/g;
 
+/**
+ * An identifier written with a Unicode escape.
+ *
+ * JavaScript decodes \u escapes inside identifiers, so pro\u0063ess.arg\u0076
+ * is the argument vector and neither denied word appears in the text. Every
+ * rule in this file reads text, so the escape has to be settled before them.
+ *
+ * Refused rather than decoded. codeOnly has already blanked strings, comments
+ * and regular expressions, so a backslash-u surviving in that copy can only be
+ * an escaped identifier, and no file in the closure contains one. Decoding
+ * would move every offset this function computes for no gain.
+ */
+const ESCAPED_IDENTIFIER = /\\u/;
+
+/**
+ * The properties of an imported node:module binding this scan can read.
+ *
+ * A namespace or default import is tracked by the spelling binding.createRequire,
+ * so binding["create" + "Require"] reaches the same factory under a name the
+ * tracker never sees. Same answer as everywhere else in this file: list what is
+ * readable, refuse the rest.
+ */
+const MODULE_PROPERTY = Object.freeze(["createRequire", "syncBuiltinESMExports"]);
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -987,6 +1011,8 @@ export function observationAccessFault(rawSource) {
   if (OBSERVATION_ROOT_MODULE.test(source))
     return "the process module is imported, which puts the process object behind a name this scan cannot read";
   const code = codeOnly(source);
+  if (ESCAPED_IDENTIFIER.test(code))
+    return "an identifier written with a Unicode escape, which this scan reads as text";
   // The bracket form carries its name inside a string, which codeOnly blanks,
   // so that one rule reads the copy where string contents survive.
   for (const [pattern, reason, needsLiterals] of REFLECTIVE_ROUTE)
@@ -1324,6 +1350,28 @@ export function analyseRequireUse(rawSource) {
   // width of a comment: const load /* alias */ = require.
   const code = codeOnly(source);
   for (const binding of code.matchAll(REQUIRE_ALIAS_BINDING)) loaders.add(binding[1]);
+  // A namespace or default import of node:module is tracked further down by the
+  // spelling binding.createRequire. Every other use of that binding is settled
+  // here: a listed property, or unfollowable. Without this, binding["create" +
+  // "Require"] reaches the factory under a name the tracker never sees.
+  let outsideImports = code;
+  const moduleBindings = [];
+  for (const pattern of [MODULE_NAMESPACE_IMPORT, MODULE_DEFAULT_IMPORT])
+    for (const statement of source.matchAll(pattern)) {
+      moduleBindings.push(statement[1]);
+      outsideImports =
+        outsideImports.slice(0, statement.index) +
+        " ".repeat(statement[0].length) +
+        outsideImports.slice(statement.index + statement[0].length);
+    }
+  for (const binding of moduleBindings)
+    for (const use of outsideImports.matchAll(
+      new RegExp("\\b" + escapeRegExp(binding) + "\\b\\s*(?:\\.\\s*([A-Za-z_$][\\w$]*)|(\\[))?", "g"),
+    )) {
+      if (use[2] !== undefined) unfollowable.push(binding + "[ computed ]");
+      else if (use[1] === undefined) unfollowable.push(binding);
+      else if (!MODULE_PROPERTY.includes(use[1])) unfollowable.push(binding + "." + use[1]);
+    }
   // Every other mention of the ambient require must be a call; handing the
   // function itself to something else is a load this scan cannot follow.
   for (const use of code.matchAll(AMBIENT_REQUIRE_USE)) {

@@ -1053,6 +1053,9 @@ function runDerivedTestCases() {
     // both halves of that split.
     'import { runInThisContext } from "node:vm";\nrunInThisContext("1");\n',
     'import * as vm from "node:vm";\nconst run = vm.runInNewContext;\nconst x = run;\n',
+    // JavaScript decodes Unicode escapes inside identifiers, so this reads the
+    // argument vector while spelling neither denied word.
+    "const how = pro\\u0063ess.arg\\u0076[1];\n",
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1104,6 +1107,32 @@ function runDerivedTestCases() {
       ? 'import assert2 from "node:assert/strict";\nassert2.ok(true);\n'
       : rest9(path);
   assertDerivedTestContract(listed);
+  // A namespace import of node:module was tracked only as the spelling
+  // binding.createRequire, so any other use of the binding reached the same
+  // factory under a name the tracker never saw.
+  for (const opaque of [
+    'import * as nodeModule from "node:module";\nconst make = nodeModule["create" + "Require"];\nconst x = make;\n',
+    'import * as nodeModule from "node:module";\nconst listing = nodeModule.builtinModules;\nconst x = listing;\n',
+    'import * as nodeModule from "node:module";\nhandOff(nodeModule);\n',
+  ]) {
+    const namespaced = base();
+    const rest10 = namespaced.readFile;
+    namespaced.readFile = (path) => (path === DERIVED_TESTS[0] ? opaque : rest10(path));
+    assert.throws(
+      () => assertDerivedTestContract(namespaced),
+      { code: "derived-test-unresolvable-require" },
+      opaque,
+    );
+  }
+  // The listed properties still pass, or the rule would be a ban on namespace
+  // imports rather than a rule about what this scan can read.
+  const namespaceListed = base();
+  const rest11 = namespaceListed.readFile;
+  namespaceListed.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import * as nodeModule from "node:module";\nnodeModule.syncBuiltinESMExports();\n'
+      : rest11(path);
+  assertDerivedTestContract(namespaceListed);
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
     permittedAccess.readFile = (path) => (path === DERIVED_TESTS[0] ? readable : rest5(path));
@@ -1140,7 +1169,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 37;
+  observed += 42;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

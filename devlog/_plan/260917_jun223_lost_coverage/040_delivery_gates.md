@@ -635,7 +635,24 @@ Codex 의 세 번째 건은 `import.meta.main` 이다. 레인이 `node --test` �
 때문에 거부되는 편이 더 강한 진술이다. 거부 대조 다섯과 허용 대조 둘을 더해 파생 계약 대조가
 111에서 118이 됐다.
 
-## 현재 값 — 20~24라운드 head 기준
+### 25라운드 — 이스케이프와 네임스페이스
+
+두 건. 둘 다 텍스트 스캔이 텍스트만 읽는다는 같은 자리에서 나왔다.
+
+JavaScript 는 식별자 안의 `\u` 이스케이프를 해석한다. `pro\u0063ess.arg\u0076[1]` 은 인자
+벡터인데 `process` 도 `argv` 도 텍스트에는 없다. 해석하지 않고 거부한다.
+`codeOnly` 가 문자열·주석·정규식을 비운 뒤라 남은 backslash-u 는 이스케이프된 식별자뿐이고,
+closure 에는 하나도 없다. 해석하면 이 함수가 계산하는 오프셋이 전부 밀리는데 얻는 것이 없다.
+
+네임스페이스 import 는 `바인딩.createRequire` 철자로만 추적됐다.
+`바인딩["create" + "Require"]` 가 같은 팩토리에 닿는다. 허용 속성을 `createRequire` 와
+`syncBuiltinESMExports` 로 적고 나머지는 `derived-test-unresolvable-require` 로 거부한다.
+계산된 접근도, 바인딩을 값으로 넘기는 것도 거부다. 기존 네임스페이스 대조들은 허용 속성을 쓰므로
+그대로 통과한다.
+
+거부 대조 넷과 허용 대조 하나를 더해 파생 계약 대조가 118에서 123이 됐다.
+
+## 현재 값 — 20~25라운드 head 기준
 
 20라운드 head `aeaf4a40` 에서 여덟 게이트 전부 exit 0, 레인 133초다.
 
@@ -647,11 +664,13 @@ Codex 의 세 번째 건은 `import.meta.main` 이다. 레인이 `node --test` �
 21라운드 head `6011ffca` 에서도 여덟 게이트 전부 exit 0, 레인 133초이고 값은
 `derivedTestContract=98`, 나머지는 같다. 22라운드 head `f4673bc2` 에서도 여덟 게이트 전부
 exit 0, 레인 133초이고 값은 `derivedTestContract=105` 다. 23라운드 수정 뒤 값은
-`derivedTestContract=111` 이다(head `fd0f59ed`, 여덟 게이트 exit 0, 레인 133초). 24라운드 수정
-뒤 값은 `derivedTestContract=118` 이고 나머지는 같다. 그 head 에서도 여덟 게이트를 다시 돌린다.
-문서가 자기 커밋의 SHA 를 담을 수는 없으므로 마지막 head 번호는 PR 본문과 인도 보고에 적는다.
+`derivedTestContract=111` 이다(head `fd0f59ed`, 여덟 게이트 exit 0, 레인 133초). 24라운드
+head `69d00cd7` 에서도 여덟 게이트 exit 0, 레인 133초이고 값은 `derivedTestContract=118` 이다.
+25라운드 수정 뒤 값은 `derivedTestContract=123` 이고 나머지는 같다. 그 head 에서도 여덟 게이트를
+다시 돌린다. 문서가 자기 커밋의 SHA 를 담을 수는 없으므로 마지막 head 번호는 PR 본문과 인도 보고에
+적는다.
 
-대응표는 그대로다. 다섯 라운드 모두 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
+대응표는 그대로다. 여섯 라운드 모두 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
 
 레인은 133초다. 가드 유발도 이 head 에서 다시 쟀고 복원은 `trap restore EXIT INT TERM` 으로
 걸었다.
