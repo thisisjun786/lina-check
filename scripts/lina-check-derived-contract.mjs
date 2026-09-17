@@ -656,6 +656,13 @@ const SPAWN_SURFACE = Object.freeze([
   "execFileSync",
   "execSync",
   "fork(",
+  // A worker thread has its own module state, so the runtime instrumentation in
+  // the observed process does not reach anything it starts. Denying the surface
+  // keeps the rule intact: a derived test starts nothing, and nothing it can
+  // reach starts anything outside what the observation can see.
+  "node:worker_threads",
+  "worker_threads",
+  "new Worker(",
 ]);
 
 /**

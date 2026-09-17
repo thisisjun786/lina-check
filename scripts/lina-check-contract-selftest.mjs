@@ -831,6 +831,27 @@ function runDerivedTestCases() {
     observed += 3;
   }
 
+  // A worker thread has its own module state, so nothing it starts is visible
+  // to the instrumentation in the observed process. The surface is denied in
+  // the declared file itself, so the refusal names the token rather than a
+  // helper path.
+  const worker = base();
+  const restWorker = worker.readFile;
+  worker.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import { Worker } from "node:worker_threads";\nnew Worker(url);\n'
+      : restWorker(path);
+  let workerRefusal = null;
+  try {
+    assertDerivedTestContract(worker);
+  } catch (error) {
+    workerRefusal = error;
+  }
+  assert.ok(workerRefusal, "a worker thread must be refused");
+  assert.equal(workerRefusal.code, "derived-test-spawns");
+  assert.match(workerRefusal.message, /worker_threads|new Worker/);
+  observed += 2;
+
   // A declared test naming a file that cannot be read must be refused rather
   // than quietly scanned less.
   const unreadable = base();
