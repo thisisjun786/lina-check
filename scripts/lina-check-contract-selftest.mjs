@@ -1056,6 +1056,10 @@ function runDerivedTestCases() {
     // JavaScript decodes Unicode escapes inside identifiers, so this reads the
     // argument vector while spelling neither denied word.
     "const how = pro\\u0063ess.arg\\u0076[1];\n",
+    // A permitted object turns back into a denied verb when the method name is
+    // assembled: new Script(...)["run" + "InThisContext"]() names neither.
+    'const S = Script;\nnew S("1")["run" + "InThisContext"]();\n',
+    'const method = "runIn" + "NewContext";\nvmApi[method]("1");\n',
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1086,6 +1090,9 @@ function runDerivedTestCases() {
     "const here = import.meta.url;\nconst x = here;\n",
     // The harness names both of these and evaluates nothing with them.
     'import { Script, createContext } from "node:vm";\nconst x = [Script, createContext];\n',
+    // A literal key is readable, and refusing every computed access would stop
+    // ordinary lookups the closure makes.
+    'const table = { run: () => 1 };\nconst value = table["run"]();\nconst x = value;\n',
   ]) {
   // An unclassified builtin used to pass as safely as a listed one, which is
   // how node:vm reached the closure without anything deciding about it.
@@ -1133,6 +1140,22 @@ function runDerivedTestCases() {
       ? 'import * as nodeModule from "node:module";\nnodeModule.syncBuiltinESMExports();\n'
       : rest11(path);
   assertDerivedTestContract(namespaceListed);
+  // Every export of node:module other than the two listed was implicitly
+  // permitted, including register, whose loader hook runs outside this isolate
+  // where the observation's instrumentation does not reach.
+  for (const named of [
+    'import { register } from "node:module";\nregister("./hook.mjs");\n',
+    'import { stripTypeScriptTypes } from "node:module";\nconst x = stripTypeScriptTypes;\n',
+  ]) {
+    const unlistedNamed = base();
+    const rest12 = unlistedNamed.readFile;
+    unlistedNamed.readFile = (path) => (path === DERIVED_TESTS[0] ? named : rest12(path));
+    assert.throws(
+      () => assertDerivedTestContract(unlistedNamed),
+      { code: "derived-test-unresolvable-require" },
+      named,
+    );
+  }
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
     permittedAccess.readFile = (path) => (path === DERIVED_TESTS[0] ? readable : rest5(path));
@@ -1169,7 +1192,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 42;
+  observed += 47;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

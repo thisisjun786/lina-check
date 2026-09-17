@@ -124,6 +124,18 @@ backslash-u 는 이스케이프된 식별자일 수밖에 없고, closure 에는
 `syncBuiltinESMExports` 이고, 계산된 접근·목록 밖 속성·바인딩 자체를 값으로 넘기는 것은 전부
 `derived-test-unresolvable-require` 다. closure 에는 네임스페이스 import 가 없다.
 
+같은 목록을 named import 에도 적용한다. 그 전에는 `createRequire` 만 읽고 나머지 export 는
+암묵 허용이었다. `register` 는 모듈 커스터마이제이션 훅을 설치하고, 그 훅은 이 isolate 밖에서
+돌아서 관측의 계측이 닿지 않는다. 목록에 없는 named import 는 거부한다.
+
+### 계산된 이름으로 하는 메서드 호출
+
+`new Script("...")["run" + "InThisContext"]()` 는 허용된 객체를 금지된 동사로 되돌린다. 이름
+어느 쪽도 텍스트에 없다. 계산된 멤버 접근을 전부 막는 것은 아니다. `rows[i]` 나
+`scripts[name]` 같은 인덱스 읽기는 closure 곳곳에 있고 평범하다. 막는 것은 계산된 이름으로
+**호출**하는 형태다. 그 형태는 closure 에 하나도 없고, 허용된 객체를 다시 위험하게 만드는 것도
+그 형태다. 리터럴 키로 하는 호출은 그대로 통과한다.
+
 속성을 허용 목록으로 둔 것은 금지 목록이 틀린 모양이기 때문이다.
 `process.report.getReport().header.commandLine` 은 `argv` 라는 철자 없이 호출 방식을 말해 준다.
 그런 속성을 하나씩 막으면 목록이 끝나지 않는다. 뒤집으면 끝난다. 파생 테스트에 필요한 것은 대역
@@ -151,19 +163,20 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
 그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
 
-양성 대조는 거부 스물여덟 개와 허용 열 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 서른두 개와 허용 열한 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
 `process.stdout.write`, 리플렉션 경로 다섯, 동적 코드 전역 셋(`new` 없는 `Function`, 공백을 낀
 호출, 바인딩에 담은 `Function`), `import.meta` 둘, `node:vm` 평가 둘, 목록 밖 지정자 셋(빌트인·
-패키지·절대 경로), 이스케이프된 식별자 하나, node:module 네임스페이스 셋이다.
+패키지·절대 경로), 이스케이프된 식별자 하나, node:module 네임스페이스 셋, 목록 밖 named import 둘,
+계산된 이름으로 하는 메서드 호출 둘이다.
 `process.stdout` 을 막는 것은 덤이
 아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
 대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 아홉 형태다. 계산된 키로 하는 환경 변수
 복원(쓰기와 삭제), 리터럴 키 읽기, `t.mock.method(globalThis, "fetch", ...)`,
 `process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`,
 `import.meta.url`, `node:vm` 의 `Script`·`createContext`, 목록에 있는 `node:assert/strict`,
-네임스페이스로 부르는 `syncBuiltinESMExports`.
+네임스페이스로 부르는 `syncBuiltinESMExports`, 리터럴 키로 하는 메서드 호출.
 허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부

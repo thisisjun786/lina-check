@@ -977,6 +977,31 @@ const ESCAPED_IDENTIFIER = /\\u/;
  */
 const MODULE_PROPERTY = Object.freeze(["createRequire", "syncBuiltinESMExports"]);
 
+/**
+ * Whether a member call names its method through an expression this scan cannot
+ * read, as in script["run" + "InThisContext"]().
+ *
+ * Narrower than refusing every computed member access, on purpose. Index reads
+ * such as rows[i] or scripts[name] are ordinary and appear across the closure,
+ * while a call through a constructed method name does not appear at all, and it
+ * is the form that turns a permitted object back into a denied verb.
+ */
+function computedMemberCall(code) {
+  for (let index = 0; index < code.length; index += 1) {
+    if (code[index] !== "[") continue;
+    const before = code.slice(0, index).replace(/\s+$/, "");
+    if (!/[A-Za-z0-9_$)\]]$/.test(before)) continue;
+    if (/\b(?:of|in|return|const|let|var|typeof|case|do|else|yield|await|new|delete|void|instanceof)$/.test(before))
+      continue;
+    const close = closingBracket(code, index);
+    if (close === -1) continue;
+    if (!/^\s*\(/.test(code.slice(close + 1))) continue;
+    if (literalKey(code.slice(index + 1, close).trim())) continue;
+    return code.slice(index, close + 1).trim();
+  }
+  return null;
+}
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -1021,6 +1046,9 @@ export function observationAccessFault(rawSource) {
   if (dynamicCode) return "the global " + dynamicCode[0] + " runs constructed code";
   const evaluation = DYNAMIC_EVALUATION.exec(code);
   if (evaluation) return evaluation[0] + " evaluates a string as code";
+  const computedCall = computedMemberCall(code);
+  if (computedCall !== null)
+    return "a member call through the constructed name " + computedCall;
   for (const match of code.matchAll(IMPORT_META)) {
     if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
     if (!IMPORT_META_PROPERTY.includes(match[1]))
@@ -1371,6 +1399,16 @@ export function analyseRequireUse(rawSource) {
       if (use[2] !== undefined) unfollowable.push(binding + "[ computed ]");
       else if (use[1] === undefined) unfollowable.push(binding);
       else if (!MODULE_PROPERTY.includes(use[1])) unfollowable.push(binding + "." + use[1]);
+    }
+  // A named import from node:module was read only for createRequire, so every
+  // other export of that module was implicitly permitted. register installs a
+  // loader hook that runs outside this isolate, where the observation's
+  // instrumentation does not reach, so the list decides here too.
+  for (const statement of source.matchAll(MODULE_NAMED_IMPORT))
+    for (const specifier of statement[1].split(",")) {
+      const imported = specifier.trim().split(/\s+as\s+/)[0].trim();
+      if (imported !== "" && !MODULE_PROPERTY.includes(imported))
+        unfollowable.push("node:module " + imported);
     }
   // Every other mention of the ambient require must be a call; handing the
   // function itself to something else is a load this scan cannot follow.
