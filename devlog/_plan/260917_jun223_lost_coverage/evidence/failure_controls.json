@@ -9,6 +9,7 @@
     {
       "file": "test/lina-check-actions-runtime.test.ts",
       "mutation": "expect a cache action generation the tree does not use",
+      "fingerprint": "ebc37cd31e94f782",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -21,6 +22,7 @@
     {
       "file": "test/lina-check-actions-runtime.test.ts",
       "mutation": "drop the parked workflows from the traversal, the way the excluded suite does",
+      "fingerprint": "5da9764cc7a6c3a7",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -33,6 +35,7 @@
     {
       "file": "test/lina-check-github-api.test.ts",
       "mutation": "accept a remote override the validator refuses",
+      "fingerprint": "d6f902c34a2949db",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -45,6 +48,7 @@
     {
       "file": "test/lina-check-response-deadlines.test.ts",
       "mutation": "claim the refused path attempted a request",
+      "fingerprint": "1e76ad3d4712df8c",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -57,6 +61,7 @@
     {
       "file": "test/lina-check-hosted-admission.test.ts",
       "mutation": "claim a registry-denied repository is eligible",
+      "fingerprint": "607adf48a2009f20",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -69,6 +74,7 @@
     {
       "file": "test/lina-check-webhook-admission.test.ts",
       "mutation": "claim an unconfigured installation admits the command",
+      "fingerprint": "839eeaab53e52903",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -81,6 +87,7 @@
     {
       "file": "test/lina-check-close-policy.test.ts",
       "mutation": "read the unparked workflow spelling again",
+      "fingerprint": "c8a75bbf1d42ee2b",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -93,6 +100,7 @@
     {
       "file": "test/lina-check-action-ledger.test.ts",
       "mutation": "read the unparked workflow spelling again",
+      "fingerprint": "c00e0b233cda8fac",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -105,6 +113,7 @@
     {
       "file": "test/lina-check-failure-telemetry.test.ts",
       "mutation": "unpin the clock reading again",
+      "fingerprint": "779dbe68a6f064b2",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -117,6 +126,7 @@
     {
       "file": "test/lina-check-scheduled-review.test.ts",
       "mutation": "move the settling boundary so an unchanged item reads as changed",
+      "fingerprint": "01d15b909dd2b710",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,
@@ -129,6 +139,7 @@
     {
       "file": "test/lina-check-node-test-runner.test.ts",
       "mutation": "expect the concurrency cap not to apply",
+      "fingerprint": "9af47b19cf37461f",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,

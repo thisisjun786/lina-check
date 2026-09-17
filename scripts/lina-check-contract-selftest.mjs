@@ -76,6 +76,7 @@ import {
 } from "./lina-check-coverage-map.mjs";
 import {
   CONTROLS as FAILURE_CONTROLS,
+  controlFingerprint,
   judge as judgeFailureControl,
 } from "./lina-check-failure-controls.mjs";
 
@@ -778,6 +779,17 @@ function runDerivedTestCases() {
       "await import(\u0060./helpers/command-intake-fixture.mjs\u0060);\n",
       "a no-substitution template literal specifier",
     ],
+    [
+      'import * as nodeModule from "node:module";\n' +
+        "const load = nodeModule.createRequire(import.meta.url);\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "createRequire reached through a namespace import",
+    ],
+    [
+      'import * as nodeModule from "node:module";\n' +
+        'const helper = nodeModule.createRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
+      "a namespace immediate call",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -887,6 +899,19 @@ const LAUNCH_LOG_ENV = "LINA_CHECK_LAUNCH_LOG";
 // by hand is exactly the kind of detail that rots.
 const ANSI = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
 const stripAnsi = (text) => String(text ?? "").replace(ANSI, "");
+
+/**
+ * Names the reporter printed as passing.
+ *
+ * The tick alone is not enough: a runtime t.todo() and a skipped case both keep
+ * it and add a directive the summary does not count, so reading the tick would
+ * let the coverage map certify a case that never ran.
+ */
+function passingCaseNames(stdout) {
+  return [...stripAnsi(stdout).matchAll(/^\s*✔ (.*?) \(\d+(?:\.\d+)?ms\)(.*)$/gm)]
+    .filter((match) => !/#\s*(?:TODO|SKIP)/i.test(match[2]))
+    .map((match) => match[1]);
+}
 const DERIVED_TEST_CASE_FLOOR = 147;
 const PRELOAD_SOURCE = [
   'import { appendFileSync } from "node:fs";',
@@ -975,7 +1000,9 @@ function observeDerivedTests(directory) {
   );
 
   const imports = DERIVED_TESTS.map(
-    (path) => "await import(" + JSON.stringify(join(root, path)) + ");",
+    // A Windows path is not a URL: embedding C:\... in import() makes Node read
+    // the drive letter as a scheme, so the observation would never start there.
+    (path) => "await import(" + JSON.stringify(pathToFileURL(join(root, path)).href) + ");",
   ).join("\n");
   const observed = observe("derived", imports);
   assert.equal(
@@ -1001,9 +1028,7 @@ function observeDerivedTests(directory) {
   // an aggregate pass count can be held up by some other case. Every record the
   // map calls recovered has to appear here as a case that actually passed.
   const passing = new Set(
-    [...observed.result.stdout.matchAll(/^\s*✔ (.*?) \(\d+(?:\.\d+)?ms\)/gm)].map(
-      (match) => match[1],
-    ),
+    passingCaseNames(observed.result.stdout),
   );
   const recovered = coverageGenerate().receipt.records.filter(
     (record) => record.disposition === "recovered",
@@ -1114,6 +1139,30 @@ function runCoverageMapCase() {
  */
 function runFailureControlCases() {
   let observed = 0;
+  // The reporter prints a runtime t.todo() with the same tick as a pass, so the
+  // name parse is checked on synthetic output before it is trusted on real
+  // output. A directive line must not enter the passing set.
+  const sample = [
+    "✔ a real case (1.2ms)",
+    "✔ a deferred case (0.1ms) # TODO not written yet",
+    "✔ a skipped case (0.1ms) # SKIP",
+    "✖ a failing case (2ms)",
+  ].join("\n");
+  assert.deepEqual(passingCaseNames(sample), ["a real case"]);
+  observed += 1;
+  // The control identity must move when the mutation moves, or the receipt
+  // comparison below would accept a swapped control.
+  const sampleControl = FAILURE_CONTROLS[0];
+  assert.notEqual(
+    controlFingerprint(sampleControl),
+    controlFingerprint({ ...sampleControl, to: sampleControl.to + " " }),
+    "the control identity must depend on the mutation text",
+  );
+  assert.notEqual(
+    controlFingerprint(sampleControl),
+    controlFingerprint({ ...sampleControl, file: "test/other.test.ts" }),
+  );
+  observed += 2;
   const pass = { status: 0, signal: null, error: null, failing: 0 };
   assert.equal(judgeFailureControl(pass, { status: 1, signal: null, error: null, failing: 1 }).detected, true);
   const rejected = [
@@ -1139,6 +1188,18 @@ function runFailureControlCases() {
   );
   assert.equal(receipt.undetected.length, 0, "the committed receipt records an undetected control");
   assert.equal(receipt.mutations, FAILURE_CONTROLS.length, "the receipt describes a different control set");
+  // Identity, not just arity: a swapped mutation keeps the count and the file
+  // set intact while the recorded result belongs to a run that never happened.
+  assert.deepEqual(
+    receipt.results.map((entry) => entry.fingerprint).sort(),
+    FAILURE_CONTROLS.map((control) => controlFingerprint(control)).sort(),
+    "the committed receipt does not describe the current controls",
+  );
+  for (const entry of receipt.results)
+    assert.ok(
+      typeof entry.fingerprint === "string" && entry.fingerprint.length === 16,
+      "a receipt entry carries no control identity",
+    );
   for (const control of FAILURE_CONTROLS) {
     const source = readFileSync(join(root, control.file), "utf8");
     assert.ok(

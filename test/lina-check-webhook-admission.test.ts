@@ -55,7 +55,11 @@ const CONFIGURED_INSTALLATION = {
 async function withConfiguredInstallation<T>(run: () => T | Promise<T>): Promise<T> {
   const realRead = nodeFs.readFileSync;
   const realExists = nodeFs.existsSync;
-  const isInstallation = (path: unknown) => String(path).endsWith(INSTALLATION_FILE);
+  // The loader builds this path with node:path, so on Windows it arrives with
+  // backslashes and never ends with the forward-slash form. Compare separator-
+  // independently or the band silently stops applying there.
+  const isInstallation = (path: unknown) =>
+    String(path).split("\\").join("/").endsWith(INSTALLATION_FILE);
   nodeFs.readFileSync = (path: unknown, options: unknown) =>
     isInstallation(path) ? JSON.stringify(CONFIGURED_INSTALLATION) : realRead(path, options);
   nodeFs.existsSync = (path: unknown) => (isInstallation(path) ? true : realExists(path));

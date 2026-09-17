@@ -696,6 +696,9 @@ const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']
 const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
 /** Node accepts both spellings, so a scan keyed to one of them is bypassable. */
 const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?module["']/g;
+/** import * as x from "node:module" puts the factory behind a member access. */
+const MODULE_NAMESPACE_IMPORT =
+  /import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s*from\s*["'](?:node:)?module["']/g;
 /**
  * Candidates CommonJS resolution would try for a specifier with no extension.
  * Dropping such a specifier silently is how an extensionless helper escapes.
@@ -741,6 +744,10 @@ export function createRequireNames(source) {
       const parts = specifier.trim().split(/\s+as\s+/);
       if (parts[0].trim() === "createRequire") names.add((parts[1] ?? parts[0]).trim());
     }
+  // A namespace import is the same factory under a member access, so the name
+  // this scan looks for is the whole dotted form.
+  for (const statement of source.matchAll(MODULE_NAMESPACE_IMPORT))
+    names.add(statement[1] + ".createRequire");
   return names;
 }
 
@@ -758,18 +765,33 @@ export function analyseRequireUse(source) {
   const specifiers = [];
   const unfollowable = [];
   const loaders = new Set();
-  for (const name of createRequireNames(source)) {
-    const pattern = new RegExp("\\b" + escapeRegExp(name) + "\\b", "g");
+  const names = [...createRequireNames(source)];
+  // Longest first: a dotted name contains the bare one, and matching the bare
+  // one inside it would read a namespace call as an untracked use.
+  names.sort((left, right) => right.length - left.length);
+  const seenAt = new Set();
+  for (const name of names) {
+    const pattern = new RegExp("(?:\\b|\\.)?" + escapeRegExp(name) + "\\b", "g");
     for (const use of source.matchAll(pattern)) {
-      const before = source.slice(Math.max(0, use.index - 120), use.index);
+      const at = use.index + (use[0].length - name.length);
+      if (seenAt.has(at)) continue;
+      // A dotted name already covered this position; the bare name inside it is
+      // not a separate use.
+      if ([...seenAt].some((start) => at > start && at < start + 40 && source.slice(start, at).endsWith(".")))
+        continue;
+      seenAt.add(at);
+      const before = source.slice(Math.max(0, at - 120), at);
       // The import specifier that brings the name in is not a use of it.
       if (/import[^;]*\{[^}]*$/.test(before)) continue;
-      const rest = source.slice(use.index + name.length);
+      // A member access on a namespace this scan does track is not an untracked
+      // use either; the dotted name was matched on its own pass.
+      if (!name.includes(".") && /\.\s*$/.test(before)) continue;
+      const rest = source.slice(at + name.length);
       if (!/^\s*\(/.test(rest)) {
         unfollowable.push(name);
         continue;
       }
-      const open = use.index + name.length + rest.indexOf("(");
+      const open = at + name.length + rest.indexOf("(");
       const close = afterGroup(source, open);
       if (close === -1) {
         unfollowable.push(name);

@@ -108,6 +108,19 @@ export const CONTROLS = Object.freeze([
 const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
 /**
+ * Identity of one control, so a receipt cannot describe a different mutation
+ * than the one the tool now defines. Counting controls is not enough: swapping
+ * a mutation while the count and the file set stay the same leaves the old
+ * result looking current.
+ */
+export function controlFingerprint(control) {
+  return createHash("sha256")
+    .update([control.file, control.what, control.from, control.to].join("\u0000"))
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
  * Crash recovery.
  *
  * The mutation is written into the working tree before a blocking call, so a
@@ -211,6 +224,7 @@ export function runControls(controls = CONTROLS) {
     results.push({
       file: control.file,
       mutation: control.what,
+      fingerprint: controlFingerprint(control),
       baseline_exit: baseline.status,
       mutated_exit: mutated.status,
       mutated_signal: mutated.signal,
