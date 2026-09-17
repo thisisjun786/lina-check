@@ -833,11 +833,11 @@ const OBSERVATION_SIGNAL = Object.freeze([
  * already follows everywhere else: refuse the forms it cannot read, which
  * leaves exactly the spellings the token list does read.
  *
- *   process.<name>          read, because the token list sees <name>
- *   process.env.<name>      read, same reason
+ *   process.env.<name>      read, because the token list sees <name>
  *   process.env["<name>"]   read: the literal sits in the scanned source
  *   process.env[key] = v    allowed, and delete too: a write carries nothing
  *                           back to the test about how it was started
+ *   process.execPath        allowed: the interpreter path, not the invocation
  *   anything else           refused
  *
  * Bare process is refused because a binding to it moves every question above
@@ -853,6 +853,18 @@ const OBSERVATION_SIGNAL = Object.freeze([
 const OBSERVATION_ROOT_MODULE = /(?:from|import|require)\s*\(?\s*["'](?:node:)?process["']/;
 const GLOBAL_ROOT = /\b(?:globalThis|global)\b/g;
 const PROCESS_ROOT = /\bprocess\b/g;
+
+/**
+ * The only properties of the process object a derived test may name.
+ *
+ * An allowlist, because a denial list was the wrong shape.
+ * process.report.getReport().header.commandLine names the invocation without
+ * spelling argv, and every further property of that kind would need its own
+ * entry. Turning it around ends the sequence: a derived test needs the
+ * environment it bands and the interpreter path a recovered runner case
+ * compares against, and nothing else on this object.
+ */
+const PROCESS_PROPERTY = Object.freeze(["env", "execPath"]);
 
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
@@ -896,6 +908,8 @@ export function observationAccessFault(rawSource) {
     const rest = code.slice(start);
     const property = /^\s*\.\s*([A-Za-z_$][\w$]*)/.exec(rest);
     if (!property) return "process reached in a form this scan cannot read";
+    if (!PROCESS_PROPERTY.includes(property[1]))
+      return "process." + property[1] + " is not one of the permitted properties";
     if (property[1] !== "env") continue;
     const afterEnv = rest.slice(property[0].length);
     if (/^\s*\.\s*[A-Za-z_$]/.test(afterEnv)) continue;

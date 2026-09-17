@@ -64,28 +64,37 @@
 
 | 형태 | 처분 |
 | -- | -- |
-| `process.<name>` | 허용. 토큰 검사가 `<name>` 을 읽는다 |
-| `process.env.<name>` | 허용. 같은 이유 |
+| `process.env.<name>` | 허용. 토큰 검사가 `<name>` 을 읽는다 |
 | `process.env["<name>"]` | 허용. 리터럴이 스캔되는 소스에 그대로 있다 |
 | `process.env[key] = v`, `delete process.env[key]` | 허용. 쓰기와 삭제는 테스트에게 아무것도 돌려주지 않는다 |
+| `process.execPath` | 허용. 호출 방식이 아니라 인터프리터 경로다 |
+| 그 밖의 `process.<name>` | 거부. 허용 속성은 `env` 와 `execPath` 둘뿐이다 |
 | `process[...]`, 맨 `process`, `const { ... } = process` | 거부 |
 | `globalThis[...]`, `global[...]` | 거부 |
 | `import ... from "node:process"` | 거부 |
+
+속성을 허용 목록으로 둔 것은 금지 목록이 틀린 모양이기 때문이다.
+`process.report.getReport().header.commandLine` 은 `argv` 라는 철자 없이 호출 방식을 말해 준다.
+그런 속성을 하나씩 막으면 목록이 끝나지 않는다. 뒤집으면 끝난다. 파생 테스트에 필요한 것은 대역
+처리하는 환경과 회복한 러너 케이스가 비교하는 인터프리터 경로뿐이고, 이 객체에서 그 밖에 쓰는 것은
+없다. closure 전체에서 실제로 쓰이는 속성은 `env` 34회, `execPath` 1회다.
 
 맨 `process` 를 거부하는 이유는 바인딩 하나가 위의 모든 질문을 한 이름 뒤로 옮기기 때문이다.
 `globalThis` 의 대괄호 접근을 거부하는 이유도 같다. 이름을 적지 않고 process 객체를 가리킬 수
 있는 유일한 형태다.
 
 경계는 적어 둔다. 이건 임의 객체에 대한 리플렉션이 없다는 증명이 아니다. 그럴 필요도 없다.
-프로세스가 어떻게 시작됐는지 알려 주는 것은 process 객체뿐이고, 그 객체는 이제 토큰 검사가 읽는
-철자로만 닿을 수 있다.
+프로세스가 어떻게 시작됐는지 알려 주는 것은 process 객체뿐이고, 파생 테스트가 그 객체에서 닿을 수
+있는 것은 이제 두 속성뿐이다.
 
-양성 대조는 거부 일곱 개와 허용 네 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 아홉 개와 허용 네 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
-계산된 접근, `node:process` import, `process` 구조 분해다. 허용 쪽은 이 저장소가 실제로 쓰는
+계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
+`process.stdout.write` 다. 마지막 것은 관측이 리포터 출력을 읽기 때문에 더 막을 값어치가 있다.
+테스트가 통과 줄을 위조할 수 있으면 대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는
 네 형태다. 계산된 키로 하는 환경 변수 복원(쓰기와 삭제), 리터럴 키 읽기,
-`t.mock.method(globalThis, "fetch", ...)`, `process.stdout.write`. 허용 대조가 없으면
-위 규칙은 process 금지와 구분되지 않는다.
+`t.mock.method(globalThis, "fetch", ...)`, `process.execPath`. 허용 대조가 없으면 위 규칙은
+process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부
 

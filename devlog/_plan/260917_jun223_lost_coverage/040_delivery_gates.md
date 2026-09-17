@@ -553,16 +553,39 @@ A의 기록이 버려진다.
 
 파생 계약 대조가 81건에서 96건으로 늘었다. 거부 대조 열, 허용 대조 넷, 수집기 대조 하나다.
 
-## 20라운드 head 기준 재측정 — 아래가 현재 값이다
+### 21라운드 — 허용 속성 목록으로 뒤집었다
 
-여덟 게이트 전부 exit 0. selftest 요약은 다음과 같다.
+20라운드 수정 뒤 Codex 가 바로 그 수정의 구멍을 짚었다.
+`process.report.getReport().header.commandLine` 은 Node 24 에서 내부 `--test-*` 인자를 담고
+있다. 레인은 `node --test` 로 돌고 관측은 테스트를 직접 import 하므로 그 배열이 다르다.
+`argv` 라는 철자는 어디에도 없으므로 토큰 검사도, 내가 방금 넣은 계산된 접근 검사도 통과한다.
+
+"process 객체는 이제 토큰 검사가 읽는 철자로만 닿는다" 는 20라운드의 주장이 그만큼 과했다.
+점 표기 속성을 전부 허용하고 위험한 이름만 막는 모양이었는데, 그런 속성을 하나씩 막으면 목록이
+끝나지 않는다. 그래서 뒤집었다. 허용 속성은 `env` 와 `execPath` 둘뿐이고 나머지는 거부한다.
+closure 전체에서 실제로 쓰이는 것도 그 둘(34회, 1회)뿐이다.
+
+덤으로 `process.stdout` 도 막혔는데, 이건 덤이 아니라 값어치가 있다. 관측은 리포터 출력을 읽어
+통과 케이스 이름을 뽑는다. 파생 테스트가 stdout 에 직접 쓸 수 있으면 통과 줄을 위조해 대응표
+인증을 흔들 수 있었다. 두 거부 대조를 더해 파생 계약 대조가 96에서 98이 됐다.
+
+같은 라운드에 Devin 이 문서 지적을 냈다. 게이트 결과가 리뷰 대상 head 보다 앞선 head 를 가리킨다는
+것이다. 맞다. 아래 절에 head 를 명시했다.
+
+## 현재 값 — 20·21라운드 head 기준
+
+20라운드 head `aeaf4a40` 에서 여덟 게이트 전부 exit 0, 레인 133초다.
 
 ```
 [lina-check-contract-selftest] derivedTestContract=96 derivedCases=147 derivedLaunches=0 launchControl=1 coverageMap=verified failureControls=46
 [lina-check-coverage-map] current: 144 records, 129 recovered, 2 partial, 13 lost
 ```
 
-대응표는 그대로다. 이 라운드는 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
+21라운드 수정 뒤 값은 `derivedTestContract=98` 이고 나머지는 같다. 그 head 에서도 여덟 게이트를
+다시 돌린다. 문서가 자기 커밋의 SHA 를 담을 수는 없으므로 그 head 번호는 PR 본문과 인도 보고에
+적는다. 이 절이 가리키는 head 가 어느 것인지 헷갈리지 않게 여기에 적어 둔다.
+
+대응표는 그대로다. 두 라운드 모두 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
 
 레인은 133초다. 가드 유발도 이 head 에서 다시 쟀고 복원은 `trap restore EXIT INT TERM` 으로
 걸었다.

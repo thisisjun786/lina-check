@@ -1026,6 +1026,10 @@ function runDerivedTestCases() {
     'const k = "proc" + "ess";\nconst p = globalThis[k];\nconst x = p;\n',
     'import proc from "node:process";\nconst x = proc;\n',
     "const { env } = process;\nconst x = env;\n",
+    // A dotted property can name the invocation without spelling argv, which
+    // is why the permitted properties are a list rather than the leftovers.
+    "const how = process.report.getReport().header.commandLine;\n",
+    'process.stdout.write("ok 1 - forged\\n");\n',
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1044,7 +1048,7 @@ function runDerivedTestCases() {
       "  process.env[name] = value;\n}\n",
     'const home = process.env["LINA_CHECK_HOME"];\nconst x = home;\n',
     'mock.method(globalThis, "fetch", () => {});\n',
-    'process.stdout.write("x");\n',
+    "const command = [process.execPath];\nconst x = command;\n",
   ]) {
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
@@ -1082,7 +1086,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 15;
+  observed += 17;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
