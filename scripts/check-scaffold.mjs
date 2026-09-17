@@ -6,8 +6,18 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  INSTALLATION_CONFIG_PATH,
+  INSTALLATION_SCHEMA_PATH,
+  MODIFIED_UPSTREAM_FILES,
   SAFE_TESTS,
   TRIPWIRE_ENV,
+  WRANGLER_PATH,
+  assertFixtureTestContract,
+  assertModifiedUpstreamContract,
+  assertDerivedTestContract,
+  assertNoForbiddenInstallationLiterals,
+  assertShippedInstallationEmpty,
+  assertWranglerUnconfigured,
   assertDerivedContract,
 } from "./lina-check-derived-contract.mjs";
 
@@ -111,6 +121,10 @@ const coreAdditions = new Set([
 ]);
 const additions = new Set([...coreAdditions, ...Object.keys(config.derived.files)]);
 const baseline = new Set(entries.map(({ path }) => path));
+// Upstream files this fork is allowed to change. The set is a code literal in
+// the contract module; configuration supplies only the reason for each entry.
+const modifiedUpstream = new Set(MODIFIED_UPSTREAM_FILES);
+const observedUpstreamChange = new Set();
 for (const entry of entries) {
   if (["package.json", ".gitignore"].includes(entry.path)) continue;
   const path = docs.includes(entry.path)
@@ -122,6 +136,22 @@ for (const entry of entries) {
   const stat = lstatSync(file);
   const data = stat.isSymbolicLink() ? Buffer.from(readlinkSync(file)) : readFileSync(file);
   const hash = createHash("sha1").update(`blob ${data.length}\0`).update(data).digest("hex");
+  // A declared file must actually differ. A declaration left behind after the
+  // edit was reverted would otherwise keep the exception open forever.
+  if (modifiedUpstream.has(path)) {
+    assert.notEqual(hash, entry.hash, `Declared modified upstream file is unchanged: ${path}`);
+    // The mode check is repeated rather than shared so the two original
+    // assertions below stay byte-identical. The self-test refuses any diff that
+    // deletes an assertion line, and rewriting them to share a branch would
+    // read as a deletion even though nothing was given up.
+    assert.equal(
+      stat.isSymbolicLink() ? "120000" : stat.mode & 0o111 ? "100755" : "100644",
+      entry.mode,
+      `Upstream mode changed: ${path}`,
+    );
+    observedUpstreamChange.add(path);
+    continue;
+  }
   assert.equal(hash, entry.hash, `Upstream bytes changed: ${path}`);
   const mode = stat.isSymbolicLink() ? "120000" : stat.mode & 0o111 ? "100755" : "100644";
   assert.equal(mode, entry.mode, `Upstream mode changed: ${path}`);
@@ -156,6 +186,51 @@ const derivedSummary = assertDerivedContract({
   readFile: (path) => read(path).toString(),
   isRegularFile: (path) => lstatSync(join(root, path)).isFile(),
 });
+
+// The installation entry point ships empty. This is not the same question as
+// whether the loader rejects an empty profile at runtime: it keeps a populated
+// installation from reaching main, which would hand every clone somebody else's
+// targets. The runtime denial paths are covered by lina:contract-selftest.
+const installationSummary = assertShippedInstallationEmpty(json(INSTALLATION_CONFIG_PATH));
+assert(
+  existsSync(join(root, INSTALLATION_SCHEMA_PATH)),
+  "Missing installation schema: " + INSTALLATION_SCHEMA_PATH,
+);
+
+const modifiedSummary = assertModifiedUpstreamContract({
+  declared: config.derived.modifiedUpstreamFiles,
+  baselinePaths: baseline,
+  presentPaths: new Set(present),
+  changed: (path) => observedUpstreamChange.has(path),
+  isRegularFile: (path) => lstatSync(join(root, path)).isFile(),
+});
+
+// Ordinary repository names are not forbidden literals, so a target list that
+// still points somewhere would pass the scan below. These keys are checked by
+// name instead. This matters because the restored profile test now reads pinned
+// upstream bytes and no longer looks at the real file.
+const wranglerSummary = assertWranglerUnconfigured(read(WRANGLER_PATH).toString());
+
+// A test that runs against pinned bytes proves something different from one that
+// runs against this fork. The mapping that decides which is which is checked here.
+const fixtureSummary = assertFixtureTestContract(config.derived.upstreamFixtureTests, baseline);
+
+// Tests this fork wrote. A derived test may import a blocked entrypoint to
+// inspect it, which a derived script may not, so the contract also denies the
+// process-spawning surface by name; otherwise the .mjs rule would just move here.
+const derivedTestSummary = assertDerivedTestContract({
+  declared: config.derived.derivedTests,
+  baselinePaths: baseline,
+  presentPaths: new Set(present),
+  readFile: (path) => read(path).toString(),
+});
+
+// Values this fork removed must not reappear in the files it owns. Scoped to
+// behaviour-carrying paths; the reasoning is in the contract module.
+assertNoForbiddenInstallationLiterals(
+  [...Object.keys(config.derived.files), ...MODIFIED_UPSTREAM_FILES],
+  (path) => read(path).toString(),
+);
 
 // Observe the preview at the test-launch boundary rather than trusting its own
 // report: the tripwire makes any spawn from the runner fail loudly, so a
@@ -195,4 +270,16 @@ console.log(
 );
 console.log(
   `Derived declarations validated: ${derivedSummary.files} files; ${derivedSummary.scripts} scripts; ${derivedSummary.safeTests} restored upstream tests; ${derivedSummary.probes} boundary-probe targets; preview observed non-executing under ${TRIPWIRE_ENV}.`,
+);
+console.log(
+  `Installation entry point ships unconfigured: ${installationSummary.sections} sections; ${installationSummary.emptyStrings} empty settings; no forbidden upstream literal in fork-owned code or configuration.`,
+);
+console.log(
+  `Declared upstream modifications: ${modifiedSummary.files} files, each observed to differ from the pin; Worker settings emptied: ${wranglerSummary.emptied} variables, ${wranglerSummary.removed} upstream-owned keys absent.`,
+);
+console.log(
+  `${fixtureSummary.tests} restored test(s) run against pinned upstream bytes rather than this installation; the fork's own settings are asserted here, not there.`,
+);
+console.log(
+  `Derived tests declared: ${derivedTestSummary.tests}, covering the admission decision the excluded upstream suite cannot reach.`,
 );

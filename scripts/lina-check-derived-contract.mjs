@@ -13,6 +13,14 @@
 
 export const TRIPWIRE_ENV = "LINA_CHECK_SPAWN_TRIPWIRE";
 export const PLAN_UNIT = "devlog/_plan/260917_jun135_part_a";
+export const PLAN_UNIT_JUN198 = "devlog/_plan/260917_jun198_install_profile";
+
+/**
+ * Plan units whose documents may be declared as derived files. Listing them here
+ * rather than widening the pattern to all of devlog/_plan keeps a new directory
+ * name from silently becoming an accepted location.
+ */
+export const PLAN_UNITS = Object.freeze([PLAN_UNIT, PLAN_UNIT_JUN198]);
 
 export const DERIVED_SCRIPT_NAMES = Object.freeze([
   "lina:boundary-probe",
@@ -113,6 +121,84 @@ export const EXCLUDED_TESTS = Object.freeze([
   "test/run-node-tests.test.ts",
 ]);
 
+/**
+ * Restored tests that run against pinned upstream bytes rather than this fork's
+ * files, with the files each one needs.
+ *
+ * test/repository-profiles.test.ts asserts the dashboard target variables still
+ * name the upstream project's repositories. Emptying them is the point of this
+ * change, so the assertion cannot hold here. Dropping the suite would have cost
+ * its profile and schema coverage too, which has nothing to do with the target
+ * lists, so instead its two working-directory reads are pointed at the pin.
+ *
+ * This proves the upstream profile resolver still behaves on upstream input. It
+ * proves nothing about this fork's configuration; that is asserted separately by
+ * check:scaffold against the real files.
+ */
+export const UPSTREAM_FIXTURE_TESTS = Object.freeze({
+  "test/repository-profiles.test.ts": Object.freeze([
+    "config/target-repositories.json",
+    "dashboard/wrangler.toml",
+  ]),
+});
+
+export const UPSTREAM_FIXTURE_TEST_NAMES = Object.freeze(Object.keys(UPSTREAM_FIXTURE_TESTS).sort());
+
+/**
+ * Tests this fork wrote, kept separate from the restored upstream set so a
+ * report never blurs the two. These cover the admission decision, which the
+ * upstream suite for it cannot: test/hosted-target-admission.test.ts opens
+ * .github/workflows/hosted-target-admission.yml, and every workflow here is
+ * parked, so that file does not exist.
+ */
+export const DERIVED_TESTS = Object.freeze(["test/lina-check-admission.test.ts"]);
+
+/**
+ * A derived test may import a blocked entrypoint to inspect its behaviour, which
+ * a derived script may not. That difference is only safe while the test cannot
+ * start anything, so the process-spawning surface is denied by name. Without
+ * this, the .mjs blocked-target rule would simply move to a .ts file.
+ */
+const SPAWN_SURFACE = Object.freeze([
+  "node:child_process",
+  "child_process",
+  "spawnSync",
+  "execFileSync",
+  "execSync",
+  "fork(",
+]);
+
+export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
+  const names = Object.keys(declared ?? {}).sort();
+  if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));
+  for (const path of names) {
+    if (!nonEmptyReason(declared[path])) fail("derived-test-reason", path);
+    if (baselinePaths.has(path)) fail("derived-test-upstream-collision", path);
+    if (!presentPaths.has(path)) fail("derived-test-missing", path);
+    if (SAFE_TESTS.includes(path) || EXCLUDED_TESTS.includes(path))
+      fail("derived-test-upstream-collision", path);
+    const source = readFile(path);
+    for (const token of SPAWN_SURFACE)
+      if (source.includes(token)) fail("derived-test-spawns", path + " -> " + token);
+  }
+  return { tests: names.length };
+}
+
+export function assertFixtureTestContract(declared, baselinePaths) {
+  const names = Object.keys(declared ?? {}).sort();
+  if (!sameList(names, [...UPSTREAM_FIXTURE_TEST_NAMES])) fail("fixture-test-set", names.join(","));
+  for (const name of names) {
+    if (!SAFE_TESTS.includes(name)) fail("fixture-test-unrestored", name);
+    if (!nonEmptyReason(declared[name])) fail("fixture-test-reason", name);
+    const files = UPSTREAM_FIXTURE_TESTS[name];
+    if (!sameList([...(declared[name].files ?? [])], [...files]))
+      fail("fixture-test-files", name);
+    for (const file of files)
+      if (!baselinePaths.has(file)) fail("fixture-test-path", file);
+  }
+  return { tests: names.length };
+}
+
 export const BOUNDARY_PROBES = Object.freeze([
   Object.freeze({ action: "auto-fix", script: "repair:execute-fix" }),
   Object.freeze({ action: "auto-fix", script: "repair:apply-result" }),
@@ -126,6 +212,190 @@ export const BOUNDARY_PROBES = Object.freeze([
 
 export const BOUNDARY_PROBE_SCRIPTS = Object.freeze(BOUNDARY_PROBES.map(({ script }) => script));
 
+/** The installation entry point that ships with the fork. */
+export const INSTALLATION_CONFIG_PATH = "config/lina-check-installation.json";
+export const INSTALLATION_SCHEMA_PATH = "schema/lina-check-installation.schema.json";
+export const WRANGLER_PATH = "dashboard/wrangler.toml";
+
+/**
+ * Upstream files this fork is allowed to change.
+ *
+ * Every judgement JUN-198 had to move lives inside a preserved upstream file,
+ * so the byte assertion needed an exception. The exception is a code literal,
+ * not a configuration list: the declaration in config records only why each
+ * entry is here, so editing configuration alone cannot add a file.
+ *
+ * The set grew from three to seven across four review rounds. Each addition was
+ * a place that still granted admission, or still reached the network, after the
+ * previous edit; the history is in the plan unit.
+ */
+export const MODIFIED_UPSTREAM_FILES = Object.freeze([
+  "dashboard/exact-review-queue.ts",
+  "dashboard/github-api.ts",
+  "dashboard/worker.ts",
+  "dashboard/wrangler.toml",
+  "src/hosted-target-admission.ts",
+  "src/repair/comment-webhook.ts",
+  "src/repair/target-fanout.ts",
+]);
+
+/**
+ * Worker settings that must carry no value. Ordinary repository names are not
+ * forbidden literals, so the forbidden-literal scan cannot see a target list
+ * that still points somewhere; these keys are checked by name.
+ */
+export const WRANGLER_EMPTY_VARS = Object.freeze([
+  "APPLY_OPTIONAL_TARGET_REPOS",
+  "APPLY_TARGET_REPOS",
+  "CLAWSWEEPER_APP_CLIENT_ID",
+  "CLAWSWEEPER_CRABFLEET_URL",
+  "CLAWSWEEPER_REPO",
+  "EXACT_REVIEW_STATE_REPO",
+  "LINA_CHECK_BOT_LOGIN",
+  "LINA_CHECK_DASHBOARD_HOST",
+  "LINA_CHECK_INSTALLATION_CONFIGURED",
+  "LINA_CHECK_PRODUCT_NAME",
+  "LINA_CHECK_SHORT_NAME",
+  "LINA_CHECK_TARGET_OWNERS",
+  "LINA_CHECK_TARGET_REGISTRY_URL",
+  "LINA_CHECK_TARGET_REPOS",
+  "LINA_CHECK_USER_AGENT",
+  "PUBLIC_BAY_REPOS",
+  "TARGET_REPOS",
+]);
+
+/** Settings whose very presence names the upstream installation. */
+export const WRANGLER_ABSENT_KEYS = Object.freeze(["account_id", "custom_domain", "pattern"]);
+
+export function assertWranglerUnconfigured(source) {
+  for (const key of WRANGLER_ABSENT_KEYS) {
+    const present = new RegExp("^\\s*" + key + "\\s*=", "m").test(source);
+    if (present) fail("wrangler-configured-key", key);
+  }
+  for (const name of WRANGLER_EMPTY_VARS) {
+    const match = new RegExp("^" + name + ' = "([^"]*)"', "m").exec(source);
+    if (!match) fail("wrangler-missing-var", name);
+    if (match[1] !== "") fail("wrangler-nonempty-var", name + '="' + match[1] + '"');
+  }
+  return { emptied: WRANGLER_EMPTY_VARS.length, removed: WRANGLER_ABSENT_KEYS.length };
+}
+
+/**
+ * A declared file whose bytes still match upstream is refused. Without that, a
+ * stale declaration would leave a permanent hole: the edit could be reverted and
+ * nothing would notice, because the exception would still be in force.
+ */
+export function assertModifiedUpstreamContract({
+  declared,
+  baselinePaths,
+  presentPaths,
+  changed,
+  isRegularFile,
+}) {
+  if (typeof declared !== "object" || declared === null)
+    fail("modified-upstream-shape", "derived.modifiedUpstreamFiles is missing");
+  const names = Object.keys(declared).sort();
+  if (!sameList(names, [...MODIFIED_UPSTREAM_FILES]))
+    fail("modified-upstream-set", names.join(","));
+  for (const path of names) {
+    if (!nonEmptyReason(declared[path])) fail("modified-upstream-reason", path);
+    if (!baselinePaths.has(path)) fail("modified-upstream-unknown", path);
+    if (!presentPaths.has(path)) fail("modified-upstream-missing", path);
+    if (!isRegularFile(path)) fail("modified-upstream-symlink", path);
+    if (!changed(path)) fail("modified-upstream-unchanged", path);
+  }
+  return { files: names.length };
+}
+
+/**
+ * Values that must not reappear in code or configuration this fork owns: the
+ * upstream maintainer account, the upstream Cloudflare account, the upstream
+ * App client, the two upstream operational hosts, and the upstream profile
+ * registry.
+ *
+ * Each value is assembled from fragments rather than written out. A scanner that
+ * spelled its own needles would match the file that defines them, so a literal
+ * table would fail the check it exists to perform. The fragments also keep the
+ * upstream maintainer's account name out of this fork's source.
+ */
+export const FORBIDDEN_INSTALLATION_LITERALS = Object.freeze([
+  Object.freeze({ label: "upstream maintainer account", value: ["stei", "pete"].join("") }),
+  Object.freeze({
+    label: "upstream Cloudflare account",
+    value: ["91b59577", "e757131d68d55a471fe32aca"].join(""),
+  }),
+  Object.freeze({ label: "upstream App client", value: ["Iv23li", "OECG0slfuhz093"].join("") }),
+  Object.freeze({ label: "upstream dashboard host", value: ["clawsweeper.", "openclaw.ai"].join("") }),
+  Object.freeze({ label: "upstream fleet host", value: ["crabfleet.", "openclaw.ai"].join("") }),
+  Object.freeze({
+    label: "upstream profile registry",
+    value: ["raw.githubusercontent.com/", "openclaw/clawsweeper"].join(""),
+  }),
+]);
+
+/**
+ * Where the forbidden-literal scan applies: files whose bytes this fork owns and
+ * that carry behaviour. Prose under devlog/ and docs/ is excluded on purpose,
+ * because a record of what was removed has to be able to name it. Untouched
+ * upstream files are excluded because the byte assertion already fixes them and
+ * preserving them is this repository's contract.
+ */
+const SCANNED_PREFIXES = Object.freeze(["src/", "dashboard/", "config/", "schema/", "scripts/"]);
+
+export function scannedForForbiddenLiterals(paths) {
+  return [...paths].filter((path) => SCANNED_PREFIXES.some((prefix) => path.startsWith(prefix)));
+}
+
+export function assertNoForbiddenInstallationLiterals(paths, readFile) {
+  for (const path of scannedForForbiddenLiterals(paths)) {
+    const source = readFile(path);
+    for (const { label, value } of FORBIDDEN_INSTALLATION_LITERALS)
+      if (source.includes(value)) fail("installation-forbidden-literal", path + " -> " + label);
+  }
+}
+
+const EMPTY_INSTALLATION_STRINGS = Object.freeze([
+  ["branding", "product_name"],
+  ["branding", "short_name"],
+  ["branding", "user_agent"],
+  ["branding", "dashboard_host"],
+  ["targets", "registry_url"],
+  ["state", "state_repo"],
+  ["state", "state_ref"],
+  ["github_app", "client_id"],
+  ["github_app", "bot_login"],
+]);
+
+/**
+ * The shipped entry point must stay empty. This is a different question from
+ * whether the loader rejects an empty profile at runtime: this one keeps a
+ * populated installation from being committed, which would hand every clone of
+ * this fork somebody else's targets.
+ */
+export function assertShippedInstallationEmpty(profile) {
+  if (typeof profile !== "object" || profile === null)
+    fail("installation-shipped-shape", "installation profile must be an object");
+  if (profile.schema_version !== 1)
+    fail("installation-shipped-shape", "schema_version must be 1");
+  if (profile.configured !== false)
+    fail("installation-shipped-configured", "shipped installation must be unconfigured");
+  for (const key of ["branding", "targets", "state", "github_app"])
+    if (typeof profile[key] !== "object" || profile[key] === null)
+      fail("installation-shipped-shape", "missing section: " + key);
+  for (const key of ["fallback_owners", "repositories"]) {
+    const list = profile.targets[key];
+    if (!Array.isArray(list)) fail("installation-shipped-shape", "targets." + key + " must be an array");
+    if (list.length !== 0) fail("installation-shipped-nonempty", "targets." + key);
+  }
+  for (const [section, key] of EMPTY_INSTALLATION_STRINGS) {
+    const value = profile[section][key];
+    if (typeof value !== "string")
+      fail("installation-shipped-shape", section + "." + key + " must be a string");
+    if (value !== "") fail("installation-shipped-nonempty", section + "." + key);
+  }
+  return { sections: 4, emptyStrings: EMPTY_INSTALLATION_STRINGS.length };
+}
+
 /** Parked workflows whose triggers would reach one of the four automatic actions. */
 export const BOUNDARY_WORKFLOWS = Object.freeze([
   "automerge-e2e",
@@ -137,7 +407,16 @@ export const BOUNDARY_WORKFLOWS = Object.freeze([
 
 const DERIVED_FILE_PATTERNS = Object.freeze([
   /^scripts\/lina-check-[a-z-]+\.mjs$/,
-  /^devlog\/_plan\/260917_jun135_part_a\/(evidence\/)?[0-9a-z_-]+\.(md|json)$/,
+  new RegExp(
+    "^(" +
+      PLAN_UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
+      ")\\/(evidence\\/)?[0-9a-z_-]+\\.(md|json)$",
+  ),
+  /^src\/lina-check-[a-z-]+\.ts$/,
+  /^config\/lina-check-[a-z-]+\.json$/,
+  /^schema\/lina-check-[a-z-]+\.schema\.json$/,
+  /^docs\/lina-check\/[a-z0-9-]+\.md$/,
+  /^test\/lina-check-[a-z-]+\.test\.ts$/,
 ]);
 const DERIVED_SCRIPT_COMMAND = /^node (scripts\/lina-check-[a-z-]+\.mjs)(?: [a-z-]+)*$/;
 const BLOCKED_NODE_TARGET = /\bnode ([\w./-]+\.(?:js|mjs|cjs|ts|mts))\b/g;

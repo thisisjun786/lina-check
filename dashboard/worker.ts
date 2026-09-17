@@ -26,6 +26,7 @@ import {
   githubEtagCacheKey,
   githubEtagCacheRequestBody,
 } from "../src/github-etag-cache-contract.ts";
+import { installationFromEnv } from "../src/lina-check-installation-contract.ts";
 import { inlineProofParticipation, publicInlineProofCohorts } from "./inline-proof-telemetry.ts";
 import { bayHtml } from "./bay-page.ts";
 import {
@@ -390,8 +391,6 @@ const APPLY_OBSERVABILITY_KEY_PREFIX = "apply-observability:";
 const APPLY_OBSERVABILITY_BUCKET_KEY_PREFIX = `${APPLY_OBSERVABILITY_KEY_PREFIX}day:`;
 const APPLY_OBSERVABILITY_LEGACY_LIMIT = 5_000;
 const CLAWSWEEPER_REVIEW_REPO = "openclaw/clawsweeper";
-const CLAWSWEEPER_STATE_REPO = "openclaw/clawsweeper-state";
-const CLAWSWEEPER_STATE_REF = "state";
 const CLUSTER_REPAIR_INTAKE_WORKFLOW = "repair-cluster-intake.yml";
 const CLAWSWEEPER_ALLOWED_ASSOCIATIONS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 const CLAWSWEEPER_ISSUE_ITEM_ACTIONS = new Set([
@@ -3462,11 +3461,11 @@ export function publicStatusFreshness(
 function refreshStatus(request, env) {
   const key = [
     new URL(request.url).origin,
-    env.CLAWSWEEPER_REPO || "openclaw/clawsweeper",
+    env.CLAWSWEEPER_REPO || "",
     dashboardWorkflowSource(env),
-    env.TARGET_REPOS || "openclaw/openclaw",
+    env.TARGET_REPOS || "",
     env.PUBLIC_BAY_REPOS || "",
-    env.CLAWSWEEPER_STATE_REPO || CLAWSWEEPER_STATE_REPO,
+    env.EXACT_REVIEW_STATE_REPO || "",
     env.WORKER_BUDGET || "",
     env.WORKER_DETAIL_RUN_LIMIT || "",
     env.INCLUDE_CI_STATUS || "",
@@ -4125,6 +4124,7 @@ async function workerHostedTargetEligibility(
       )
     : undefined;
   return resolveHostedTargetEligibility(targetRepo, fetch, {
+    installation: installationFromEnv(env as Record<string, unknown>),
     ...(configuredRepositories ? { configuredRepositories } : {}),
     ...(typeof env.hostedTargetPredicate === "function"
       ? {
@@ -4148,6 +4148,7 @@ async function workerHostedTargetVisibilityAdmission(
     const token = await exactReviewRepositoryToken(env, { metadata: "read" });
     return probeHostedPublicTarget(targetRepo, token, fetch, {
       apiUrl: (path) => githubApiUrl(env, path),
+      installation: installationFromEnv(env as Record<string, unknown>),
     });
   } catch (error) {
     return hostedTargetRetryableAdmission(error);
@@ -4902,9 +4903,12 @@ function isEligibleGithubWebhookRepository(repo, hostedTargetEligible = false) {
   if (Boolean(repo.private) || Boolean(repo.archived) || Boolean(repo.fork)) return false;
   if (repo.has_issues === false) return false;
   if (CLAWSWEEPER_WEBHOOK_DENY_REPOS.has(targetRepo)) return false;
-  if (hostedTargetEligible) return true;
-  const [owner] = targetRepo.split("/");
-  return owner === "openclaw" || owner === "steipete";
+  // Upstream admitted two owner names written into this file. A fork inherits
+  // that judgement without inheriting any reason to hold it, so the owner
+  // comparison is gone and hosted eligibility is the only way through. That
+  // path now consults the installation profile, so an unconfigured fork admits
+  // nothing rather than admitting the upstream project's repositories.
+  return hostedTargetEligible;
 }
 
 function targetDefaultBranch(repo) {
@@ -6881,7 +6885,7 @@ async function applyObservabilityJson(request: Request, env: DashboardEnv) {
   if (!isDurableStatusStore(env.STATUS_STORE)) {
     return json({ error: "apply_observability_not_configured" }, 503);
   }
-  const requiredRepositories = String(env.APPLY_TARGET_REPOS || "openclaw/openclaw")
+  const requiredRepositories = String(env.APPLY_TARGET_REPOS || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -7571,8 +7575,8 @@ async function statusSnapshot(env) {
   const github = createGithubJsonCache(env);
   const generatedAt = new Date().toISOString();
   const errors = [];
-  const repo = env.CLAWSWEEPER_REPO || "openclaw/clawsweeper";
-  const targetRepos = String(env.TARGET_REPOS || "openclaw/openclaw")
+  const repo = env.CLAWSWEEPER_REPO || "";
+  const targetRepos = String(env.TARGET_REPOS || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -7747,7 +7751,7 @@ async function statusSnapshot(env) {
       return emptyApplyHealthStatus(targetRepos);
     }),
     withTimeout(
-      recentAutomerge(env, targetRepos[0] || "openclaw/openclaw", github),
+      recentAutomerge(env, targetRepos[0] || "", github),
       OPTIONAL_SECTION_TIMEOUT_MS,
       "automerge timing",
     ).catch((error) => {
@@ -8618,11 +8622,11 @@ function triageTargetRepos(env) {
     .map((value) => value.trim())
     .filter(Boolean);
   if (configured.length) return configured;
-  const targetRepos = String(env.TARGET_REPOS || "openclaw/openclaw")
+  const targetRepos = String(env.TARGET_REPOS || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  return targetRepos.length ? [targetRepos[0]] : ["openclaw/openclaw"];
+  return targetRepos.length ? [targetRepos[0]] : [];
 }
 
 function prProofTargetRepos(env) {
@@ -10946,8 +10950,8 @@ async function readApplyHealthMarker(
   targetRepo,
   github: GithubJsonReader = (path) => githubJson(env, path),
 ) {
-  const stateRepo = String(env.CLAWSWEEPER_STATE_REPO || CLAWSWEEPER_STATE_REPO);
-  const stateRef = String(env.CLAWSWEEPER_STATE_REF || CLAWSWEEPER_STATE_REF);
+  const stateRepo = String(env.EXACT_REVIEW_STATE_REPO || "");
+  const stateRef = String(env.EXACT_REVIEW_STATE_REF || "");
   const repoSlug = String(targetRepo || "").replace(/\//g, "-");
   const statusPath = `results/sweep-status/${repoSlug}.json`;
   try {
@@ -11166,8 +11170,8 @@ async function readClusterRepairMarker(
   targetRepo,
   github: GithubJsonReader = (path) => githubJson(env, path),
 ) {
-  const stateRepo = String(env.CLAWSWEEPER_STATE_REPO || CLAWSWEEPER_STATE_REPO);
-  const stateRef = String(env.CLAWSWEEPER_STATE_REF || CLAWSWEEPER_STATE_REF);
+  const stateRepo = String(env.EXACT_REVIEW_STATE_REPO || "");
+  const stateRef = String(env.EXACT_REVIEW_STATE_REF || "");
   const repoSlug = String(targetRepo || "").replace(/\//g, "-");
   const markerPath = `results/cluster-repair-intake/${repoSlug}.json`;
   try {

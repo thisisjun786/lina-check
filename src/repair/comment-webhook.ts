@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import http from "node:http";
 
 import { repositoryProfileFor } from "../repository-profiles.js";
+import { installationProfile } from "../lina-check-installation.js";
+import { installationAdmitsFallbackOwner, installationAdmitsRepository } from "../lina-check-installation-contract.js";
 import {
   hostedTargetRetryableAdmission,
   probeHostedPublicTarget,
@@ -161,7 +163,9 @@ export async function handleGitHubWebhook({
       repositories: [repoName(REVIEW_REPO)],
       permissions: { metadata: "read" },
     });
-    admission = await probeHostedPublicTarget(accepted.targetRepo, metadataToken, fetch);
+    admission = await probeHostedPublicTarget(accepted.targetRepo, metadataToken, fetch, {
+      installation: installationProfile(),
+    });
   } catch (error) {
     admission = hostedTargetRetryableAdmission(error);
   }
@@ -193,7 +197,7 @@ export async function handleGitHubWebhook({
       queueUrl:
         process.env.CLAWSWEEPER_EXACT_REVIEW_QUEUE_URL ||
         process.env.QUEUE_URL ||
-        "https://clawsweeper.openclaw.ai",
+        "",
       secret: process.env.CLAWSWEEPER_WEBHOOK_SECRET || "",
       intake,
     });
@@ -479,12 +483,24 @@ function isEligibleRepositoryPayload(repo: LooseRecord) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(targetRepo)) return false;
   if (Boolean(repo.private) || Boolean(repo.archived) || Boolean(repo.fork)) return false;
   if (repo.has_issues === false) return false;
+  // Resolving a profile is not permission to act on a repository. Upstream
+  // treated a successful lookup as eligibility, which meant every repository
+  // described in the inherited profile list was admitted here regardless of who
+  // is running this fork. The installation decides; the profile only describes.
+  if (!installationAdmitsTarget(targetRepo)) return false;
   try {
     repositoryProfileFor(targetRepo);
     return true;
   } catch {
     return false;
   }
+}
+
+function installationAdmitsTarget(targetRepo: string): boolean {
+  const profile = installationProfile();
+  if (installationAdmitsRepository(profile, targetRepo)) return true;
+  const owner = targetRepo.split("/")[0] ?? "";
+  return installationAdmitsFallbackOwner(profile, owner);
 }
 
 function targetDefaultBranch(repo: LooseRecord) {

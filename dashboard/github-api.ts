@@ -3,6 +3,7 @@ import {
   githubResponseRateLimited,
   type GitHubRateLimitHint,
 } from "../src/hosted-target-admission.ts";
+import { githubTransportPermitted } from "../src/lina-check-installation-contract.ts";
 
 export {
   githubResponseRateLimitHint,
@@ -82,6 +83,17 @@ export function githubApiBaseUrl(env: GithubApiEnv = {}): string {
 export function githubApiUrl(env: GithubApiEnv, path: string): string {
   const normalizedPath = String(path);
   if (!normalizedPath.startsWith("/")) throw new Error("GitHub API path must start with /");
+  // Every outbound GitHub request in the Worker, the queue and this module
+  // builds its URL here, so this is the one place that can refuse them all.
+  const route = normalizedPath.split("?")[0] ?? "";
+  if (route.includes("//"))
+    throw new Error(
+      "GitHub API path has an empty segment: refusing a request assembled from unset configuration",
+    );
+  if (!githubTransportPermitted(env))
+    throw new Error(
+      "refusing a GitHub request: this installation is unconfigured and carries no GitHub credential",
+    );
   return `${githubApiBaseUrl(env)}${normalizedPath}`;
 }
 

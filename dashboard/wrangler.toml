@@ -1,6 +1,5 @@
-name = "clawsweeper-status"
+name = "lina-check-status"
 main = "worker.ts"
-account_id = "91b59577e757131d68d55a471fe32aca"
 compatibility_date = "2026-05-11"
 workers_dev = true
 
@@ -12,7 +11,7 @@ directory = "./public"
 
 [[r2_buckets]]
 binding = "STATE_SNAPSHOTS"
-bucket_name = "clawsweeper-state-snapshots"
+bucket_name = "lina-check-state-snapshots"
 
 [[durable_objects.bindings]]
 name = "STATUS_STORE"
@@ -38,21 +37,34 @@ new_sqlite_classes = ["ExactReviewQueue"]
 tag = "v3"
 new_sqlite_classes = ["GithubEtagCache"]
 
-[[routes]]
-pattern = "clawsweeper.openclaw.ai"
-custom_domain = true
-
 [vars]
-CLAWSWEEPER_REPO = "openclaw/clawsweeper"
+# Installation settings. Every one of these ships empty: an unconfigured
+# deployment must not inherit the upstream project's account, domain or targets.
+# The installation operator fills them in. Emptiness is enforced by
+# check:scaffold, not left to review.
+LINA_CHECK_INSTALLATION_CONFIGURED = ""
+LINA_CHECK_TARGET_OWNERS = ""
+LINA_CHECK_TARGET_REPOS = ""
+LINA_CHECK_TARGET_REGISTRY_URL = ""
+# Branding. installationFromEnv reads these, so they belong in the documented
+# variable list rather than only in source; an operator cannot configure what the
+# configuration file never mentions.
+LINA_CHECK_PRODUCT_NAME = ""
+LINA_CHECK_SHORT_NAME = ""
+LINA_CHECK_USER_AGENT = ""
+LINA_CHECK_DASHBOARD_HOST = ""
+LINA_CHECK_BOT_LOGIN = ""
+CLAWSWEEPER_REPO = ""
 CLAWSWEEPER_DASHBOARD_WORKFLOW_SOURCE = "poll"
-CLAWSWEEPER_APP_CLIENT_ID = "Iv23liOECG0slfuhz093"
-CLAWSWEEPER_CRABFLEET_URL = "https://crabfleet.openclaw.ai"
-TARGET_REPOS = "openclaw/openclaw,openclaw/clawhub,openclaw/clawsweeper,openclaw/fs-safe"
-# Explicit public-only allowlist for canonical repository + issue/PR references
-# rendered in OpenClaw Bay. Repositories must be verified public before addition.
-PUBLIC_BAY_REPOS = "openclaw/openclaw,openclaw/clawhub,openclaw/clawsweeper,openclaw/fs-safe"
-APPLY_TARGET_REPOS = "openclaw/openclaw"
-APPLY_OPTIONAL_TARGET_REPOS = "openclaw/clawhub"
+CLAWSWEEPER_APP_CLIENT_ID = ""
+CLAWSWEEPER_CRABFLEET_URL = ""
+TARGET_REPOS = ""
+# Explicit public-only allowlist for canonical repository and issue/PR
+# references rendered on the public page. Repositories must be verified public
+# before addition.
+PUBLIC_BAY_REPOS = ""
+APPLY_TARGET_REPOS = ""
+APPLY_OPTIONAL_TARGET_REPOS = ""
 CLAWSWEEPER_ENABLE_CLAWHUB = "1"
 WORKER_BUDGET = "32"
 EXACT_REVIEW_ACTIONS_BUDGET = "194"
@@ -92,7 +104,7 @@ EXACT_REVIEW_TARGET_RATE_PER_HOUR = "60"
 EXACT_REVIEW_TARGET_BURST = "6"
 EXACT_REVIEW_PUBLICATION_BATCHING_ENABLED = "1"
 EXACT_REVIEW_DIRECT_PUBLICATION_ENABLED = "1"
-EXACT_REVIEW_STATE_REPO = "openclaw/clawsweeper-state"
+EXACT_REVIEW_STATE_REPO = ""
 EXACT_REVIEW_STATE_REF = "state"
 EXACT_REVIEW_PUBLICATION_BATCH_SIZE = "8"
 EXACT_REVIEW_PUBLICATION_BATCH_MAX_CONCURRENT = "8"

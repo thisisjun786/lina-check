@@ -31,6 +31,7 @@ import {
   type HostedTargetEligibility,
   type HostedTargetAdmission,
 } from "../src/hosted-target-admission.ts";
+import { installationFromEnv } from "../src/lina-check-installation-contract.ts";
 import {
   clawSweeperCommandAckMarker,
   renderClawSweeperQueuedAcknowledgement,
@@ -9465,7 +9466,10 @@ export class ExactReviewQueue {
           targetRepo,
           await hostedTargetMetadataToken(),
           (input, init) => fetch(input, init),
-          { apiUrl: (path) => githubApiUrl(this.env, path) },
+          {
+            apiUrl: (path) => githubApiUrl(this.env, path),
+            installation: installationFromEnv(this.env as Record<string, unknown>),
+          },
         );
       } catch (error) {
         admission = hostedTargetRetryableAdmission(error);
@@ -9499,6 +9503,7 @@ export class ExactReviewQueue {
         )
       : undefined;
     return resolveHostedTargetEligibility(targetRepo, (input, init) => fetch(input, init), {
+      installation: installationFromEnv(this.env as Record<string, unknown>),
       ...(configuredRepositories ? { configuredRepositories } : {}),
       ...(typeof this.env.hostedTargetPredicate === "function"
         ? {

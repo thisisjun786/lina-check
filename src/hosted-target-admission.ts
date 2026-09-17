@@ -1,10 +1,20 @@
+import {
+  UNCONFIGURED_INSTALLATION,
+  brandedUserAgent,
+  installationAdmitsFallbackOwner,
+  installationAdmitsRepository,
+  installationConfigured,
+  installationRegistryUrl,
+  type InstallationProfile,
+  // The .ts specifier is deliberate. This module is inside the dashboard import
+  // graph, which Node executes as TypeScript directly, so a .js specifier would
+  // typecheck and then fail to resolve at run time. tsc rewrites it on emit.
+} from "./lina-check-installation-contract.ts";
+
 const GITHUB_RATE_LIMIT_FALLBACK_MS = 15 * 60 * 1000;
 const GITHUB_RATE_LIMIT_MAX_RETRY_MS = 2 * 60 * 60 * 1000;
 const HOSTED_TARGET_RETRY_MAX_MS = 2 * 60 * 60 * 1000;
 const HOSTED_TARGET_REGISTRY_TIMEOUT_MS = 5_000;
-const HOSTED_TARGET_FALLBACK_OWNERS = new Set(["openclaw", "steipete"]);
-const DEFAULT_HOSTED_TARGET_REGISTRY_URL =
-  "https://raw.githubusercontent.com/openclaw/clawsweeper/main/config/target-repositories.json";
 export const HOSTED_TARGET_ELIGIBILITY_HEADER = "x-clawsweeper-hosted-target-eligible";
 
 export type GitHubRateLimitHint = {
@@ -26,6 +36,12 @@ export type HostedTargetEligibility = {
 export type HostedTargetPolicy = {
   configuredRepositories: readonly string[];
   genericFallbacks: readonly HostedTargetFallbackPolicy[];
+  /**
+   * Who this installation actually manages. Upstream kept the owner set in a
+   * source literal and let the fetched registry decide the rest, so a registry
+   * entry could admit a repository nobody running the fork had named.
+   */
+  installation: InstallationProfile;
 };
 type HostedTargetFallbackPolicy = {
   owner: string;
@@ -36,11 +52,20 @@ type HostedTargetFallbackPolicy = {
 export function isHostedTargetEligible(targetRepo: string, policy: HostedTargetPolicy): boolean {
   const normalized = normalizeTargetRepo(targetRepo);
   if (!normalized) return false;
-  for (const configured of policy.configuredRepositories) {
-    if (normalizeTargetRepo(configured) === normalized) return true;
-  }
+  // The installation grants; the registry only describes. An unconfigured
+  // installation admits nothing, including a repository the registry lists.
+  if (!installationConfigured(policy.installation)) return false;
+  // An explicit grant stands on its own. Requiring a registry entry as well made
+  // the two admission paths disagree: the Worker reads a registry and the Node
+  // paths read a preserved local inventory, so the same installation could admit
+  // a target in one and refuse it in the other. Whether a profile describing the
+  // target exists is a separate question, answered where the profile is used.
+  if (installationAdmitsRepository(policy.installation, normalized)) return true;
   const [owner, repoName] = normalized.split("/");
-  if (!owner || !repoName || !HOSTED_TARGET_FALLBACK_OWNERS.has(owner)) return false;
+  if (!owner || !repoName) return false;
+  // A fallback owner is a pattern, not a name, and the pattern comes from the
+  // registry. The installation still decides which owners may be matched at all.
+  if (!installationAdmitsFallbackOwner(policy.installation, owner)) return false;
   const fallback = policy.genericFallbacks.find((candidate) => candidate.owner === owner);
   return Boolean(
     fallback &&
@@ -56,11 +81,21 @@ export async function resolveHostedTargetEligibility(
     configuredRepositories?: Iterable<string>;
     predicate?: (targetRepo: string) => boolean | Promise<boolean>;
     registryUrl?: string;
+    installation?: InstallationProfile;
   } = {},
 ): Promise<HostedTargetEligibility> {
   const normalized = normalizeTargetRepo(targetRepo);
   if (!normalized) return { outcome: "terminal" };
+  const installation = options.installation ?? UNCONFIGURED_INSTALLATION;
+  // Dependency-injection seam, inherited from upstream and kept deliberately.
+  // A caller that supplies a predicate has already decided for itself, which is
+  // the same trust level as the caller that built this env object. It is not a
+  // configuration surface: Cloudflare vars and secrets are strings, so no
+  // deployment setting can produce a function here, and typeof is checked at
+  // every call site. lina:contract-selftest asserts that a string, boolean or
+  // object under the same name grants nothing.
   if (options.predicate) {
+    if (typeof options.predicate !== "function") return { outcome: "terminal" };
     try {
       return (await options.predicate(normalized))
         ? { outcome: "eligible" }
@@ -73,16 +108,22 @@ export async function resolveHostedTargetEligibility(
     return isHostedTargetEligible(normalized, {
       configuredRepositories: [...options.configuredRepositories],
       genericFallbacks: [],
+      installation,
     })
       ? { outcome: "eligible" }
       : { outcome: "terminal" };
   }
+  // No registry means no request. Upstream defaulted to its own repository here,
+  // so an unconfigured fork would have asked the upstream project which targets
+  // it may act on.
+  const registryUrl = options.registryUrl ?? installationRegistryUrl(installation);
+  if (!registryUrl) return { outcome: "terminal" };
   try {
-    const response = await reader(options.registryUrl ?? DEFAULT_HOSTED_TARGET_REGISTRY_URL, {
+    const response = await reader(registryUrl, {
       headers: {
         Accept: "application/json",
         "Cache-Control": "no-store",
-        "User-Agent": "openclaw-clawsweeper-hosted-target-registry",
+        "User-Agent": brandedUserAgent(installation, "hosted-target-registry"),
       },
       cache: "no-store",
       redirect: "manual",
@@ -99,7 +140,7 @@ export async function resolveHostedTargetEligibility(
     } catch {
       return { outcome: "retryable" };
     }
-    const policy = hostedTargetPolicyFromRegistry(parsed);
+    const policy = hostedTargetPolicyFromRegistry(parsed, installation);
     if (!policy) return { outcome: "retryable" };
     return isHostedTargetEligible(normalized, policy)
       ? { outcome: "eligible" }
@@ -109,7 +150,10 @@ export async function resolveHostedTargetEligibility(
   }
 }
 
-export function hostedTargetPolicyFromRegistry(value: unknown): HostedTargetPolicy | null {
+export function hostedTargetPolicyFromRegistry(
+  value: unknown,
+  installation: InstallationProfile = UNCONFIGURED_INSTALLATION,
+): HostedTargetPolicy | null {
   const config = objectValue(value);
   if (config.schema_version !== 1 && config.schema_version !== 2) return null;
   if (!Array.isArray(config.repositories)) return null;
@@ -151,6 +195,7 @@ export function hostedTargetPolicyFromRegistry(value: unknown): HostedTargetPoli
   return {
     configuredRepositories: [...new Set(repositories)],
     genericFallbacks,
+    installation,
   };
 }
 
@@ -160,6 +205,7 @@ export async function probeHostedPublicTarget(
   reader: typeof fetch = fetch,
   options: {
     apiUrl?: (path: string) => string;
+    installation?: InstallationProfile;
   } = {},
 ): Promise<HostedTargetAdmission> {
   const normalized = targetRepo.trim().toLowerCase();
@@ -173,7 +219,7 @@ export async function probeHostedPublicTarget(
         Accept: "application/vnd.github+json",
         Authorization: `Bearer ${token}`,
         "Cache-Control": "no-store",
-        "User-Agent": "openclaw-clawsweeper-public-target-probe",
+        "User-Agent": brandedUserAgent(options.installation ?? null, "public-target-probe"),
       },
       cache: "no-store",
       redirect: "manual",

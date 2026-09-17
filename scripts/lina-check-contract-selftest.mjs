@@ -31,14 +31,24 @@ import {
   BOUNDARY_PROBE_SCRIPTS,
   DerivedContractError,
   EXCLUDED_TESTS,
+  FORBIDDEN_INSTALLATION_LITERALS,
   GUARD_SHA256,
+  INSTALLATION_CONFIG_PATH,
+  MODIFIED_UPSTREAM_FILES,
   SAFE_TESTS,
   TRIPWIRE_ENV,
+  UPSTREAM_FIXTURE_TESTS,
+  WRANGLER_PATH,
   assertDerivedContract,
+  assertFixtureTestContract,
   assertGuardIntact,
+  assertModifiedUpstreamContract,
+  assertNoForbiddenInstallationLiterals,
   assertNoLifecycleHooks,
   assertPinnedPnpm,
   assertProbeTargetGuarded,
+  assertShippedInstallationEmpty,
+  assertWranglerUnconfigured,
   assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
@@ -54,7 +64,7 @@ const BASELINE_ASSERTION_CALLS = 23;
 // not the historical baseline: a floor of 23 would let the 26-assertion
 // validator shed three and still pass whenever the baseline object is absent.
 // Adding assertions legitimately raises this number; it never lowers.
-const VALIDATOR_ASSERTION_FLOOR = 26;
+const VALIDATOR_ASSERTION_FLOOR = 29;
 const ASSERTION_CALL = /^\s*assert(\.|\()/;
 const VALIDATOR = "scripts/check-scaffold.mjs";
 const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"];
@@ -347,6 +357,322 @@ function countAssertionCalls(source) {
 }
 
 function runAssertionIntegrity() {
+  return runAssertionIntegrityInner();
+}
+
+/**
+ * The upstream-modification exception. Permission to change a file is the most
+ * dangerous thing this contract hands out, so every way the declaration can be
+ * wrong is fed in and observed to be refused.
+ */
+function runModifiedUpstreamCases() {
+  const base = () => ({
+    declared: structuredClone(config.derived.modifiedUpstreamFiles),
+    baselinePaths: new Set(MODIFIED_UPSTREAM_FILES),
+    presentPaths: new Set(MODIFIED_UPSTREAM_FILES),
+    changed: () => true,
+    isRegularFile: () => true,
+  });
+  const first = MODIFIED_UPSTREAM_FILES[0];
+  let observed = 0;
+
+  // Clean control: the real declaration must pass, or every rejection below
+  // would be satisfied by a checker that simply refuses everything.
+  assertModifiedUpstreamContract(base());
+
+  const cases = [
+    ["modified-upstream-shape", (i) => (i.declared = null)],
+    ["modified-upstream-set", (i) => delete i.declared[first]],
+    [
+      "modified-upstream-set",
+      (i) => (i.declared["src/clawsweeper.ts"] = { reason: "sneaking one in" }),
+    ],
+    ["modified-upstream-reason", (i) => (i.declared[first] = { reason: "  " })],
+    ["modified-upstream-unknown", (i) => i.baselinePaths.delete(first)],
+    ["modified-upstream-missing", (i) => i.presentPaths.delete(first)],
+    ["modified-upstream-symlink", (i) => (i.isRegularFile = () => false)],
+    // The one that keeps a stale exception from becoming permanent.
+    ["modified-upstream-unchanged", (i) => (i.changed = () => false)],
+  ];
+  for (const [code, mutate] of cases) {
+    const input = base();
+    mutate(input);
+    assert.throws(() => assertModifiedUpstreamContract(input), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // Worker settings. Ordinary repository names are not forbidden literals, so
+  // these are the assertions that notice a target list still pointing somewhere.
+  const wrangler = readFileSync(join(root, WRANGLER_PATH), "utf8");
+  assertWranglerUnconfigured(wrangler);
+  const wranglerCases = [
+    ["wrangler-nonempty-var", wrangler.replace('TARGET_REPOS = ""', 'TARGET_REPOS = "a/b"')],
+    ["wrangler-nonempty-var", wrangler.replace('PUBLIC_BAY_REPOS = ""', 'PUBLIC_BAY_REPOS = "a/b"')],
+    ["wrangler-missing-var", wrangler.replace('CLAWSWEEPER_REPO = ""', "")],
+    ["wrangler-configured-key", wrangler + "\naccount_id = \"deadbeef\"\n"],
+    ["wrangler-configured-key", wrangler + "\ncustom_domain = true\n"],
+  ];
+  for (const [code, source] of wranglerCases) {
+    assert.throws(() => assertWranglerUnconfigured(source), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // Fixture tests run against pinned bytes, so the mapping decides what a green
+  // result actually means. Both the test set and its file list are compared.
+  const fixtureBaseline = new Set(Object.values(UPSTREAM_FIXTURE_TESTS).flat());
+  assertFixtureTestContract(config.derived.upstreamFixtureTests, fixtureBaseline);
+  const fixtureCases = [
+    ["fixture-test-set", {}],
+    [
+      "fixture-test-files",
+      {
+        "test/repository-profiles.test.ts": { reason: "x", files: ["dashboard/wrangler.toml"] },
+      },
+    ],
+    [
+      "fixture-test-reason",
+      {
+        "test/repository-profiles.test.ts": {
+          reason: " ",
+          files: [...UPSTREAM_FIXTURE_TESTS["test/repository-profiles.test.ts"]],
+        },
+      },
+    ],
+  ];
+  for (const [code, declared] of fixtureCases) {
+    assert.throws(
+      () => assertFixtureTestContract(declared, fixtureBaseline),
+      { code },
+      "expected " + code,
+    );
+    observed += 1;
+  }
+  return observed;
+}
+
+/**
+ * Installation profile. Two different questions are checked here, and they are
+ * deliberately not the same check.
+ *
+ * What ships: the entry point committed to this repository must stay empty, so
+ * a populated installation cannot reach main and hand every clone somebody
+ * else's targets. That is a static JSON assertion and needs no build.
+ *
+ * What is accepted: the runtime loader must refuse to grant anything from an
+ * unconfigured profile. Upstream admitted an explicitly listed repository
+ * before it ever consulted the owner set, so emptying an owner list alone would
+ * not have denied an upstream target. Both denials are exercised by name.
+ */
+async function runInstallationCases() {
+  let observed = 0;
+  const reject = (mutate, code) => {
+    const broken = JSON.parse(readFileSync(join(root, INSTALLATION_CONFIG_PATH), "utf8"));
+    mutate(broken);
+    assert.throws(() => assertShippedInstallationEmpty(broken), { code }, "expected " + code);
+    observed += 1;
+  };
+
+  // Clean control. Without it every rejection below could pass against a checker
+  // that rejects everything, which would prove nothing.
+  const shipped = JSON.parse(readFileSync(join(root, INSTALLATION_CONFIG_PATH), "utf8"));
+  assertShippedInstallationEmpty(shipped);
+
+  reject((p) => (p.configured = true), "installation-shipped-configured");
+  reject((p) => p.targets.fallback_owners.push("example"), "installation-shipped-nonempty");
+  reject((p) => p.targets.repositories.push("example/repo"), "installation-shipped-nonempty");
+  reject((p) => (p.targets.registry_url = "https://example.invalid/x.json"), "installation-shipped-nonempty");
+  reject((p) => (p.state.state_repo = "example/state"), "installation-shipped-nonempty");
+  reject((p) => (p.github_app.client_id = "example"), "installation-shipped-nonempty");
+  reject((p) => (p.branding.product_name = "Example"), "installation-shipped-nonempty");
+  reject((p) => (p.schema_version = 2), "installation-shipped-shape");
+  reject((p) => delete p.targets, "installation-shipped-shape");
+
+  // Forbidden literals. The needles are assembled from fragments in the contract
+  // module, so the scan does not match the file that defines it; the clean
+  // control below is what shows the scan is not simply inert.
+  assertNoForbiddenInstallationLiterals(["src/lina-check-installation-contract.ts"], () => "clean");
+  assertNoForbiddenInstallationLiterals(["devlog/_plan/x.md"], () => {
+    throw new Error("prose must not be scanned");
+  });
+  for (const { value } of FORBIDDEN_INSTALLATION_LITERALS) {
+    assert.throws(
+      () => assertNoForbiddenInstallationLiterals(["src/x.ts"], () => "prefix " + value + " suffix"),
+      { code: "installation-forbidden-literal" },
+    );
+    observed += 1;
+  }
+
+  const contract = await import("../dist/lina-check-installation-contract.js").catch((error) => {
+    throw new Error(
+      "built installation contract is unavailable; run build:all first (" +
+        (error instanceof Error ? error.message : String(error)) +
+        ")",
+    );
+  });
+
+  const parsedShipped = contract.parseInstallationProfile(shipped);
+  assert.equal(parsedShipped.ok, true, "the shipped profile must parse");
+  const empty = parsedShipped.profile;
+  assert.equal(contract.installationConfigured(empty), false);
+
+  // The two denials that matter for this change, named so a regression is legible.
+  assert.equal(
+    contract.installationAdmitsRepository(empty, "openclaw/clawsweeper"),
+    false,
+    "an unconfigured installation must deny an explicitly listed upstream repository",
+  );
+  assert.equal(
+    contract.installationAdmitsFallbackOwner(empty, "openclaw"),
+    false,
+    "an unconfigured installation must deny an upstream owner fallback",
+  );
+  assert.equal(
+    contract.installationRegistryUrl(empty),
+    null,
+    "an unconfigured installation must not name a registry to fetch",
+  );
+  observed += 3;
+
+  const denials = [
+    ["installation-shape", 42],
+    ["installation-schema", { ...shipped, schema_version: 99 }],
+    ["installation-shape", { ...shipped, configured: "yes" }],
+    [
+      "installation-empty",
+      { ...shipped, configured: true },
+    ],
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["not a login"] } },
+    ],
+    [
+      "installation-owner-duplicate",
+      {
+        ...shipped,
+        targets: {
+          ...shipped.targets,
+          fallback_owners: ["dup", "dup"],
+          registry_url: "https://example.invalid/t.json",
+        },
+      },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["missing-slash"] } },
+    ],
+    [
+      "installation-repository-duplicate",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["a/b", "a/b"] } },
+    ],
+    // Case is not folded. The schema patterns are lowercase-only, so a parser
+    // that lowercased first would accept what the published contract rejects.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["MixedCase"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["Acme/Tool"] } },
+    ],
+    // Whitespace is not normalised either. The schema patterns are anchored, so
+    // trimming first would turn a typo the published contract rejects into a
+    // stored grant.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: [" acme"] } },
+    ],
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["acme "] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: [" acme/granted "] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\t"] } },
+    ],
+    // A bare $ would accept these: JavaScript lets it match before a final line
+    // terminator, and the entry would then be stored with a suffix no normalised
+    // admission query can ever match.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["acme\n"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\n"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\r\n"] } },
+    ],
+    // note is optional but typed by the schema.
+    ["installation-field-shape", { ...shipped, note: 1 }],
+    // additionalProperties:false in every schema object. The dangerous direction
+    // is a dropped restriction: a deny list written under a name this build does
+    // not know would be ignored while the grant beside it stood.
+    ["installation-unknown-field", { ...shipped, surprise: 1 }],
+    [
+      "installation-unknown-field",
+      { ...shipped, targets: { ...shipped.targets, deny_repositories: ["a/b"] } },
+    ],
+    ["installation-unknown-field", { ...shipped, branding: { ...shipped.branding, theme: "x" } }],
+    // Owners are patterns and the patterns live in the registry. Naming owners
+    // with nowhere to read their rules parses clean and then refuses everything.
+    [
+      "installation-inoperable",
+      {
+        ...shipped,
+        configured: true,
+        targets: { fallback_owners: ["acme"], repositories: [], registry_url: "" },
+      },
+    ],
+    [
+      "installation-registry-shape",
+      { ...shipped, targets: { ...shipped.targets, registry_url: "http://example.invalid" } },
+    ],
+    // A document the published schema rejects must not parse, or an operator
+    // gets a profile that looks configured while carrying defaults they never wrote.
+    [
+      "installation-field-shape",
+      { ...shipped, branding: { ...shipped.branding, product_name: 42 } },
+    ],
+    ["installation-field-shape", { ...shipped, state: { state_ref: "" } }],
+    [
+      "installation-field-shape",
+      { ...shipped, github_app: { ...shipped.github_app, bot_login: null } },
+    ],
+  ];
+  for (const [code, value] of denials) {
+    const parsed = contract.parseInstallationProfile(value);
+    assert.equal(parsed.ok, false, "expected " + code + " to be refused");
+    assert.equal(parsed.code, code);
+    observed += 1;
+  }
+
+  // A configured profile grants only what it names.
+  const configured = contract.parseInstallationProfile({
+    ...shipped,
+    configured: true,
+    targets: {
+      fallback_owners: ["example-org"],
+      repositories: ["example-org/tool"],
+      registry_url: "https://example.invalid/targets.json",
+    },
+  });
+  assert.equal(configured.ok, true);
+  assert.equal(contract.installationAdmitsRepository(configured.profile, "Example-Org/Tool"), true);
+  assert.equal(contract.installationAdmitsRepository(configured.profile, "other/tool"), false);
+  assert.equal(contract.installationAdmitsFallbackOwner(configured.profile, "example-org"), true);
+  assert.equal(contract.installationAdmitsFallbackOwner(configured.profile, "openclaw"), false);
+  observed += 4;
+
+  return observed;
+}
+
+function runAssertionIntegrityInner() {
   const current = countAssertionCalls(readFileSync(join(root, VALIDATOR), "utf8"));
   // The literal floor always applies and needs no Git history.
   assert.ok(
@@ -386,6 +712,8 @@ function runAssertionIntegrity() {
 try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
+  const installation = await runInstallationCases();
+  const upstream = runModifiedUpstreamCases();
   const controls = runTripwireControls();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
@@ -394,6 +722,10 @@ try {
       declarations +
       " helpers=" +
       helpers +
+      " installation=" +
+      installation +
+      " modifiedUpstream=" +
+      upstream +
       " tripwireControls=" +
       controls.ran +
       " routing=" +

@@ -38,12 +38,28 @@ corepack pnpm run lina:contract-selftest   # 위 선언 검사의 거부 경로�
 
 - GitHub 워크플로 35개는 `.github/workflows/*.yml.disabled`에 원문 그대로 보관했다. GitHub Actions가 실행 대상으로 읽는 YAML은 없다.
 - 기존 package 명령 중 build·lint 계열만 열어뒀고, 그 위에 LINA Check가 추가한 `lina:*` 네 개가 있다. 리뷰, 자동 수정, 닫기, 머지, 댓글 게시, 상태 변경, Worker 실행과 배포 명령은 즉시 실패한다.
-- 이 차단은 실수 방지 장치다. 원본 코드를 직접 `node`나 `npx`로 실행하거나 파일을 고치면 우회할 수 있다. 원본 설정에는 OpenClaw 운영 대상이 남아 있으므로 아직 운영 명령을 직접 실행하지 않는다.
+- 이 차단은 실수 방지 장치다. 원본 코드를 직접 `node`나 `npx`로 실행하거나 파일을 고치면 우회할 수 있다. 차단되어 있다는 것이 허가 모형은 아니다.
+- 관리 대상 저장소는 [설치 설정](config/lina-check-installation.json)이 정한다. 저장소에 들어 있는 값은 비어 있고, 빈 설정은 아무나 허용이 아니라 아무도 허용하지 않음이다. 설치 운영자가 채우기 전에는 어떤 저장소도 통과하지 못한다.
+- Worker 설정에서 계정·도메인·대상·상태 저장소 값을 비웠다. 구조는 원본 그대로 두었고 프로비저닝하지 않았다.
 - 소스 저장소는 [thisisjun786/lina-check](https://github.com/thisisjun786/lina-check)다. 개발 체크아웃의 `origin`은 이 저장소를, `upstream`은 ClawSweeper 원본을 가리킨다. 소스 공개와 별개로 배포, GitHub App, 상태 저장소, 인증 정보는 연결하지 않았다.
+
+## 설치 설정
+
+관리 대상과 브랜딩, 상태 저장소, GitHub App 값이 들어갈 자리는 [config/lina-check-installation.json](config/lina-check-installation.json)이다. 형식은 [스키마](schema/lina-check-installation.schema.json)에 있다.
+
+규칙은 한 문장이다. **레지스트리는 대상을 서술하고 설치 설정이 허가한다.** 설정이 비어 있으면 원본 프로필에 적혀 있는 저장소도 통과하지 못한다.
+
+허가 방식은 두 가지다. `targets.repositories`에 이름을 적으면 그것만으로 허가된다. `targets.fallback_owners`는 소유자 단위 패턴이고 그 패턴은 레지스트리에서 읽으므로 `targets.registry_url`이 함께 필요하다. 소유자만 적고 레지스트리를 비워두면 설정 자체가 거부된다.
+
+허가된 대상을 어떤 설정으로 다룰지는 별도 문제이고 프로필 인벤토리가 답한다. 허가와 서술을 섞지 않는다.
+
+`check:scaffold`는 이 파일이 비어 있는 채로 유지되는지 확인한다. 값이 채워진 설정이 저장소에 들어오면 통과하지 않는다. 거부 경로가 실제로 거부하는지는 `lina:contract-selftest`이 확인한다. 설정은 프로세스당 한 번 읽으므로 바꾸면 재시작이 필요하다.
+
+GitHub App이 실제로 필요한 권한 범위는 [권한 문서](docs/lina-check/github-app-permissions.md)에 있다. 소스가 실제로 부르는 엔드포인트에서 도출했고 단계별로 나눴다. 휴면 상태에서 필요한 권한은 없다.
 
 ## 다음 개발 작업
 
-먼저 관리할 저장소와 GitHub App 권한, 상태 저장소를 정한다. 그다음 ClawSweeper의 기존 분류·관리 흐름에 LINA Check 정책과 Devin·Codex 결과를 연결한다. 원본 워크플로를 켜기 전에는 대상·권한·모델 호출·쓰기 동작과 포크 PR 경계를 검증해야 한다. Oracle 호출은 설치 운영자가 지정한 허용 사용자 전용 경로로 구현한다. 외부 기여자가 PR이나 댓글을 작성했다는 이유만으로 호출 권한을 얻지는 않는다. 파일 이름만 되돌려 운영을 시작하지 않는다.
+ClawSweeper의 기존 분류·관리 흐름에 LINA Check 정책과 Devin·Codex 결과를 연결한다. 원본 워크플로를 켜기 전에는 대상·권한·모델 호출·쓰기 동작과 포크 PR 경계를 검증해야 한다. Oracle 호출은 설치 운영자가 지정한 허용 사용자 전용 경로로 구현한다. 외부 기여자가 PR이나 댓글을 작성했다는 이유만으로 호출 권한을 얻지는 않는다. 파일 이름만 되돌려 운영을 시작하지 않는다.
 
 ## 크레딧과 라이선스
 
