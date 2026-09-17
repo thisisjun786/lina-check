@@ -148,7 +148,7 @@ export function main(argv) {
       "One control per recovered suite. Each replaces a recovered expectation with a wrong one; " +
       "a suite that cannot detect it is not carrying coverage. Sampled evidence, not a proof that " +
       "every assertion inside a recovered case still bites.",
-    suites_covered: [...new Set(results.map((entry) => entry.file))].length,
+    suites_covered: new Set(results.map((entry) => entry.file)).size,
     mutations: results.length,
     detected: results.filter((entry) => entry.detected).length,
     undetected: undetected.map((entry) => entry.mutation),
