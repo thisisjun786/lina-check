@@ -249,3 +249,44 @@ wp3 를 다시 열면서 대응표의 부분 9건을 들여다봤다. 그중 8�
 
 처음 제외를 넓게 잡은 것은 내 실수다. 이름으로 묶어 판단했고, 그 판단이 대응표에 부분 8건으로
 그대로 굳을 뻔했다.
+
+## 이 인도에서 내가 틀린 곳
+
+고친 뒤 지우지 않고 남긴다. 게이트가 잡아 준 것과 리뷰가 잡아 준 것을 구분하는 데 필요한 기록이다.
+
+**게이트 결과를 읽지 않고 push 한 게 두 번.** `682559c7` 와 `01e2727c` 다. 둘 다 스윕에서
+lint 가 exit 1 이었는데 마지막 줄만 보고 커밋했다. 앞의 것은 `prefer-set-size`, 뒤의 것은 생성기를
+다시 돌리면서 되살아난 미사용 import 였다. 각각 `3673678f` 와 `212c52a0` 에서 고쳤고
+지금은 여덟 게이트가 전부 exit 0 이다. 게이트가 초록불이라는 말은 그 스윕의 EXIT 값을 전부 봤다는
+뜻이어야 하는데, 두 번은 그러지 않았다.
+
+**생성기를 import 하면 그 파일이 다시 쓰인다.** webhook 생성기가 ledger 생성기를 import 해서 함수를
+가져오는데, import 자체가 ledger 생성을 다시 돌린다. 그래서 손으로 고친 두 가지(미사용 import,
+파킹된 워크플로 경로)가 두 번 되돌아갔다. 생성기는 이제 다 돌았으니 더 재발하지 않지만, 저장소에
+남는 것은 생성기가 아니라 생성 결과라는 점은 적어 둔다.
+
+**제외를 이름으로 묶었다.** `handleGitHubWebhook` 을 쓰는 케이스 여덟 개를 "HTTP 와 durable intake" 로
+한꺼번에 부분 처리했는데, 실제로 서버가 필요한 건 한 건이었다. 5라운드에서 일곱 건을 되살렸다.
+리뷰어가 짚어 준 게 아니라 내가 다시 열어 보고 찾은 것이고, 그래서 더 적어 둘 필요가 있다.
+표에 "부분" 으로 굳었으면 아무도 다시 안 열어 봤을 자리다.
+
+## 최종 head 기준 재측정
+
+인도 시점 head `212c52a0` 에서 여덟 게이트 전부 exit 0, 레인 134초다. selftest 요약은
+다음과 같다.
+
+```
+[lina-check-contract-selftest] derivedTestContract=34 derivedCases=147 derivedLaunches=0 launchControl=1 coverageMap=verified
+[lina-check-coverage-map] current: 144 records, 129 recovered, 2 partial, 13 lost
+[lina-check-failure-controls] suites=10 controls=11 detected=11 undetected=0
+```
+
+가드 유발도 이 head 에서 다시 쟀다. 값은 처음 측정과 같다.
+
+| 값 | |
+| -- | -- |
+| 변조 전 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` |
+| 변조 후 sha256 | `76b1142449a872ee38b77715ab18a3c4e28ae227556bcef7deae3a13749a87c1` |
+| 변조 상태 `check:scaffold` | exit 1, `Upstream bytes changed: src/clawsweeper-text.ts` |
+| 복원 후 sha256 | 변조 전과 동일 |
+| 복원 후 `check:scaffold` | exit 0 |
