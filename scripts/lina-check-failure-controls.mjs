@@ -25,7 +25,6 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -199,98 +198,63 @@ export function lockIsStale(record, now = Date.now(), alive = processAlive) {
 
 function acquireCheckout() {
   const record = () => JSON.stringify({ pid: process.pid, at: Date.now() });
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      // A directory is the mutex: mkdir either creates it or fails, in one step,
-      // so two runs starting together cannot both believe they hold the
-      // checkout. The owner record lives inside it.
-      mkdirSync(RUN_LOCK);
-      writeFileSync(RUN_OWNER, record());
-      return {
-        // Refreshed between controls so the bound measures silence, not length.
-        beat: () => {
-          // Losing the lock has to be loud. A contender that judged this run
-          // stale can have moved the directory aside between beats, and
-          // continuing to mutate test files after that is exactly the
-          // interleaving the lock exists to prevent.
-          let held = null;
-          try {
-            held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
-          } catch {
-            held = null;
-          }
-          if (held?.pid !== process.pid)
-            throw new Error(
-              "lost the checkout lock at " + RUN_LOCK + "; another run took it over",
-            );
-          writeFileSync(RUN_OWNER, record());
-        },
-        release: () => {
-          if (!existsSync(RUN_LOCK)) return;
-          try {
-            const held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
-            if (held.pid === process.pid) rmSync(RUN_LOCK, { recursive: true, force: true });
-          } catch {
-            rmSync(RUN_LOCK, { recursive: true, force: true });
-          }
-        },
-      };
-    } catch (error) {
-      if (error?.code !== "EEXIST") throw error;
-      let held = null;
-      try {
-        held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
-      } catch {
-        held = null;
-      }
-      if (!lockIsStale(held))
-        throw new Error(
-          "another failure-control run holds this checkout (pid " +
-            String(held?.pid) +
-            "); wait for it rather than interleaving mutations",
-          { cause: error },
-        );
-      // Takeover has to be atomic too, or two contenders that both judged the
-      // same lock stale can each delete the other's fresh one. Moving the
-      // directory aside is a single step: exactly one contender succeeds, and
-      // the loser sees ENOENT and re-reads what is there now.
-      // Move it aside first, then judge what was moved. The read above can be
-      // stale by the time the rename lands: the owner may have refreshed in
-      // between. Renaming is atomic, so exactly one contender ends up holding
-      // the directory and can decide on its real contents; if it turns out to
-      // be live, it goes straight back.
-      const aside = RUN_LOCK + "." + process.pid + "." + Date.now() + ".stale";
-      try {
-        renameSync(RUN_LOCK, aside);
-      } catch (moveError) {
-        if (moveError?.code !== "ENOENT") throw moveError;
-        continue;
-      }
-      let moved = null;
-      try {
-        moved = JSON.parse(readFileSync(join(aside, "owner.json"), "utf8"));
-      } catch {
-        moved = null;
-      }
-      if (!lockIsStale(moved)) {
+  try {
+    // A directory is the mutex: mkdir either creates it or fails, in one step,
+    // so two runs starting together cannot both believe they hold the checkout.
+    mkdirSync(RUN_LOCK);
+    writeFileSync(RUN_OWNER, record());
+    return {
+      // Refreshed between controls so a reader can tell progress from silence.
+      beat: () => {
+        // Losing the lock has to be loud: continuing to mutate test files after
+        // that is the interleaving the lock exists to prevent.
+        let held = null;
         try {
-          renameSync(aside, RUN_LOCK);
+          held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
         } catch {
-          // Someone created a fresh lock while this one was aside; theirs wins
-          // and this copy is discarded rather than clobbering it.
-          rmSync(aside, { recursive: true, force: true });
+          held = null;
         }
-        throw new Error(
-          "another failure-control run holds this checkout (pid " +
-            String(moved?.pid) +
-            "); wait for it rather than interleaving mutations",
-          { cause: error },
-        );
-      }
-      rmSync(aside, { recursive: true, force: true });
+        if (held?.pid !== process.pid)
+          throw new Error(
+            "lost the checkout lock at " + RUN_LOCK + "; it is no longer held by this run",
+          );
+        writeFileSync(RUN_OWNER, record());
+      },
+      release: () => {
+        if (!existsSync(RUN_LOCK)) return;
+        try {
+          const held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
+          if (held.pid === process.pid) rmSync(RUN_LOCK, { recursive: true, force: true });
+        } catch {
+          rmSync(RUN_LOCK, { recursive: true, force: true });
+        }
+      },
+    };
+  } catch (error) {
+    if (error?.code !== "EEXIST") throw error;
+    let held = null;
+    try {
+      held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
+    } catch {
+      held = null;
     }
+    // No automatic takeover. Every version of it had a race: the owner can
+    // refresh between the read and the move, and a third run can take the lock
+    // while a second is putting the first one back. Refusing and naming the path
+    // leaves the judgement with the operator, who can see whether a run is
+    // actually going. This is an operator tool, not a service.
+    const state = lockIsStale(held) ? "looks abandoned" : "is live";
+    throw new Error(
+      "this checkout is locked by a failure-control run (pid " +
+        String(held?.pid) +
+        ", " +
+        state +
+        "). Wait for it, or if nothing is running remove " +
+        RUN_LOCK +
+        " and run again; the next run restores any mutation the interrupted one left.",
+      { cause: error },
+    );
   }
-  throw new Error("could not take the checkout lock at " + RUN_LOCK);
 }
 const pending = new Map();
 

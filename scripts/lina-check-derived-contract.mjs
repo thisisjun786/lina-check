@@ -669,8 +669,12 @@ const SPAWN_SURFACE = Object.freeze([
  * the invocation, and a restored runner case needs it.
  */
 const OBSERVATION_SIGNAL = Object.freeze([
-  "process.argv",
-  "process.execArgv",
+  // Bare identifiers, because an exact substring check on process.argv is
+  // defeated by const { argv } = process or process["argv"]. Neither name has
+  // any other use in a test: a derived test reads fixtures it wrote, not the
+  // arguments its process was started with.
+  "argv",
+  "execArgv",
   "NODE_OPTIONS",
   "LINA_CHECK_LAUNCH_LOG",
   "FORCE_COLOR",
@@ -1203,7 +1207,7 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
             (member === path ? path : path + " -> " + member) + " -> " + token,
           );
       for (const token of OBSERVATION_SIGNAL)
-        if (source.includes(token))
+        if (new RegExp("\\b" + token + "\\b").test(source))
           fail(
             "derived-test-observation-signal",
             (member === path ? path : path + " -> " + member) + " -> " + token,
