@@ -899,6 +899,13 @@ const REFLECTIVE_ROUTE = Object.freeze([
   [/\[\s*["'`]\s*constructor/, "constructor reached through a bracket", true],
   [/\b__proto__\b/, "__proto__", false],
   [/\bReflect\s*\./, "Reflect", false],
+  // Object.getOwnPropertyDescriptor(prototype, "con" + "structor").value is the
+  // constructor access spelled as a lookup, and the key is an argument rather
+  // than a member, so the rules above do not see it. The plural form is not on
+  // this list: it takes no key, the pinned worker harness uses it, and reaching
+  // a constructor from its result needs the computed read that is recorded as
+  // residue either way.
+  [/\bgetOwnPropertyDescriptor\b(?!s)/, "getOwnPropertyDescriptor", false],
 ]);
 
 /**

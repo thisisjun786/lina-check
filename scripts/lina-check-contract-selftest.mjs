@@ -1018,7 +1018,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 27;
+  observed += 29;
   // A name the scan can read is one thing, a name computed at run time
   // another. process["arg" + "v"] reaches the argument vector and spells
   // neither half of it, so every form this scan cannot read is refused.
@@ -1054,6 +1054,9 @@ function runDerivedTestCases() {
     'const C = ({})["constructor"];\nconst x = C;\n',
     "const proto = target.__proto__;\nconst x = proto;\n",
     "const value = Reflect.get(target, key);\nconst x = value;\n",
+    // The constructor access spelled as a descriptor lookup, where the key is
+    // an argument rather than a member.
+    'const F = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(() => {}), "con" + "structor").value;\nconst x = F;\n',
     // Function is callable without new, whitespace is allowed before the
     // parenthesis, and either global can be held in a binding first. The name
     // is what is refused, so none of the three spellings survives.
@@ -1117,6 +1120,8 @@ function runDerivedTestCases() {
     // A prototype is inert without the constructor access refused above, and
     // the same harness reads one.
     "const proto = Object.getPrototypeOf(env);\nconst x = proto;\n",
+    // The plural form takes no key and the pinned worker harness uses it.
+    "const shape = Object.getOwnPropertyDescriptors(target);\nconst x = shape;\n",
     // The module URL is what createRequire needs, and every file in the closure
     // that reaches import.meta reaches only this property.
     "const here = import.meta.url;\nconst x = here;\n",
