@@ -179,9 +179,9 @@ export function stripComments(source) {
 }
 
 const TEST_DECLARATION = new RegExp(
-  "(?:^|[\\s;{}()])(?:await\\s+)?(?:test|nodeTest)\\s*\\(\\s*([\"'" +
+  "(?:^|[\\s;{}()])(?:await\\s+)?(?:test|nodeTest)(\\.(?:skip|todo|only))?\\s*\\(\\s*([\"'" +
     BT +
-    "])((?:[^\\\\]|\\\\.)*?)\\1\\s*(?:,\\s*(\\{[^}]*\\}))?",
+    "])((?:[^\\\\]|\\\\.)*?)\\2\\s*(?:,\\s*(\\{[^}]*\\}))?",
   "gm",
 );
 
@@ -204,9 +204,15 @@ function expand(raw) {
 export function declarations(source) {
   const found = [];
   for (const match of stripComments(source).matchAll(TEST_DECLARATION)) {
-    const options = match[3] ?? "";
-    const skipped = /\b(?:skip|todo)\b/.test(options);
-    for (const name of expand(match[2])) found.push({ name, skipped });
+    // Two ways a case can be declared without running: the member form
+    // test.skip(...) and an options object. The options form has to read the
+    // value, because { skip: false } is a case that runs and an earlier version
+    // recorded it as skipped.
+    const member = match[1] ?? "";
+    const options = match[4] ?? "";
+    const flagged = /\b(?:skip|todo)\s*:\s*(?!false\b)[A-Za-z0-9_."'\u0060]/.test(options);
+    const skipped = member === ".skip" || member === ".todo" || flagged;
+    for (const name of expand(match[3])) found.push({ name, skipped });
   }
   return found;
 }

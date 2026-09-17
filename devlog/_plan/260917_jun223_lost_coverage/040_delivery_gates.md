@@ -1,6 +1,11 @@
 # 040 · 인도 게이트와 증거
 
-## 게이트
+
+이 문서는 라운드별로 덧붙여 왔기 때문에 절마다 측정 시점이 다르다. 제목에 어느 head 의 값인지
+적어 두었고, 인도 시점의 현재 값은 `최종 head 기준 재측정` 절과 그 뒤의 라운드 기록에 있다.
+옛 측정을 지우지 않는 이유는 그때 무엇을 보고 무엇을 보고했는지가 라운드별 대응과 맞물려 있어서다.
+
+## 게이트 (첫 측정, head `dd97f6fe`)
 
 패킷에 적힌 여덟 개를 적힌 형태 그대로 돌렸다. 축약형은 쓰지 않았다.
 
@@ -31,7 +36,7 @@ AssertionError [ERR_ASSERTION]: Unexpected source addition:
 `PLAN_UNITS` 추가와 파일 등록을 둘 다 해야 한다는 규칙이 실제로 작동한다는 뜻이고, 등록을 더한
 뒤 다시 exit 0 이 됐다.
 
-## 레인
+## 레인 (첫 측정, head `dd97f6fe`)
 
 선언된 파일 206개에 파생 테스트 11개를 더해 217개를 돌렸다. 테스트 2709건 통과, 실패 0,
 건너뜀 0. 실행 시간은 134초다. 같은 트리에서 두 번 쟀고 135초와 136초가 나왔다.
@@ -41,7 +46,7 @@ AssertionError [ERR_ASSERTION]: Unexpected source addition:
 조건이 다르고, 늘어난 파생 테스트는 대부분 순수 함수 호출이라 원래 싸다. 여기서 말할 수 있는
 것은 레인 시간이 눈에 띄게 늘지 않았다는 것뿐이다.
 
-## 가드 유발 확인
+## 가드 유발 확인 (첫 측정, head `dd97f6fe`)
 
 `src/clawsweeper-text.ts` 에 한 줄을 넣고 `check:scaffold` 를 돌린 뒤 복원했다. 복원은
 `trap restore EXIT INT TERM` 으로 걸어 중간에 죽어도 변조가 남지 않게 했다.
@@ -54,7 +59,7 @@ AssertionError [ERR_ASSERTION]: Unexpected source addition:
 | 복원 후 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` (변조 전과 동일) |
 | 복원 후 `check:scaffold` | exit 0 |
 
-## 탐지기
+## 탐지기 (1라운드 수정 뒤, head `1e3b8c0e`)
 
 `lina:contract-selftest` 한 줄 요약에 그대로 찍힌다.
 
@@ -71,7 +76,7 @@ derivedTestContract=26 derivedCases=140 derivedLaunches=0 launchControl=1 covera
 `derived-test-spawns` 로 거부하고, 거부 메시지가 그 helper 경로를 지목한다. 본문만 보는 스캔은
 이 대조를 통과하지 못한다.
 
-## 실패 대조
+## 실패 대조 (첫 측정, 일곱 건)
 
 회복한 기대값을 일부러 틀린 값으로 바꿔 검사가 그것을 잡는지 봤다. 일곱 건 전부 잡혔고, 일곱 건
 모두 원래 바이트로 복원됐다. 영수증은 `evidence/failure_controls.json` 에 있다.
@@ -270,7 +275,7 @@ lint 가 exit 1 이었는데 마지막 줄만 보고 커밋했다. 앞의 것은
 리뷰어가 짚어 준 게 아니라 내가 다시 열어 보고 찾은 것이고, 그래서 더 적어 둘 필요가 있다.
 표에 "부분" 으로 굳었으면 아무도 다시 안 열어 봤을 자리다.
 
-## 최종 head 기준 재측정
+## 최종 head 기준 재측정 — 아래가 현재 값이다
 
 인도 시점 head `212c52a0` 에서 여덟 게이트 전부 exit 0, 레인 134초다. selftest 요약은
 다음과 같다.

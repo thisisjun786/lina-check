@@ -74,6 +74,10 @@ import {
   stripComments as coverageStripComments,
   testNames as coverageTestNames,
 } from "./lina-check-coverage-map.mjs";
+import {
+  CONTROLS as FAILURE_CONTROLS,
+  judge as judgeFailureControl,
+} from "./lina-check-failure-controls.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
@@ -760,6 +764,20 @@ function runDerivedTestCases() {
         'const helper = makeRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
       "an aliased immediate call",
     ],
+    [
+      'import { createRequire as makeRequire } from "module";\n' +
+        "const load = makeRequire(import.meta.url);\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "createRequire imported from the bare module specifier",
+    ],
+    [
+      'import { startIntakeFixture } from "./helpers/command-intake-fixture.mjs?cachebust";\n',
+      "a specifier carrying a query string",
+    ],
+    [
+      "await import(\u0060./helpers/command-intake-fixture.mjs\u0060);\n",
+      "a no-substitution template literal specifier",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -863,6 +881,12 @@ function runDerivedTestCases() {
  * anything is not evidence.
  */
 const LAUNCH_LOG_ENV = "LINA_CHECK_LAUNCH_LOG";
+/** Reporter colour must not decide whether an observed case is seen. */
+// The escape is built rather than written into the pattern: a literal control
+// character in a regular expression is refused by the linter, and escaping it
+// by hand is exactly the kind of detail that rots.
+const ANSI = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
+const stripAnsi = (text) => String(text ?? "").replace(ANSI, "");
 const DERIVED_TEST_CASE_FLOOR = 147;
 const PRELOAD_SOURCE = [
   'import { appendFileSync } from "node:fs";',
@@ -918,14 +942,24 @@ function observeDerivedTests(directory) {
         cwd: root,
         encoding: "utf8",
         timeout: 600_000,
-        env: { ...process.env, [LAUNCH_LOG_ENV]: log },
+        // The reporter's colour is inherited from this process's environment,
+        // and the lines below are read with plain regexes. Ask for no colour and
+        // strip it anyway, so a coloured terminal cannot make a passing suite
+        // look like a missing one.
+        env: { ...process.env, [LAUNCH_LOG_ENV]: log, FORCE_COLOR: "0", NO_COLOR: "1" },
       },
     );
     const launches = readFileSync(log, "utf8").split("\n").filter(Boolean).map(JSON.parse);
-    return { result, launches };
+    return { result: { ...result, stdout: stripAnsi(result.stdout) }, launches };
   };
 
   const control = observe("control", "await import(" + JSON.stringify(sentinel) + ");");
+  // Colour is stripped before any of the lines below are read. Without this the
+  // observation rejects a passing suite whenever the environment asks for ANSI.
+  assert.equal(
+    stripAnsi(String.fromCharCode(27) + "[32m\u2714 a coloured case (1.2ms)" + String.fromCharCode(27) + "[39m"),
+    "\u2714 a coloured case (1.2ms)",
+  );
   assert.equal(
     control.result.status,
     0,
@@ -1057,7 +1091,72 @@ function runCoverageMapCase() {
     coverageDeclarations(skipped).map((entry) => entry.skipped),
     [false, true],
   );
+
+  // The other two ways a case can be declared without running, and the one that
+  // looks like it but runs.
+  const memberSkip = 'test.skip("member skip", () => {});\ntest.todo("member todo");\n';
+  assert.deepEqual(coverageExecutedNames(memberSkip), [], "test.skip and test.todo do not run");
+  assert.deepEqual(coverageTestNames(memberSkip), ["member skip", "member todo"]);
+  assert.deepEqual(
+    coverageExecutedNames('test("runs anyway", { skip: false }, () => {});\n'),
+    ["runs anyway"],
+    "{ skip: false } is a case that runs",
+  );
+  assert.deepEqual(coverageExecutedNames('test.only("only runs", () => {});\n'), ["only runs"]);
   return "verified";
+}
+
+/**
+ * The failure controls are an operator tool, so nothing here runs them: they
+ * edit test files. What is checked is the part that can go wrong silently — the
+ * rule that decides what counts as detection, and whether the committed receipt
+ * still describes this tree.
+ */
+function runFailureControlCases() {
+  let observed = 0;
+  const pass = { status: 0, signal: null, error: null, failing: 0 };
+  assert.equal(judgeFailureControl(pass, { status: 1, signal: null, error: null, failing: 1 }).detected, true);
+  const rejected = [
+    ["a suite that already fails", { status: 1 }, { status: 1, failing: 1 }],
+    ["a timeout", pass, { status: null, signal: "SIGTERM", error: "ETIMEDOUT", failing: null }],
+    ["a signal", pass, { status: null, signal: "SIGKILL", error: null, failing: null }],
+    ["a launch that never started", pass, { status: null, signal: null, error: "ENOENT", failing: null }],
+    ["an exit code that is not a test failure", pass, { status: 7, signal: null, error: null, failing: 1 }],
+    ["a failure with no failing case", pass, { status: 1, signal: null, error: null, failing: 0 }],
+  ];
+  for (const [name, baseline, mutated] of rejected) {
+    const verdict = judgeFailureControl(baseline, mutated);
+    assert.equal(verdict.detected, false, name + " must not count as detection");
+    assert.ok(verdict.reason.length > 0, name + " must say why");
+    observed += 1;
+  }
+
+  // Receipt freshness, checked without mutating anything: every control still
+  // has its anchor in the file it targets, the receipt covers exactly the
+  // recovered suites, and nothing in it is undetected.
+  const receipt = JSON.parse(
+    readFileSync(join(root, "devlog/_plan/260917_jun223_lost_coverage/evidence/failure_controls.json"), "utf8"),
+  );
+  assert.equal(receipt.undetected.length, 0, "the committed receipt records an undetected control");
+  assert.equal(receipt.mutations, FAILURE_CONTROLS.length, "the receipt describes a different control set");
+  for (const control of FAILURE_CONTROLS) {
+    const source = readFileSync(join(root, control.file), "utf8");
+    assert.ok(
+      source.includes(control.from),
+      "control anchor is gone, so the receipt is stale: " + control.file + " :: " + control.what,
+    );
+    observed += 1;
+  }
+  const recoveredSuites = new Set(
+    coverageGenerate()
+      .receipt.records.filter((record) => record.disposition === "recovered")
+      .map((record) => record.covered_by),
+  );
+  const covered = new Set(FAILURE_CONTROLS.map((control) => control.file));
+  for (const suite of recoveredSuites)
+    assert.ok(covered.has(suite), "no failure control for recovered suite " + suite);
+  observed += 1;
+  return observed;
 }
 
 /**
@@ -1486,6 +1585,7 @@ try {
   const derivedTests = runDerivedTestCases();
   const observation = runDerivedTestObservation();
   const coverageMap = runCoverageMapCase();
+  const failureControls = runFailureControlCases();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +
@@ -1513,6 +1613,8 @@ try {
       observation.control +
       " coverageMap=" +
       coverageMap +
+      " failureControls=" +
+      failureControls +
       " assertionCalls=" +
       integrity.baseline +
       "->" +

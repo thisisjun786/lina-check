@@ -688,10 +688,30 @@ export function resolveRelativeImport(fromPath, specifier) {
  * createRequire, which the keyword form cannot see: the specifier there is an
  * argument to the result of a call, not to a named keyword.
  */
-const IMPORT_SPECIFIER = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
+// A no-substitution template literal is a valid specifier too, so the quote
+// class has to include it or import(`./helper.mjs`) is invisible.
+const IMPORT_SPECIFIER =
+  /(?:from|import|require)\s*\(?\s*(?:["']([^"']+)["']|`([^`$]+)`)/g;
 const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']/g;
 const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
-const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["']node:module["']/g;
+/** Node accepts both spellings, so a scan keyed to one of them is bypassable. */
+const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?module["']/g;
+/**
+ * Candidates CommonJS resolution would try for a specifier with no extension.
+ * Dropping such a specifier silently is how an extensionless helper escapes.
+ */
+const EXTENSION_CANDIDATES = Object.freeze([
+  ".js",
+  ".cjs",
+  ".mjs",
+  ".ts",
+  ".mts",
+  ".cts",
+  "/index.js",
+  "/index.cjs",
+  "/index.mjs",
+  "/index.ts",
+]);
 const escapeRegExp = (value) => value.replace(/[.*+?^=!:!{}()|[\]/\\$]/g, "\\$&");
 
 /** Index just past the parenthesis group that starts at open. */
@@ -819,13 +839,8 @@ export function derivedTestClosure(entry, readFile) {
     }
     for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
       for (const match of source.matchAll(pattern)) {
-        const resolved = resolveRelativeImport(path, match[1]);
-        if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
-        // Only files this scan can actually read are followed. A data file or an
-        // extensionless name is not a module whose source could start anything.
-        if (!FOLLOWABLE.test(resolved)) continue;
-        seen.add(resolved);
-        queue.push(resolved);
+        // A template literal carries its specifier in the second group.
+        follow(path, match[1] ?? match[2], readFile, seen, queue);
       }
     }
     const required = analyseRequireUse(source);
@@ -834,17 +849,64 @@ export function derivedTestClosure(entry, readFile) {
         "derived-test-unresolvable-require",
         path + ": " + [...new Set(required.unfollowable)].join(", ") + " used in an unfollowable form",
       );
-    for (const specifier of required.specifiers) {
-      const resolved = resolveRelativeImport(path, specifier);
-      if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
-      if (!FOLLOWABLE.test(resolved)) continue;
-      seen.add(resolved);
-      queue.push(resolved);
-    }
+    for (const specifier of required.specifiers) follow(path, specifier, readFile, seen, queue);
   }
   return visited;
 }
 
+
+/**
+ * A URL suffix is not part of the file name. Node resolves
+ * ./helper.mjs?cachebust to ./helper.mjs, so an end-anchored extension test on
+ * the raw specifier drops the very import it is meant to follow.
+ */
+export function specifierPath(specifier) {
+  return String(specifier).split("?")[0].split("#")[0];
+}
+
+/** Whether readFile can produce this path's source at all. */
+function readable(path, readFile) {
+  try {
+    readFile(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Queue one specifier, or refuse it.
+ *
+ * Three outcomes, and the third is the one that matters: a specifier this scan
+ * cannot resolve to a readable module is refused rather than dropped, because a
+ * dropped edge cannot be told apart from a clean one.
+ */
+function follow(from, specifier, readFile, seen, queue) {
+  const resolved = resolveRelativeImport(from, specifierPath(specifier));
+  if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) return;
+  if (FOLLOWABLE.test(resolved)) {
+    seen.add(resolved);
+    queue.push(resolved);
+    return;
+  }
+  // Some other extension is data, not a module that could start anything.
+  if (/\.[A-Za-z0-9]+$/.test(resolved)) return;
+  // No extension: CommonJS resolution would try several. Follow the first that
+  // reads, and refuse when none do.
+  for (const candidate of EXTENSION_CANDIDATES) {
+    const target = resolved + candidate;
+    if (seen.has(target)) return;
+    if (readable(target, readFile)) {
+      seen.add(target);
+      queue.push(target);
+      return;
+    }
+  }
+  fail(
+    "derived-test-unresolvable-require",
+    from + ": no readable module for the extensionless specifier " + specifier,
+  );
+}
 export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
   const names = Object.keys(declared ?? {}).sort();
   if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));

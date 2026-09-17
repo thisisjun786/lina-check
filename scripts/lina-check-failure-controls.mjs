@@ -20,8 +20,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -106,7 +107,88 @@ export const CONTROLS = Object.freeze([
 
 const digest = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
+/**
+ * Crash recovery.
+ *
+ * The mutation is written into the working tree before a blocking call, so a
+ * hard kill can leave it there and quietly weaken every later run. The original
+ * bytes are parked outside the repository first, and any run starts by putting
+ * back what a previous run failed to restore.
+ */
+const LOCK = join(tmpdir(), "lina-check-failure-control.lock.json");
+const pending = new Map();
+
+function park(path, source) {
+  pending.set(path, source);
+  writeFileSync(LOCK, JSON.stringify({ path, source }));
+}
+
+function unpark(path) {
+  pending.delete(path);
+  if (existsSync(LOCK)) rmSync(LOCK, { force: true });
+}
+
+export function recoverInterrupted() {
+  if (!existsSync(LOCK)) return null;
+  const parked = JSON.parse(readFileSync(LOCK, "utf8"));
+  writeFileSync(parked.path, parked.source);
+  rmSync(LOCK, { force: true });
+  return parked.path;
+}
+
+function restoreAll() {
+  for (const [path, source] of pending) writeFileSync(path, source);
+  pending.clear();
+  if (existsSync(LOCK)) rmSync(LOCK, { force: true });
+}
+
+process.on("exit", restoreAll);
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
+  process.on(signal, () => {
+    restoreAll();
+    process.exit(128 + (signal === "SIGINT" ? 2 : signal === "SIGTERM" ? 15 : 1));
+  });
+
+/** One suite run, read for what actually happened rather than for a truthy code. */
+function runSuite(file) {
+  const run = spawnSync(process.execPath, ["--test", file], {
+    cwd: root,
+    encoding: "utf8",
+    timeout: 300_000,
+  });
+  const failing = /^# fail (\d+)$|fail (\d+)/m.exec(run.stdout ?? "");
+  return {
+    status: run.status,
+    signal: run.signal ?? null,
+    error: run.error ? (run.error.code ?? run.error.message) : null,
+    failing: failing ? Number(failing[1] ?? failing[2]) : null,
+  };
+}
+
+/**
+ * A control proves sensitivity only when three things hold together: the suite
+ * passes before the mutation, fails after it, and fails because a case failed.
+ *
+ * The first version asked only whether the exit code was non-zero, which counts
+ * a timeout, a launch that never started, and a suite that was already failing
+ * as evidence. All three produce a green receipt while proving nothing.
+ */
+export function judge(baseline, mutated) {
+  if (baseline.status !== 0)
+    return { detected: false, reason: "the suite does not pass before the mutation" };
+  if (mutated.error) return { detected: false, reason: "the mutated run errored: " + mutated.error };
+  if (mutated.signal)
+    return { detected: false, reason: "the mutated run ended on " + mutated.signal };
+  if (mutated.status !== 1)
+    return { detected: false, reason: "the mutated run exited " + String(mutated.status) };
+  if (!(mutated.failing >= 1))
+    return { detected: false, reason: "the mutated run reported no failing case" };
+  return { detected: true, reason: "" };
+}
+
 export function runControls(controls = CONTROLS) {
+  const recovered = recoverInterrupted();
+  if (recovered) process.stderr.write(LABEL + " restored an interrupted mutation in " + recovered + "\n");
   const results = [];
   for (const control of controls) {
     const path = join(root, control.file);
@@ -114,28 +196,30 @@ export function runControls(controls = CONTROLS) {
     const source = readFileSync(path, "utf8");
     if (!source.includes(control.from))
       throw new Error("anchor not found in " + control.file + ": " + control.what);
-    let outcome;
+    const baseline = runSuite(control.file);
+    let mutated;
     try {
+      park(path, source);
       writeFileSync(path, source.replace(control.from, control.to));
-      const run = spawnSync(process.execPath, ["--test", control.file], {
-        cwd: root,
-        encoding: "utf8",
-        timeout: 300_000,
-      });
-      const failing = /fail (\d+)/.exec(run.stdout ?? "");
-      outcome = {
-        file: control.file,
-        mutation: control.what,
-        exit_code: run.status,
-        failing_cases: failing ? Number(failing[1]) : null,
-        detected: run.status !== 0,
-      };
+      mutated = runSuite(control.file);
     } finally {
       writeFileSync(path, source);
+      unpark(path);
     }
     if (digest(path) !== before) throw new Error("restore left " + control.file + " changed");
-    outcome.restored_identical = true;
-    results.push(outcome);
+    const verdict = judge(baseline, mutated);
+    results.push({
+      file: control.file,
+      mutation: control.what,
+      baseline_exit: baseline.status,
+      mutated_exit: mutated.status,
+      mutated_signal: mutated.signal,
+      mutated_error: mutated.error,
+      failing_cases: mutated.failing,
+      detected: verdict.detected,
+      not_detected_because: verdict.reason,
+      restored_identical: true,
+    });
   }
   return results;
 }
@@ -148,6 +232,9 @@ export function main(argv) {
       "One control per recovered suite. Each replaces a recovered expectation with a wrong one; " +
       "a suite that cannot detect it is not carrying coverage. Sampled evidence, not a proof that " +
       "every assertion inside a recovered case still bites.",
+    detection_rule:
+      "Detected means the suite exits 0 before the mutation and exits 1 with at least one failing " +
+      "case after it. A timeout, a signal, a launch error or an already-failing suite is not detection.",
     suites_covered: new Set(results.map((entry) => entry.file)).size,
     mutations: results.length,
     detected: results.filter((entry) => entry.detected).length,
@@ -165,4 +252,3 @@ export function main(argv) {
 
 if (process.argv[1] && process.argv[1].endsWith("lina-check-failure-controls.mjs"))
   process.exitCode = main(process.argv.slice(2));
-
