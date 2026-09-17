@@ -107,3 +107,54 @@ Codex 는 코드 리뷰와 보안 리뷰가 각각 완료됐고 1건을 냈다. 
 
 틀린 지적은 없었다. 4번과 7번은 지적 자체가 정확했고, 다만 이 과제가 그것을 고칠 자리가
 아니라는 근거를 붙여 회신했다. 코드를 바꾸지 않았다.
+
+## 리뷰 2회전 영수증
+
+측정 SHA `4a4ca4b6`. 미해결 스레드 14건 전부 회신했고 뿌리는 하나였다.
+
+| # | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- |
+| 1 | Node admission 이 설치 레지스트리를 무시한다 | 뿌리는 더 앞이었다. `isHostedTargetEligible` 이 명시 허가에 레지스트리 항목을 함께 요구했다. 그 조건 제거. `4a4ca4b6` | 빈 `registry_url` 로도 명시 허가가 통과함을 admission 테스트가 관측 |
+| 2 | 주입된 predicate 가 권한을 건너뛴다 | 남김. `typeof` 검사 추가. `4a4ca4b6` | 함수 아닌 값 6종이 전부 `terminal` 임을 관측 |
+| 3 | 자격증명이 미설정 transport 를 연다 | 남김. `githubTransportPermitted` 로 개명하고 admission 게이트가 아님을 첫 줄에 명시. `4a4ca4b6` | 자격증명 보유 env 가 transport 는 통과하고 admission 은 거부함을 관측 |
+| 4 | 런타임과 스키마가 다른 문서를 받는다 | 미선언 필드 거부, 대소문자 접지 제거. `4a4ca4b6` | selftest `installation=34→40` |
+| 5 | admission 스위트가 제외돼 있다 | `test/lina-check-admission.test.ts` 신규 10건, 게이트 6 안에서 실행. `4a4ca4b6` | `lina:test-safe` 333→343 |
+| 6 | 설정됐지만 동작 불가능한 프로필이 통과한다 | `installation-inoperable` 로 파싱 시점 거부. `4a4ca4b6` | 거부 픽스처 관측 |
+| 7 | 미선언 필드가 있어도 `ok:true` (Codex P2) | 루트와 각 절에서 키 검증. `4a4ca4b6` | `targets.deny_repositories` 픽스처로 관측 |
+| 8 | 설정한 `EXACT_REVIEW_STATE_REPO` 를 못 읽는다 | 읽기 3곳·ref 2곳·캐시 키를 선언된 이름으로. `4a4ca4b6` | `rg CLAWSWEEPER_STATE_RE dashboard/worker.ts` 결과 없음 |
+| 9 | 설정한 `user_agent` 가 프로브에서 무시된다 | 프로브 옵션에 installation 추가, 호출부 4곳 전달. `4a4ca4b6` | `rg 'brandedUserAgent\(null'` 결과 없음 |
+| 10 | 잘못된 프로필이 admission 을 켠다 | `f7dcd2da` + `4a4ca4b6` | Devin 이 `Resolved` 확인 |
+| 11 | 프로필 캐시가 재시작을 요구한다 | `f7dcd2da` 문서화 | Devin 이 `Resolved` 확인 |
+| 12·13 | 아티팩트 저장소와 proof 토큰 정렬 | `2ac9ac34` | Devin 후속 코멘트가 정렬 확인 |
+| 14 | 정보성: proof 저장소 핀 일관 | 코드 변경 없음 | 확인 후 종료 |
+
+틀린 지적은 없었다. 2번과 3번은 지적이 정확하고, 남기는 편이 맞다는 근거를 코드가 아니라
+실행되는 테스트로 냈다.
+
+## 바이트 보존 검사 자체 검증
+
+이번 라운드에서 upstream 소스를 실제로 고쳤으므로 가장 큰 위험은 보존 검사가 조용히 느슨해지는
+것이다. 문장으로 확인하지 않고 깨뜨려 봤다.
+
+| 관측 | 결과 |
+| -- | -- |
+| 미선언 upstream 파일에 한 줄 추가 | `check:scaffold` exit 1, `Upstream bytes changed: src/repository-profiles.ts` |
+| 되돌린 뒤 | exit 0, 해당 파일 `git status` 에 없음 |
+| 원래 단정 문장 | `scripts/check-scaffold.mjs:154` 에 바이트 그대로 존재 |
+| 선언된 7개 | `continue` 로 앞에서 빠지고 "달라야 한다" 단정을 따로 받는다 |
+| 단정 삭제 감지 | `lina:contract-selftest` 하한 29, 매 실행 확인 |
+
+검사가 약해진 것이 아니라 선언이 늘었다. 선언은 코드 리터럴이 고정하고 config 는 근거만 갖는다.
+
+## 2회전 게이트
+
+| # | 명령 | exit | 결과 |
+| -- | -- | -- | -- |
+| 1 | `install --frozen-lockfile --ignore-scripts` | 0 | |
+| 2 | `build:all` | 0 | tsc 3개 무오류 |
+| 3 | `check:scaffold` | 0 | 파생 27, 수정 선언 7, 파생 테스트 1 |
+| 4 | `lint` | 0 | |
+| 5 | `lina:contract-selftest` | 0 | `rejected=30 helpers=18 installation=40 modifiedUpstream=16 assertionCalls=23->29` |
+| 6 | `lina:test-safe` | 0 | 343 통과. 복원 13 + 파생 1 |
+| 7 | `lina:test-safe:preview` | 0 | 복원 13·파생 1 나열, 미실행 |
+| 8 | `lina:boundary-probe` | 0 | 입구 8개 차단 유지 |
