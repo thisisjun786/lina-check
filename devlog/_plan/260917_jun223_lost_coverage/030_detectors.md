@@ -73,6 +73,15 @@
 | `globalThis[...]`, `global[...]` | 거부 |
 | `import ... from "node:process"` | 거부 |
 
+`import.meta` 도 같은 모양으로 묶는다. 허용 속성은 `url` 하나다. `import.meta.main` 은
+레인이 `node --test` 로 파일을 띄우면 참이고 관측이 직접 import 하면 거짓이라, 금지 신호를 하나도
+적지 않고 어느 실행인지 알려 준다. closure 에서 실제로 쓰이는 것은 `url` 11회뿐이다.
+
+구성된 코드를 실행하는 전역 `eval`·`Function`·`AsyncFunction`·`GeneratorFunction` 은 호출
+모양이 아니라 이름으로 막는다. 호출 앞에는 공백이 올 수 있고, `Function` 은 `new` 없이도 불리며,
+둘 다 바인딩에 먼저 담을 수 있다. 호출 철자에 묶인 검사는 공백 하나로 전부 놓친다. closure 에는
+두 이름이 한 번도 나오지 않는다.
+
 속성을 허용 목록으로 둔 것은 금지 목록이 틀린 모양이기 때문이다.
 `process.report.getReport().header.commandLine` 은 `argv` 라는 철자 없이 호출 방식을 말해 준다.
 그런 속성을 하나씩 막으면 목록이 끝나지 않는다. 뒤집으면 끝난다. 파생 테스트에 필요한 것은 대역
@@ -100,15 +109,16 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
 그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
 
-양성 대조는 거부 열네 개와 허용 여섯 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 열아홉 개와 허용 일곱 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
-`process.stdout.write`, 그리고 리플렉션 경로 다섯이다. `process.stdout` 을 막는 것은 덤이
+`process.stdout.write`, 리플렉션 경로 다섯, 동적 코드 전역 셋(`new` 없는 `Function`, 공백을 낀
+호출, 바인딩에 담은 `Function`), 그리고 `import.meta` 둘이다. `process.stdout` 을 막는 것은 덤이
 아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
-대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 여섯 형태다. 계산된 키로 하는 환경 변수
+대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 일곱 형태다. 계산된 키로 하는 환경 변수
 복원(쓰기와 삭제), 리터럴 키 읽기, `t.mock.method(globalThis, "fetch", ...)`,
-`process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`. 허용 대조가 없으면
-위 규칙은 process 금지와 구분되지 않는다.
+`process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`,
+`import.meta.url`. 허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부
 

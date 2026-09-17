@@ -891,6 +891,29 @@ const REFLECTIVE_ROUTE = Object.freeze([
   [/\bReflect\s*\./, "Reflect", false],
 ]);
 
+/**
+ * The globals that run constructed code, denied as names rather than as calls.
+ *
+ * The spawn-surface list names two call spellings. JavaScript has more:
+ * whitespace is permitted between a callee and its parenthesis, Function is
+ * callable without new, and either global can be held in a binding first. A
+ * scan keyed to a call shape is one space away from missing all of them, so the
+ * identifier is what is refused. No file in the closure names either one.
+ */
+const DYNAMIC_CODE_GLOBAL = /\b(?:eval|Function|AsyncFunction|GeneratorFunction)\b/;
+
+/**
+ * The only properties of import.meta a derived test may name.
+ *
+ * Same shape as the process rule, for the same reason. import.meta.main is true
+ * when the lane launches a file through node --test and false when the
+ * observation imports it, so it tells a test which run it is in without naming
+ * any denied signal. Listing what is allowed ends the sequence: createRequire
+ * needs the module URL, and nothing here needs anything else.
+ */
+const IMPORT_META_PROPERTY = Object.freeze(["url"]);
+const IMPORT_META = /import\s*\.\s*meta\s*(?:\.\s*([A-Za-z_$][\w$]*))?/g;
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -929,6 +952,13 @@ export function observationAccessFault(rawSource) {
   // so that one rule reads the copy where string contents survive.
   for (const [pattern, reason, needsLiterals] of REFLECTIVE_ROUTE)
     if (pattern.test(needsLiterals ? source : code)) return reason;
+  const dynamicCode = DYNAMIC_CODE_GLOBAL.exec(code);
+  if (dynamicCode) return "the global " + dynamicCode[0] + " runs constructed code";
+  for (const match of code.matchAll(IMPORT_META)) {
+    if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
+    if (!IMPORT_META_PROPERTY.includes(match[1]))
+      return "import.meta." + match[1] + " is not one of the permitted properties";
+  }
   for (const match of code.matchAll(GLOBAL_ROOT))
     if (/^\s*\[/.test(code.slice(match.index + match[0].length)))
       return "computed member access on " + match[0];

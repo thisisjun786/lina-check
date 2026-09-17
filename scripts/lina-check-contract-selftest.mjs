@@ -1038,6 +1038,16 @@ function runDerivedTestCases() {
     'const C = ({})["constructor"];\nconst x = C;\n',
     "const proto = target.__proto__;\nconst x = proto;\n",
     "const value = Reflect.get(target, key);\nconst x = value;\n",
+    // Function is callable without new, whitespace is allowed before the
+    // parenthesis, and either global can be held in a binding first. The name
+    // is what is refused, so none of the three spellings survives.
+    'const p = Function("return globalThis")();\n',
+    'const p = eval ("pro" + "cess");\n', // justified: a refusal control, not a call
+    'const run = Function;\nconst p = run("return 1")();\n',
+    // import.meta.main is true under node --test and false when the
+    // observation imports the file, which tells a test which run it is in.
+    "if (import.meta.main) startLane();\n",
+    "const meta = import.meta;\nconst x = meta;\n",
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1063,6 +1073,9 @@ function runDerivedTestCases() {
     // A prototype is inert without the constructor access refused above, and
     // the same harness reads one.
     "const proto = Object.getPrototypeOf(env);\nconst x = proto;\n",
+    // The module URL is what createRequire needs, and every file in the closure
+    // that reaches import.meta reaches only this property.
+    "const here = import.meta.url;\nconst x = here;\n",
   ]) {
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
@@ -1100,7 +1113,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 24;
+  observed += 30;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
