@@ -663,6 +663,15 @@ const SPAWN_SURFACE = Object.freeze([
   "node:worker_threads",
   "worker_threads",
   "new Worker(",
+  // Mechanisms that resolve a module or run constructed code at run time. The
+  // entries above name modules, which a computed string can evade; these name
+  // the ways of getting one at all, so what the argument evaluates to stops
+  // mattering. A derived test has no use for any of them: it imports what it
+  // needs by name.
+  "getBuiltinModule",
+  "process.binding",
+  "eval(", // justified: a denial-list entry naming the surface, not a call
+  "new Function(",
 ]);
 
 /**

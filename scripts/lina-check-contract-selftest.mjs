@@ -852,6 +852,26 @@ function runDerivedTestCases() {
   assert.match(workerRefusal.message, /worker_threads|new Worker/);
   observed += 2;
 
+  // Runtime module resolution and constructed code. Naming modules is not
+  // enough on its own: a computed string reaches the same module, so the
+  // mechanisms are denied and the argument stops mattering.
+  for (const mechanism of [
+    'const threads = process.getBuiltinModule("worker_" + "threads");\n',
+    'const binding = process.binding("spawn_sync");\n',
+    'const run = new Function("return 1");\n',
+  ]) {
+    const constructed = base();
+    const restConstructed = constructed.readFile;
+    constructed.readFile = (path) =>
+      path === DERIVED_TESTS[0] ? mechanism : restConstructed(path);
+    assert.throws(
+      () => assertDerivedTestContract(constructed),
+      { code: "derived-test-spawns" },
+      "expected a refusal for: " + mechanism.trim(),
+    );
+    observed += 1;
+  }
+
   // A declared test naming a file that cannot be read must be refused rather
   // than quietly scanned less.
   const unreadable = base();
