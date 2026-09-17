@@ -5295,7 +5295,7 @@ async function reviewProofProducerRequest(request: Request, env) {
 async function reviewProofArtifact(env, token: string, id: string): Promise<Uint8Array> {
   if (!/^[1-9][0-9]{0,19}$/.test(id)) throw new Error("invalid_artifact_id");
   let response = await fetch(
-    githubApiUrl(env, `/repos/${String(env.CLAWSWEEPER_REPO || "")}/actions/artifacts/${id}/zip`),
+    githubApiUrl(env, `/repos/openclaw/openclaw/actions/artifacts/${id}/zip`),
     {
       headers: {
         Authorization: `Bearer ${token}`,
