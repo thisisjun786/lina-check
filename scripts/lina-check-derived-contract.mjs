@@ -576,6 +576,30 @@ export function describeLaunchOutcome(outcome, timeoutMs = LANE_TIMEOUT_MS) {
 }
 
 /**
+ * Kill what a timed-out launch left behind.
+ *
+ * spawnSync's own timeout signals the process it started and nothing else, and
+ * the restored lane contains tests that start node, git, curl and local
+ * servers. A runner stopped at the bound can therefore exit while a descendant
+ * of one of its tests is still holding a port. The launch runs in its own
+ * process group so the whole group can be signalled here; the kill is injected
+ * so the self-test can walk this without killing anything.
+ */
+export function reapLaunchGroup(outcome, kill) {
+  const pid = outcome === null || typeof outcome !== "object" ? undefined : outcome.pid;
+  // A pid of 0 or 1 would address this process's own group or init.
+  if (!Number.isInteger(pid) || pid <= 1) return { reaped: false, reason: "no usable process group" };
+  try {
+    kill(-pid, "SIGKILL");
+    return { reaped: true, group: -pid };
+  } catch (error) {
+    // The group is already gone when every descendant exited with the runner,
+    // which is the ordinary case and not a failure.
+    return { reaped: false, reason: error?.code ?? String(error) };
+  }
+}
+
+/**
  * Tests this fork wrote, kept separate from the restored upstream set so a
  * report never blurs the two. These cover the admission decision, which the
  * upstream suite for it cannot: test/hosted-target-admission.test.ts opens

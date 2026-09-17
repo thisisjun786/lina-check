@@ -57,6 +57,7 @@ import {
   blockedNodeTargets,
   classifyBuildPair,
   describeLaunchOutcome,
+  reapLaunchGroup,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 
@@ -357,6 +358,25 @@ function runLaneShapeCases() {
     "a real spawnSync timeout must be classified as one",
   );
   observed += 1;
+
+  // The bound stops the runner; the tests it started can still be alive. The
+  // reap is driven with an injected kill so this walks every branch without
+  // signalling anything.
+  const signalled = [];
+  const spy = (pid, signal) => signalled.push([pid, signal]);
+  assert.deepEqual(reapLaunchGroup({ pid: 4242 }, spy), { reaped: true, group: -4242 });
+  assert.deepEqual(signalled, [[-4242, "SIGKILL"]]);
+  for (const outcome of [null, {}, { pid: 1 }, { pid: 0 }, { pid: -3 }, { pid: 1.5 }]) {
+    const result = reapLaunchGroup(outcome, spy);
+    assert.equal(result.reaped, false, "must refuse " + JSON.stringify(outcome));
+    observed += 1;
+  }
+  assert.equal(signalled.length, 1, "a refused reap must signal nothing");
+  const failing = reapLaunchGroup({ pid: 4242 }, () => {
+    throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+  });
+  assert.deepEqual(failing, { reaped: false, reason: "ESRCH" });
+  observed += 2;
   return observed;
 }
 

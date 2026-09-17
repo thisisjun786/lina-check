@@ -19,10 +19,10 @@
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
 | 2 | `corepack pnpm run build:all` | 0 | 0.97 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.10 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.50 | oxlint 4개 스크립트 전부 Done |
-| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.25 | `rejected=30 helpers=18 laneShape=14 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 135.75 | 통과 2579건, fail 0, skip 0 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.18 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.44 | oxlint 4개 스크립트 전부 Done |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.26 | `rejected=30 helpers=18 laneShape=22 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 134.97 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,7 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 135.8초 |
+| 게이트 6 전체 | 207 | | 135.0초 |
 
 구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
 실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
@@ -110,6 +110,14 @@ PR 을 올리기 전에 독립 리뷰어(다른 모델, 읽기 전용)에게 감
 | -- | -- | -- | -- | -- |
 | 9 | 3라운드 (blocker) | 계측을 자식 환경에 심으면 스캐너 환경 검사가 깨져서 테스트가 중간에 죽고, 그 뒤의 기동이 기록되지 않는다. `test/assist-artifact.test.ts` 의 `node` 기동이 빠져 있었다 | 관측을 두 패스로 나눴다. 평상 패스는 계측을 `process.env` 에서 지워 자식에게 상속되지 않게 하고, 선언 문장은 거기서만 뽑는다. 자식 패스는 소켓만 보탠다 | 평상 패스 207개 전부 exit 0. `assist-artifact` 선언이 스텁 `trufflehog` 와 `node` 를 둘 다 적는다 |
 | 10 | 3라운드 (should-fix) | 계측의 사각지대를 명시하라. 콜백형 `execFile` 의 옵션 주입 누락, `worker_threads`·`dgram` 미포함, 계측 전에 붙잡힌 참조, `fetch` 아닌 HTTP 의 목적지 유실 | 옵션 위치를 인자 끝이 아니라 실제 옵션 객체 자리에서 찾도록 고쳤고, `Socket.connect` 의 호스트·포트를 기록하게 했다. 나머지 사각지대는 `020` 에 "이 관측이 보지 못하는 것" 으로 적었다. `worker_threads`·`dgram` 은 `test/`·`src/`·`dashboard/` 어디에도 없음을 확인했다(`rg -l` 0건) | `020_fixture_lane.md` |
+
+PR 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다. 둘 다 `95dde5b9` 를 봤다.
+
+| # | 출처 | 지적 | 처리 | 확인 |
+| -- | -- | -- | -- | -- |
+| 11 | Devin(bug)·Codex(P2), 같은 건 | 시간 초과가 러너만 죽인다. `spawnSync` 의 timeout 신호는 자기가 띄운 프로세스에만 가고, 이 레인에는 node·git·curl·로컬 서버를 띄우는 테스트가 있으므로 자손이 포트를 쥔 채 남을 수 있다 | 실행을 자기 프로세스 그룹으로 띄우고(`detached: true`), 시간 초과로 판정되면 `reapLaunchGroup` 이 그룹 전체에 SIGKILL 을 보낸다. kill 을 주입받는 순수 함수라 자기시험이 모든 갈래를 확인한다. 대가는 적어 뒀다: 대화형 Ctrl-C 가 더 이상 테스트에 닿지 않는다 | `laneShape` 14 → 22 |
+| 12 | Devin(analysis) | README 가 아직 13개 레인이라고 안내한다 | 206개로 고치고, 그중 23개가 고정 pin 바이트 위에서 도는 사실을 함께 적었다 | `README.md` |
+| 13 | Devin(analysis) | 복원한 테스트가 임시 디렉터리를 정리하지 않고 남긴다 | 이미 이 문서의 실행 경계 관측에 적혀 있던 사실이다. 보이는 자리에서도 보이도록 해당 테스트의 선언 사유에 옮겨 적었다 | `config/lina-check-scaffold.json` 의 `test/repair/gitcrawl-cluster-history.test.ts` |
 
 감사가 통과로 확인한 것도 적는다. 가드 완화 없음(`allowedScripts` 동일, 제품 코드·워크플로·가드
 바이트 불변), 기존 거부 경로 약화 없음, 실패하는 레인이 exit 0 으로 새는 경로 없음, 변경한 네

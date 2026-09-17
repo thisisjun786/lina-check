@@ -73,6 +73,7 @@ import {
   classifyBuildPair,
   describeLaunchOutcome,
   resolveFixtureFiles,
+  reapLaunchGroup,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -268,6 +269,12 @@ export function launchTests(paths, concurrency, options = {}) {
     // have hung it instead of failing it, which is the one result a lane must
     // never produce, because nobody can tell it apart from work in progress.
     timeout: LANE_TIMEOUT_MS,
+    // Its own process group, so a launch stopped at the bound can be reaped
+    // whole. Restored tests start node, git, curl and local servers, and the
+    // timeout signal reaches only the process spawnSync started. The cost is
+    // that an interactive interrupt no longer reaches the tests: Ctrl-C stops
+    // the lane and leaves the group behind.
+    detached: true,
   });
 }
 
@@ -384,6 +391,15 @@ export function main(argv, deps = {}) {
     if (verdict.kind === "ok") continue;
     if (verdict.kind === "unstarted")
       throw new Error("could not start the node test runner", { cause: outcome.error });
+    if (verdict.kind === "timeout") {
+      const reaped = reapLaunchGroup(outcome, (pid, signal) => process.kill(pid, signal));
+      process.stderr.write(
+        LABEL +
+          " reaping the launch group: " +
+          (reaped.reaped ? String(reaped.group) : "nothing to reap (" + reaped.reason + ")") +
+          "\n",
+      );
+    }
     process.stderr.write(LABEL + " " + verdict.detail + "\n");
     return verdict.exitCode;
   }
