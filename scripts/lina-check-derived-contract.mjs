@@ -690,7 +690,48 @@ export function resolveRelativeImport(fromPath, specifier) {
  */
 const IMPORT_SPECIFIER = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
 const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']/g;
+const CREATE_REQUIRE_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*createRequire\s*\(/g;
+const CREATE_REQUIRE_USE = /\bcreateRequire\b/g;
 const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
+
+/**
+ * Specifiers loaded through a require function held in a variable.
+ *
+ * Matching only the immediate createRequire(...)(...) call left the ordinary
+ * two-step spelling invisible, which is the same hole one level further along.
+ * Bindings are collected first, then calls of those bindings are read.
+ */
+function aliasedRequireSpecifiers(source) {
+  const specifiers = [];
+  for (const binding of source.matchAll(CREATE_REQUIRE_BINDING)) {
+    const name = binding[1];
+    const calls = new RegExp("\\b" + name + "\\s*\\(\\s*[\"']([^\"']+)[\"']", "g");
+    for (const call of source.matchAll(calls)) specifiers.push(call[1]);
+  }
+  return specifiers;
+}
+
+/**
+ * Refuse a require function this scan cannot follow.
+ *
+ * Tracking bindings covers the two spellings that actually occur; it cannot
+ * follow a loader passed as an argument, reassigned, or returned. Rather than
+ * let that read as "nothing found", every createRequire use must be either an
+ * immediate call or a plain binding declaration, and anything else is refused by
+ * name. A scan that cannot see a load must not be mistaken for a clean one.
+ */
+function assertRequireFormsResolvable(path, source) {
+  for (const use of source.matchAll(CREATE_REQUIRE_USE)) {
+    const before = source.slice(Math.max(0, use.index - 80), use.index);
+    const after = source.slice(use.index);
+    const isBinding = /(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*$/.test(before);
+    const isImmediate = /^createRequire\s*\([^)]*\)\s*\(/.test(after);
+    // The import that brings the name in is not a use of it.
+    const isImport = /import[^;]*\{[^}]*$/.test(before);
+    if (!isBinding && !isImmediate && !isImport)
+      fail("derived-test-unresolvable-require", path + ": createRequire used in an unfollowable form");
+  }
+}
 
 /**
  * Every file inside the test tree a derived test can reach, entry included.
@@ -728,6 +769,14 @@ export function derivedTestClosure(entry, readFile) {
         seen.add(resolved);
         queue.push(resolved);
       }
+    }
+    assertRequireFormsResolvable(path, source);
+    for (const specifier of aliasedRequireSpecifiers(source)) {
+      const resolved = resolveRelativeImport(path, specifier);
+      if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
+      if (!FOLLOWABLE.test(resolved)) continue;
+      seen.add(resolved);
+      queue.push(resolved);
     }
   }
   return visited;

@@ -66,7 +66,14 @@ import {
   interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
-import { main as coverageMapMain } from "./lina-check-coverage-map.mjs";
+import {
+  declarations as coverageDeclarations,
+  executedNames as coverageExecutedNames,
+  generate as coverageGenerate,
+  main as coverageMapMain,
+  stripComments as coverageStripComments,
+  testNames as coverageTestNames,
+} from "./lina-check-coverage-map.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
@@ -738,6 +745,10 @@ function runDerivedTestCases() {
       'const load = createRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
       "createRequire",
     ],
+    [
+      'const load = createRequire(import.meta.url);\nconst helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "an assigned createRequire loader",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -767,6 +778,27 @@ function runDerivedTestCases() {
     path === DERIVED_TESTS[0] ? 'import x from "./helpers/absent.mjs";\n' : readable(path);
   assert.throws(() => assertDerivedTestContract(unreadable), { code: "derived-test-unreadable" });
   observed += 1;
+
+  // A loader this scan cannot follow must be refused rather than read as clean.
+  // Tracking bindings covers the spellings that occur; handing the loader to
+  // something else is the case where "found nothing" would be a lie.
+  const opaque = base();
+  const plain = opaque.readFile;
+  opaque.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? "handOff(createRequire);\n" : plain(path);
+  assert.throws(() => assertDerivedTestContract(opaque), {
+    code: "derived-test-unresolvable-require",
+  });
+  // The spelling this repository actually uses must still be accepted, or the
+  // rule above would just be a ban on createRequire.
+  const permitted = base();
+  const rest = permitted.readFile;
+  permitted.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import { createRequire } from "node:module";\nconst fs = createRequire(import.meta.url)("node:fs");\n'
+      : rest(path);
+  assertDerivedTestContract(permitted);
+  observed += 2;
 
   // The helper is real and still carries what the control depends on. If it is
   // ever cleaned up, the control above would silently stop proving anything.
@@ -894,10 +926,32 @@ function observeDerivedTests(directory) {
     [],
     "a derived test started a process: " + JSON.stringify(observed.launches),
   );
+
+  // Bind the coverage map to this run. A name parsed out of a file is not a case
+  // that executed: a mapped case declared with { skip: true } still parses, and
+  // an aggregate pass count can be held up by some other case. Every record the
+  // map calls recovered has to appear here as a case that actually passed.
+  const passing = new Set(
+    [...observed.result.stdout.matchAll(/^\s*✔ (.*?) \(\d+(?:\.\d+)?ms\)/gm)].map(
+      (match) => match[1],
+    ),
+  );
+  const recovered = coverageGenerate().receipt.records.filter(
+    (record) => record.disposition === "recovered",
+  );
+  const missing = recovered.filter((record) => !passing.has(record.case)).map((record) => record.case);
+  assert.deepEqual(
+    missing,
+    [],
+    "the map calls these records recovered but they did not pass in the observed run: " +
+      missing.join(" | "),
+  );
+  assert.ok(recovered.length > 0, "the map recovered nothing, so this control proves nothing");
   return {
     cases: Number(passed[1]),
     launches: observed.launches.length,
     control: control.launches.length,
+    boundRecords: recovered.length,
   };
 }
 
@@ -927,6 +981,46 @@ function runCoverageMapCase() {
     () => coverageMapMain(["check"], stripped),
     /no disposition recorded for/,
     "a record with no derived counterpart and no written reason must fail generation",
+  );
+
+  // How records are read out of a file, which is where a line-by-line scan was
+  // wrong in both directions at once.
+  const multiline = [
+    "test(",
+    '  "a name on the next line",',
+    "  () => {},",
+    ");",
+  ].join("\n");
+  assert.deepEqual(
+    coverageTestNames(multiline),
+    ["a name on the next line"],
+    "a declaration split across lines is still a record",
+  );
+  assert.deepEqual(
+    coverageTestNames('/*\ntest("commented out", () => {});\n*/\n'),
+    [],
+    "a declaration inside a block comment is not a record",
+  );
+  assert.deepEqual(
+    coverageTestNames('// test("commented out", () => {});\n'),
+    [],
+    "a declaration inside a line comment is not a record",
+  );
+  assert.match(
+    coverageStripComments('const url = "https://example.invalid/x"; // trailing\n'),
+    /https:\/\/example\.invalid\/x/,
+    "a comment marker inside a string is not a comment",
+  );
+  const skipped = 'test("runs", () => {});\ntest("does not run", { skip: true }, () => {});\n';
+  assert.deepEqual(coverageTestNames(skipped), ["runs", "does not run"]);
+  assert.deepEqual(
+    coverageExecutedNames(skipped),
+    ["runs"],
+    "a skipped case is declared but does not execute, so it cannot count as restored",
+  );
+  assert.deepEqual(
+    coverageDeclarations(skipped).map((entry) => entry.skipped),
+    [false, true],
   );
   return "verified";
 }

@@ -6,29 +6,29 @@
 
 | 게이트 | 결과 |
 | -- | -- |
-| \`corepack pnpm install --frozen-lockfile --ignore-scripts\` | exit 0 |
-| \`corepack pnpm run build:all\` | exit 0 |
-| \`corepack pnpm run check:scaffold\` | exit 0 |
-| \`corepack pnpm run lint\` | exit 0 |
-| \`corepack pnpm run lina:contract-selftest\` | exit 0 |
-| \`corepack pnpm run lina:test-safe\` | exit 0 |
-| \`corepack pnpm run lina:test-safe:preview\` | exit 0 |
-| \`corepack pnpm run lina:boundary-probe\` | exit 0 |
+| `corepack pnpm install --frozen-lockfile --ignore-scripts` | exit 0 |
+| `corepack pnpm run build:all` | exit 0 |
+| `corepack pnpm run check:scaffold` | exit 0 |
+| `corepack pnpm run lint` | exit 0 |
+| `corepack pnpm run lina:contract-selftest` | exit 0 |
+| `corepack pnpm run lina:test-safe` | exit 0 |
+| `corepack pnpm run lina:test-safe:preview` | exit 0 |
+| `corepack pnpm run lina:boundary-probe` | exit 0 |
 
 수치는 이 문서를 커밋하기 직전 작업 트리에서 잰 것이다. 그 뒤로 바뀐 것은 이 문서와 그 등록
 두 줄뿐이고, 등록까지 포함한 재실행 결과는 PR 본문에 적는다.
 
 ### 한 번 빨간불이 났고, 그게 계약이 도는 증거다
 
-중간 실행에서 \`check:scaffold\` 가 exit 1 로 멈췄다.
+중간 실행에서 `check:scaffold` 가 exit 1 로 멈췄다.
 
-\`\`\`
+```
 AssertionError [ERR_ASSERTION]: Unexpected source addition:
   devlog/_plan/260917_jun223_lost_coverage/evidence/failure_controls.json
-\`\`\`
+```
 
-실패 대조 영수증을 만들어 놓고 \`derived.files\` 에 등록하지 않아서다. 계획 단위를 새로 만들면
-\`PLAN_UNITS\` 추가와 파일 등록을 둘 다 해야 한다는 규칙이 실제로 작동한다는 뜻이고, 등록을 더한
+실패 대조 영수증을 만들어 놓고 `derived.files` 에 등록하지 않아서다. 계획 단위를 새로 만들면
+`PLAN_UNITS` 추가와 파일 등록을 둘 다 해야 한다는 규칙이 실제로 작동한다는 뜻이고, 등록을 더한
 뒤 다시 exit 0 이 됐다.
 
 ## 레인
@@ -43,54 +43,54 @@ AssertionError [ERR_ASSERTION]: Unexpected source addition:
 
 ## 가드 유발 확인
 
-\`src/clawsweeper-text.ts\` 에 한 줄을 넣고 \`check:scaffold\` 를 돌린 뒤 복원했다. 복원은
-\`trap restore EXIT INT TERM\` 으로 걸어 중간에 죽어도 변조가 남지 않게 했다.
+`src/clawsweeper-text.ts` 에 한 줄을 넣고 `check:scaffold` 를 돌린 뒤 복원했다. 복원은
+`trap restore EXIT INT TERM` 으로 걸어 중간에 죽어도 변조가 남지 않게 했다.
 
 | 값 | |
 | -- | -- |
-| 변조 전 sha256 | \`fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c\` |
-| 변조 후 sha256 | \`76b1142449a872ee38b77715ab18a3c4e28ae227556bcef7deae3a13749a87c1\` |
-| 변조 상태 \`check:scaffold\` | exit 1, \`Upstream bytes changed: src/clawsweeper-text.ts\` |
-| 복원 후 sha256 | \`fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c\` (변조 전과 동일) |
-| 복원 후 \`check:scaffold\` | exit 0 |
+| 변조 전 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` |
+| 변조 후 sha256 | `76b1142449a872ee38b77715ab18a3c4e28ae227556bcef7deae3a13749a87c1` |
+| 변조 상태 `check:scaffold` | exit 1, `Upstream bytes changed: src/clawsweeper-text.ts` |
+| 복원 후 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` (변조 전과 동일) |
+| 복원 후 `check:scaffold` | exit 0 |
 
 ## 탐지기
 
-\`lina:contract-selftest\` 한 줄 요약에 그대로 찍힌다.
+`lina:contract-selftest` 한 줄 요약에 그대로 찍힌다.
 
-\`\`\`
-derivedTestContract=14 derivedCases=140 derivedLaunches=0 launchControl=1
-\`\`\`
+```
+derivedTestContract=26 derivedCases=140 derivedLaunches=0 launchControl=1 coverageMap=verified
+```
 
-\`launchControl=1\` 이 양성 대조다. sentinel 기동 한 건을 같은 훅이 이름까지 기록했고, 그
-다음에 \`derivedLaunches=0\` 을 받았다. \`derivedCases=140\` 은 관측 실행에서 실제로 통과한
+`launchControl=1` 이 양성 대조다. sentinel 기동 한 건을 같은 훅이 이름까지 기록했고, 그
+다음에 `derivedLaunches=0` 을 받았다. `derivedCases=140` 은 관측 실행에서 실제로 통과한
 파생 케이스 수다. 0건과 "아무것도 안 돌았다" 를 구분하려고 함께 단언한다.
 
-정적 쪽 양성 대조는 \`derivedTestContract=14\` 안에 들어 있다. 선언된 파일의 본문을
-\`test/helpers/command-intake-fixture.mjs\` 를 import 하는 한 줄로 바꿔 먹이면 계약이
-\`derived-test-spawns\` 로 거부하고, 거부 메시지가 그 helper 경로를 지목한다. 본문만 보는 스캔은
+`coverageMap=verified` 는 대응표가 두 테스트 집합과 아직 일치한다는 뜻이다. 정적 쪽 양성 대조는 `derivedTestContract=26` 안에 들어 있다. 선언된 파일의 본문을
+`test/helpers/command-intake-fixture.mjs` 를 import 하는 한 줄로 바꿔 먹이면 계약이
+`derived-test-spawns` 로 거부하고, 거부 메시지가 그 helper 경로를 지목한다. 본문만 보는 스캔은
 이 대조를 통과하지 못한다.
 
 ## 실패 대조
 
 회복한 기대값을 일부러 틀린 값으로 바꿔 검사가 그것을 잡는지 봤다. 일곱 건 전부 잡혔고, 일곱 건
-모두 원래 바이트로 복원됐다. 영수증은 \`evidence/failure_controls.json\` 에 있다.
+모두 원래 바이트로 복원됐다. 영수증은 `evidence/failure_controls.json` 에 있다.
 
 처음 만든 대조 중 하나는 버렸다. 거부 목록에서 입력 하나를 빼는 변조였는데, 그건 틀린 결과가
-아니라 검사 대상이 줄어드는 변조라서 원래 실패할 수 없다. 그 자리를 \`assert.throws\` 를
-\`assert.doesNotThrow\` 로 뒤집는 변조로 바꿨다.
+아니라 검사 대상이 줄어드는 변조라서 원래 실패할 수 없다. 그 자리를 `assert.throws` 를
+`assert.doesNotThrow` 로 뒤집는 변조로 바꿨다.
 
 ## 고치지 않고 보고하는 것
 
-\`dashboard/github-api.ts\` 의 \`githubAppJson\` 은 \`githubApiUrl\` 이 던진 거부를 자기
-\`try\` 블록에서 받아 \`GitHubRequestError("... network failure")\` 로 다시 던진다. 요청은
+`dashboard/github-api.ts` 의 `githubAppJson` 은 `githubApiUrl` 이 던진 거부를 자기
+`try` 블록에서 받아 `GitHubRequestError("... network failure")` 로 다시 던진다. 요청은
 실제로 나가지 않지만, 메시지만 보면 미설정 거부와 나갔다가 실패한 요청을 구분할 수 없다.
 제품 동작을 바꾸지 않기로 했으므로 손대지 않았고, 대신 회복 테스트가 메시지 대신 "요청이 한 번도
 시도되지 않았다" 를 단언한다. 진단 가능성을 개선할 자리로 보이지만 그 판단은 이 PR 밖이다.
 
 ## 확인하지 못한 것
 
-upstream 전체 테스트와 \`check\` 는 파킹된 워크플로 경로를 전제하므로 여기서 돌리지 않았고
+upstream 전체 테스트와 `check` 는 파킹된 워크플로 경로를 전제하므로 여기서 돌리지 않았고
 통과로 보고하지 않는다. 워크플로 활성화·배포·App 설치·실제 모델 호출은 범위 밖이라 손대지
 않았다. 파생 테스트가 네트워크를 쓰지 않는다는 것은 요청 경계를 대역 처리한 자리에서만
 단언했고, 프로세스 전체를 상대로 한 네트워크 계측은 하지 않았다.
@@ -133,4 +133,53 @@ Devin 이 제안한 "파서로 파싱하라" 는 받지 않았다. 이 저장소
 커밋된 표·영수증과 대조하고, 어긋나면 실패한다. 생성기 자체의 대조도 넣었다. 회복 파일 하나를
 비운 트리를 먹이면 그 파일의 레코드가 사유 없는 미회복이 되므로 생성이 실패해야 하고, 그것을
 단언한다.
+
+
+### 2라운드 (head 1e3b8c0e)
+
+Devin 이 앞의 세 건을 Resolved 로 닫았고 네 건이 새로 붙었다. Devin Review 체크는 SUCCESS.
+
+#### 4. 변수에 담은 createRequire 는 여전히 안 보인다 (Codex P2 + Devin 분석, 같은 건)
+
+맞다. 1라운드 수정은 즉시 호출 형태만 따라갔고 `const load = createRequire(...); load("./x")` 는
+빠져나갔다. 바인딩을 먼저 모으고 그 이름으로 하는 호출을 읽도록 고쳤다.
+
+여기서 한 발 더 갔다. 정적 스캔이 따라갈 수 없는 형태, 이를테면 로더를 인자로 넘기거나 재대입하는
+경우를 "못 찾았다" 로 읽지 않고 `derived-test-unresolvable-require` 로 거부한다. 따라갈 수
+있거나 거부되거나 둘 중 하나다. 이 저장소가 실제로 쓰는 형태, 즉 import 로 들여와 즉시 호출하는
+쪽은 그대로 통과해야 하므로 그 음성 대조도 같이 넣었다.
+
+#### 5. 줄 단위 스캔이 두 방향으로 틀린다 (Codex P2)
+
+맞다. `test(` 다음 줄에 이름이 오면 못 세고, 블록 주석 안의 `test("...")` 는 세어
+버렸다. 둘 다 표는 그대로인데 실제 레코드 집합은 바뀐 상태를 만든다.
+
+문자열과 템플릿 리터럴을 구분하는 주석 제거기를 넣고, 그 위에서 줄바꿈을 건너뛰는 선언 매칭을
+한다. `https://` 의 슬래시 두 개를 주석으로 지우면 안 되기 때문에 단순 치환은 쓰지 않았다.
+대조 네 개를 selftest 에 넣었다. 여러 줄 선언은 세고, 블록 주석과 줄 주석 안은 세지 않고, 문자열
+안의 주석 표시는 살린다. 바꾼 뒤 집계는 144/122/9/13 으로 이전과 같다.
+
+#### 6. 대응표가 skip 된 레코드를 회복으로 인증한다 (Devin 버그)
+
+맞는 지적이고 실제로 구멍이었다. 이름만 읽으면 `{ skip: true }` 가 붙은 선언과 도는 선언을
+구분할 수 없다.
+
+두 군데를 고쳤다. 생성기는 선언의 옵션 인자를 읽어 skip 과 todo 를 실행되지 않는 것으로 보고
+회복에서 뺀다. 그리고 관측 실행과 대응표를 묶었다. 표가 회복이라고 부른 레코드 122개는 관측
+실행의 통과 목록에 이름이 실제로 있어야 한다. 합계 하한만으로는 한 건이 skip 되고 다른 한 건이
+추가되는 교환을 못 잡는다는 지적이 맞아서, 하한은 남기고 이름 대조를 더했다.
+
+대조가 실제로 도는지도 확인했다. 회복 케이스 하나에 `{ skip: true }` 를 붙이고 selftest 를
+돌리면 exit 1 로 멈춘다.
+
+```
+[lina-check-contract-selftest] observed 139 derived cases, below the floor of 140
+```
+
+파일은 원래 바이트로 복원했고 sha256 이 일치하는 것까지 확인했다.
+
+#### 7. 040 의 탐지기 수치가 낡았다 (Devin 분석)
+
+맞다. 1라운드 수정으로 대조가 14건에서 늘었는데 문서는 14 그대로였다. 현재 head 의 값으로
+고쳤다. 같은 정리에서 이 문서와 `030_detectors.md` 에 남아 있던 이스케이프된 백틱도 걷어냈다.
 

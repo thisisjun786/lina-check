@@ -151,32 +151,110 @@ export const UNRESTORED = Object.freeze({
   },
 });
 
-const TEST_DECLARATION = /^\s*(?:await\s+)?(?:test|nodeTest)\(\s*(["'\u0060])([\s\S]*?)\1/;
-
-/** Top-level record names, with the parameterised suites expanded to what runs. */
-export function testNames(source) {
-  const names = [];
-  for (const line of source.split("\n")) {
-    const match = TEST_DECLARATION.exec(line);
-    if (!match) continue;
-    const raw = match[2];
-    if (raw.includes(NAME_SLOT) && raw.includes(STATUS_SLOT)) {
-      for (const reader of READERS)
-        for (const status of STATUSES)
-          names.push(raw.replace(NAME_SLOT, reader).replace(STATUS_SLOT, String(status)));
-    } else if (raw.includes(NAME_SLOT)) {
-      for (const reader of READERS) names.push(raw.replace(NAME_SLOT, reader));
-    } else {
-      names.push(raw);
+/**
+ * Blank out comments, respecting string and template literals.
+ *
+ * A line-by-line scan counted a declaration inside a block comment as a record
+ * and missed one whose name sits on the next line. Both directions are wrong in
+ * the same way: the map would stay green while the executed record set changed.
+ * Naive comment stripping is not enough either, since "https://x" carries the
+ * line-comment marker inside a string.
+ */
+export function stripComments(source) {
+  let out = "";
+  let index = 0;
+  let quote = null;
+  while (index < source.length) {
+    const two = source.slice(index, index + 2);
+    const character = source[index];
+    if (quote) {
+      if (character === "\\") {
+        out += "  ";
+        index += 2;
+        continue;
+      }
+      if (character === quote) quote = null;
+      out += character;
+      index += 1;
+      continue;
     }
+    if (character === '"' || character === "'" || character === BT) {
+      quote = character;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (two === "//") {
+      while (index < source.length && source[index] !== "\n") {
+        out += " ";
+        index += 1;
+      }
+      continue;
+    }
+    if (two === "/*") {
+      while (index < source.length && source.slice(index, index + 2) !== "*/") {
+        out += source[index] === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    out += character;
+    index += 1;
   }
-  return names;
+  return out;
+}
+
+const TEST_DECLARATION = new RegExp(
+  "(?:^|[\\s;{}()])(?:await\\s+)?(?:test|nodeTest)\\s*\\(\\s*([\"'" +
+    BT +
+    "])((?:[^\\\\]|\\\\.)*?)\\1\\s*(?:,\\s*(\\{[^}]*\\}))?",
+  "gm",
+);
+
+function expand(raw) {
+  if (raw.includes(NAME_SLOT) && raw.includes(STATUS_SLOT))
+    return READERS.flatMap((reader) =>
+      STATUSES.map((status) => raw.replace(NAME_SLOT, reader).replace(STATUS_SLOT, String(status))),
+    );
+  if (raw.includes(NAME_SLOT)) return READERS.map((reader) => raw.replace(NAME_SLOT, reader));
+  return [raw];
+}
+
+/**
+ * Declared records, with the parameterised suites expanded to what runs.
+ *
+ * skipped is read from the options argument, because a name alone cannot tell a
+ * case that runs from one declared with { skip: true }. Treating those as equal
+ * would let the map certify coverage that never executes.
+ */
+export function declarations(source) {
+  const found = [];
+  for (const match of stripComments(source).matchAll(TEST_DECLARATION)) {
+    const options = match[3] ?? "";
+    const skipped = /\b(?:skip|todo)\b/.test(options);
+    for (const name of expand(match[2])) found.push({ name, skipped });
+  }
+  return found;
+}
+
+/** Every declared record name, whether or not it executes. */
+export function testNames(source) {
+  return declarations(source).map((entry) => entry.name);
+}
+
+/** Only the records that actually run, which is what "restored" has to mean. */
+export function executedNames(source) {
+  return declarations(source)
+    .filter((entry) => !entry.skipped)
+    .map((entry) => entry.name);
 }
 
 export function buildRecords(readFile) {
   const records = [];
   for (const [original, derived] of Object.entries(RECOVERY)) {
-    const restored = new Set(testNames(readFile(derived)));
+    const restored = new Set(executedNames(readFile(derived)));
     const declared = [
       ...testNames(readFile(original)).map((name) => ({ name, nested: false })),
       ...(NESTED[original] ?? []).map((entry) => ({
@@ -383,4 +461,3 @@ export function main(argv, readFile) {
 
 if (process.argv[1] && process.argv[1].endsWith("lina-check-coverage-map.mjs"))
   process.exitCode = main(process.argv.slice(2));
-
