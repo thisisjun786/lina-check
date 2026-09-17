@@ -999,6 +999,10 @@ function runDerivedTestCases() {
     "const { argv } = process;\nconst how = argv[1];\n",
     'const how = process["argv"][1];\n',
     'if (process.env.NODE_TEST_CONTEXT) skipLaunch();\n',
+    // Node owns this namespace and adds to it: NODE_TEST_WORKER_ID is set by
+    // the lane's runner and absent in the observation, and listing names one at
+    // a time is how the first one was missed.
+    "if (process.env.NODE_TEST_WORKER_ID) startLane();\n",
   ]) {
     const looking = base();
     const rest2 = looking.readFile;
@@ -1014,7 +1018,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 20;
+  observed += 21;
   // A name the scan can read is one thing, a name computed at run time
   // another. process["arg" + "v"] reaches the argument vector and spells
   // neither half of it, so every form this scan cannot read is refused.

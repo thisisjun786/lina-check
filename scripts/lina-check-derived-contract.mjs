@@ -824,6 +824,16 @@ const OBSERVATION_SIGNAL = Object.freeze([
 ]);
 
 /**
+ * Everything the test runner puts in the environment, by prefix.
+ *
+ * NODE_TEST_CONTEXT was listed by name and NODE_TEST_WORKER_ID was not, which
+ * is the shape of mistake this file has made repeatedly. Node owns this
+ * namespace and can add to it; the prefix covers what it adds. A derived test
+ * reads fixtures it wrote, not the runner's bookkeeping.
+ */
+const RUNNER_ENVIRONMENT = /\bNODE_TEST_[A-Z0-9_]+\b/;
+
+/**
  * Reaching the process object under a name this scan cannot read.
  *
  * The token list above asks whether a name appears in the source, and that
@@ -1776,6 +1786,12 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
             "derived-test-observation-signal",
             (member === path ? path : path + " -> " + member) + " -> " + token,
           );
+      const runnerName = RUNNER_ENVIRONMENT.exec(source);
+      if (runnerName)
+        fail(
+          "derived-test-observation-signal",
+          (member === path ? path : path + " -> " + member) + " -> " + runnerName[0],
+        );
       const unreadable = observationAccessFault(source);
       if (unreadable !== null)
         fail(
