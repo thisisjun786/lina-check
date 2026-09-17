@@ -11,17 +11,25 @@
  * accompanying self-test can assert that each rejection path really rejects.
  */
 
+import { createHash } from "node:crypto";
+
 export const TRIPWIRE_ENV = "LINA_CHECK_SPAWN_TRIPWIRE";
 export const PLAN_UNIT = "devlog/_plan/260917_jun135_part_a";
 export const PLAN_UNIT_JUN198 = "devlog/_plan/260917_jun198_install_profile";
 export const PLAN_UNIT_JUN203 = "devlog/_plan/260917_jun203_safe_test_lane";
+export const PLAN_UNIT_JUN223 = "devlog/_plan/260917_jun223_lost_coverage";
 
 /**
  * Plan units whose documents may be declared as derived files. Listing them here
  * rather than widening the pattern to all of devlog/_plan keeps a new directory
  * name from silently becoming an accepted location.
  */
-export const PLAN_UNITS = Object.freeze([PLAN_UNIT, PLAN_UNIT_JUN198, PLAN_UNIT_JUN203]);
+export const PLAN_UNITS = Object.freeze([
+  PLAN_UNIT,
+  PLAN_UNIT_JUN198,
+  PLAN_UNIT_JUN203,
+  PLAN_UNIT_JUN223,
+]);
 
 export const DERIVED_SCRIPT_NAMES = Object.freeze([
   "lina:boundary-probe",
@@ -623,7 +631,139 @@ export function reapLaunchGroup(outcome, kill, platform = process.platform) {
  * .github/workflows/hosted-target-admission.yml, and every workflow here is
  * parked, so that file does not exist.
  */
-export const DERIVED_TESTS = Object.freeze(["test/lina-check-admission.test.ts"]);
+export const DERIVED_TESTS = Object.freeze([
+  "test/lina-check-action-ledger.test.ts",
+  "test/lina-check-actions-runtime.test.ts",
+  "test/lina-check-admission.test.ts",
+  "test/lina-check-close-policy.test.ts",
+  "test/lina-check-failure-telemetry.test.ts",
+  "test/lina-check-github-api.test.ts",
+  "test/lina-check-hosted-admission.test.ts",
+  "test/lina-check-node-test-runner.test.ts",
+  "test/lina-check-response-deadlines.test.ts",
+  "test/lina-check-scheduled-review.test.ts",
+  "test/lina-check-webhook-admission.test.ts",
+]);
+
+/**
+ * The modules outside test/ that each derived test may reach, by digest.
+ *
+ * The closure scan follows imports inside the test tree and reads what it
+ * finds. It cannot do that outside: product modules legitimately carry the
+ * process-starting surface, and one derived test imports the lane runner on
+ * purpose, because that runner's behaviour is the coverage being recovered.
+ * Dropping those edges quietly was the gap - a derived test could reach any
+ * product module at all and nothing recorded it.
+ *
+ * So the edge is declared instead of followed, and the declaration is a
+ * ceiling: an external import fails until its digest is written here, where
+ * it is reviewed.
+ *
+ * Digests rather than paths, because several of these modules are blocked
+ * upstream entrypoints and a derived script may not spell one. That rule is
+ * not worked around here: a digest cannot be handed to a loader, so this file
+ * still cannot reach any of them. The refusal prints the path it read, and
+ * 030_detectors.md carries the list in plain text.
+ *
+ * The check is one-directional on purpose. The self-test's positive controls
+ * replace a declared test's source with two lines, and requiring equality
+ * would fail every one of them for the imports that substitution removed.
+ */
+export const DERIVED_TEST_EXTERNAL_IMPORTS = Object.freeze({
+  "test/lina-check-action-ledger.test.ts": Object.freeze([
+    // action-ledger.js
+    "66c3255a3ba2903ab7954d357677550764d781ad9e005d750e48105d2a5703c1",
+    // clawsweeper-apply-lease-guards.js
+    "958c27ceac4444b619e6119357512b7dbb17ef53b33ada9bcd715f7ed84c8185",
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // github-retry.js
+    "03c185b4e47a2dc0acf3e50a1b4f9dad332b3b8ca973808328c120a9ce9dfee2",
+  ]),
+  "test/lina-check-actions-runtime.test.ts": Object.freeze([
+  ]),
+  "test/lina-check-admission.test.ts": Object.freeze([
+    // hosted-target-admission.js
+    "4b655a11a0f8fb81b2692c9f105ae829e1167625476eb11a4a6150d580591435",
+    // lina-check-installation-contract.js
+    "0dc6a2db497908af56111e6a14bde552d4e51406b54952941706a8e59f8e7dd9",
+    // lina-check-installation.js
+    "7fef8c67b1e73da21b431884aa5cb45e6e1301d146be825e098fd5973d314e58",
+    // comment-webhook.js
+    "7c740526e6ea952ff5bcf2aea2e695c5bdb52ddb26bac9b0e0cab5d14bb4fb2b",
+    // target-fanout.js
+    "f36196b1ac2d92d6177436ab1687f94778287a11416c7c83e410caa7f27d304c",
+  ]),
+  "test/lina-check-close-policy.test.ts": Object.freeze([
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // commit-sweeper.js
+    "105c7300c3163d2782ee8ef796c7e8433329c342b596c0e15576397e71f61db5",
+    // review-activity-cursor.js
+    "ddebf60605ee872990d0e3b9c7245467aa071675d0663705813e32b2c0f9b64d",
+  ]),
+  "test/lina-check-failure-telemetry.test.ts": Object.freeze([
+    // exact-review-direct-publication.ts
+    "c2b20dbf7d247f07f921795056a221013e12854694a6f3fcc256397359b7e647",
+    // exact-review-failure-telemetry.ts
+    "5a144f36afb5c8fafad1211df581fd3ef749460680f01796c5757861b9008786",
+    // exact-review-lifecycle-telemetry.ts
+    "b83f0a5082e0396088193fe7192c70a91760eb6e53a81e4f4c7c4d4e5f82ce86",
+    // exact-review-lifecycle.ts
+    "8419ea22913c7c66c388734da53a0f3fb1c5c4587373ae8914ebe49ad42f3111",
+    // exact-review-publication-batches.ts
+    "0493adb6ffb44ce62a836a1f02ea8a5ccc5396a153d98926b9cce503c9050b91",
+    // exact-review-queue.ts
+    "e5bdadd917f0a8ef9fe68b215dc829fec8c05efa7caa22175cb99b20e5e32865",
+    // live-activity.ts
+    "abc4bd9921834831ef4171ca8717cb5abce0693264dbfa5a14e58494d259e3c1",
+    // worker.ts
+    "0fd97372e43f15e9566104704eedb826e81459de4ada426dcb30816955009cb9",
+    // canonical-record-baseline.js
+    "e02180896a7717c59deabfb3674d12bea48a4eb2e5a66d8946e1c3db5506205b",
+    // publish-main.js
+    "229bfdd401c511fd80f0830cc30f05a2006005de8940c79f7e1d2651ae2c7312",
+  ]),
+  "test/lina-check-github-api.test.ts": Object.freeze([
+    // github-api.ts
+    "b139b8c8ca26956af5fc06004c3591715abae88634282d879a8a97ff19a0f396",
+  ]),
+  "test/lina-check-hosted-admission.test.ts": Object.freeze([
+    // hosted-target-admission.ts
+    "7aaad37da1be2aa308ca4805c9c5c9f6d59a3b5fbb64818a4ed22e3aafc450c6",
+    // lina-check-installation-contract.ts
+    "80f2e2103bc3c74628282b4863103fc4fd83706730ac19f4853f1e51a0b0693e",
+  ]),
+  "test/lina-check-node-test-runner.test.ts": Object.freeze([
+    // run-node-tests.mjs
+    "cf80f818b2664e049804d1cd031cb6828392fc33e66b3670b3615775647a60cb",
+  ]),
+  "test/lina-check-response-deadlines.test.ts": Object.freeze([
+    // exact-review-queue.ts
+    "e5bdadd917f0a8ef9fe68b215dc829fec8c05efa7caa22175cb99b20e5e32865",
+    // github-api.ts
+    "b139b8c8ca26956af5fc06004c3591715abae88634282d879a8a97ff19a0f396",
+  ]),
+  "test/lina-check-scheduled-review.test.ts": Object.freeze([
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // classify-scheduled-review-noop.ts
+    "0818365ad1bf903015a2e332abb61551292750fd65528782357c42880cc986b2",
+  ]),
+  "test/lina-check-webhook-admission.test.ts": Object.freeze([
+    // lina-check-installation.js
+    "7fef8c67b1e73da21b431884aa5cb45e6e1301d146be825e098fd5973d314e58",
+    // comment-webhook.js
+    "7c740526e6ea952ff5bcf2aea2e695c5bdb52ddb26bac9b0e0cab5d14bb4fb2b",
+    // repository-profiles.js
+    "1d069a37b325a42eb3578a09ca135f7811547847c3738152b0a10671dfbe2b31",
+  ]),
+});
+
+/** Stable name for one external module, so a ceiling can pin it. */
+export function externalImportDigest(path) {
+  return createHash("sha256").update(String(path)).digest("hex");
+}
 
 /**
  * A derived test may import a blocked entrypoint to inspect its behaviour, which
@@ -638,22 +778,1062 @@ const SPAWN_SURFACE = Object.freeze([
   "execFileSync",
   "execSync",
   "fork(",
+  // A worker thread has its own module state, so the runtime instrumentation in
+  // the observed process does not reach anything it starts. Denying the surface
+  // keeps the rule intact: a derived test starts nothing, and nothing it can
+  // reach starts anything outside what the observation can see.
+  "node:worker_threads",
+  "worker_threads",
+  "new Worker(",
+  // Mechanisms that resolve a module or run constructed code at run time. The
+  // entries above name modules, which a computed string can evade; these name
+  // the ways of getting one at all, so what the argument evaluates to stops
+  // mattering. A derived test has no use for any of them: it imports what it
+  // needs by name.
+  "getBuiltinModule",
+  "process.binding",
+  "eval(", // justified: a denial-list entry naming the surface, not a call
+  "new Function(",
 ]);
 
+/**
+ * Surfaces that tell a derived test how it was started.
+ *
+ * Chasing indistinguishability between the observed run and the lane is an arms
+ * race: two different invocations always differ somewhere. What can be settled
+ * is whether a derived test is allowed to look. Reading the argument vector is
+ * denied by name, so a load or a call cannot be made conditional on being
+ * watched. process.execPath is not on this list: it names the interpreter, not
+ * the invocation, and a restored runner case needs it.
+ */
+const OBSERVATION_SIGNAL = Object.freeze([
+  // Bare identifiers, because an exact substring check on process.argv is
+  // defeated by const { argv } = process or process["argv"]. Neither name has
+  // any other use in a test: a derived test reads fixtures it wrote, not the
+  // arguments its process was started with.
+  "argv",
+  "execArgv",
+  "NODE_OPTIONS",
+  "LINA_CHECK_LAUNCH_LOG",
+  "FORCE_COLOR",
+  "NO_COLOR",
+  // Set by node --test and absent when the observation imports the tests
+  // directly. Denying the read is the same choice as for the argument vector:
+  // parity between two invocations is unreachable, permission is decidable.
+  "NODE_TEST_CONTEXT",
+]);
+
+/**
+ * Everything the test runner puts in the environment, by prefix.
+ *
+ * NODE_TEST_CONTEXT was listed by name and NODE_TEST_WORKER_ID was not, which
+ * is the shape of mistake this file has made repeatedly. Node owns this
+ * namespace and can add to it; the prefix covers what it adds. A derived test
+ * reads fixtures it wrote, not the runner's bookkeeping.
+ */
+const RUNNER_ENVIRONMENT = /\bNODE_TEST_[A-Z0-9_]+\b/;
+
+/**
+ * Reaching the process object under a name this scan cannot read.
+ *
+ * The token list above asks whether a name appears in the source, and that
+ * question is only decidable while the name is written down. process["arg" +
+ * "v"] reaches the same property and spells neither half of it. Evaluating the
+ * key is not something a text scan can do, so the rule is the one this file
+ * already follows everywhere else: refuse the forms it cannot read, which
+ * leaves exactly the spellings the token list does read.
+ *
+ *   process.env.<name>      read, because the token list sees <name>
+ *   process.env["<name>"]   read: the literal sits in the scanned source
+ *   process.env[key] = v    allowed, and delete too: a write carries nothing
+ *                           back to the test about how it was started
+ *   process.execPath        allowed: the interpreter path, not the invocation
+ *   anything else           refused
+ *
+ * Bare process is refused because a binding to it moves every question above
+ * one name further along, where this scan no longer asks it. Bracket access on
+ * globalThis and global is refused for the same reason: it is the one form
+ * that can name the process object without writing its name.
+ *
+ * The boundary is stated rather than implied. This does not prove the absence
+ * of reflection over arbitrary objects; it does not have to. Nothing but the
+ * process object tells a module how its process was started, and the process
+ * object is now reachable only through spellings the token scan reads.
+ */
+const OBSERVATION_ROOT_MODULE = /(?:from|import|require)\s*\(?\s*["'](?:node:)?process["']/;
+const GLOBAL_ROOT = /\b(?:globalThis|global)\b/g;
+const PROCESS_ROOT = /\bprocess\b/g;
+
+/**
+ * The only properties of the process object a derived test may name.
+ *
+ * An allowlist, because a denial list was the wrong shape.
+ * process.report.getReport().header.commandLine names the invocation without
+ * spelling argv, and every further property of that kind would need its own
+ * entry. Turning it around ends the sequence: a derived test needs the
+ * environment it bands and the interpreter path a recovered runner case
+ * compares against, and nothing else on this object.
+ */
+const PROCESS_PROPERTY = Object.freeze(["env", "execPath"]);
+
+/**
+ * Named routes from any value back to dynamic code or to a property whose name
+ * is never written down.
+ *
+ * The allowlist above bounds the first property read off the process object. It
+ * does not bound what that value can do: every JavaScript value reaches the
+ * Function constructor through its prototype chain, so
+ * process.execPath.constructor.constructor builds code that returns the process
+ * object under a name this scan never sees. That route does not need process at
+ * all - [].constructor.constructor is the same thing - so it is closed here
+ * rather than in the process rule.
+ *
+ * A class body's constructor is a declaration, not a member access, and the
+ * worker harness defines several. Only the access forms are refused.
+ *
+ * Object.getPrototypeOf stays allowed: the harness uses it, and a prototype is
+ * inert without the constructor access this now refuses.
+ */
+const REFLECTIVE_ROUTE = Object.freeze([
+  [/\.\s*constructor\b/, "a member access named constructor", false],
+  [/\[\s*["'`]\s*constructor/, "constructor reached through a bracket", true],
+  [/\b__proto__\b/, "__proto__", false],
+  [/\bReflect\s*\./, "Reflect", false],
+  // Object.getOwnPropertyDescriptor(prototype, "con" + "structor").value is the
+  // constructor access spelled as a lookup, and the key is an argument rather
+  // than a member, so the rules above do not see it. The plural form is not on
+  // this list: it takes no key, the pinned worker harness uses it, and reaching
+  // a constructor from its result needs the computed read that is recorded as
+  // residue either way.
+  [/\bgetOwnPropertyDescriptor\b(?!s)/, "getOwnPropertyDescriptor", false],
+]);
+
+/**
+ * The globals that run constructed code, denied as names rather than as calls.
+ *
+ * The spawn-surface list names two call spellings. JavaScript has more:
+ * whitespace is permitted between a callee and its parenthesis, Function is
+ * callable without new, and either global can be held in a binding first. A
+ * scan keyed to a call shape is one space away from missing all of them, so the
+ * identifier is what is refused. No file in the closure names either one.
+ */
+const DYNAMIC_CODE_GLOBAL = /\b(?:eval|Function|AsyncFunction|GeneratorFunction)\b/;
+
+/**
+ * node:vm's evaluation surface, denied by name.
+ *
+ * Script and createContext are not on this list, and the omission is the point.
+ * test/dashboard-worker-harness.ts imports both from node:vm and re-exports
+ * them without ever evaluating anything; those bytes are upstream-pinned, so
+ * check:scaffold proves they have not changed. Every way to actually run a
+ * compiled script goes through one of the names below, and none of them appears
+ * anywhere in the closure. Denying the two names the harness needs would cost a
+ * recovered suite for nothing.
+ */
+const DYNAMIC_EVALUATION = /\b(?:runInThisContext|runInNewContext|runInContext|compileFunction|createScript|SourceTextModule|SyntheticModule)\b/;
+
+/**
+ * The bare specifiers a derived test's closure may name.
+ *
+ * Treating every unclassified builtin as safe was the last silent pass in this
+ * scan: node:vm compiles strings, node:repl and node:inspector evaluate them,
+ * and denying them one at a time repeats the sequence this file has already run
+ * three times. These are the thirteen the closure actually uses. A package or
+ * an unlisted builtin is refused, which also covers an absolute specifier,
+ * since neither resolves inside this repository.
+ */
+const PERMITTED_MODULE = Object.freeze([
+  "node:assert/strict",
+  "node:crypto",
+  "node:events",
+  "node:fs",
+  "node:module",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "node:test",
+  "node:timers/promises",
+  "node:util",
+  "node:vm",
+  "node:zlib",
+]);
+
+/**
+ * The only properties of import.meta a derived test may name.
+ *
+ * Same shape as the process rule, for the same reason. import.meta.main is true
+ * when the lane launches a file through node --test and false when the
+ * observation imports it, so it tells a test which run it is in without naming
+ * any denied signal. Listing what is allowed ends the sequence: createRequire
+ * needs the module URL, and nothing here needs anything else.
+ */
+const IMPORT_META_PROPERTY = Object.freeze(["url"]);
+const IMPORT_META = /import\s*\.\s*meta\s*(?:\.\s*([A-Za-z_$][\w$]*))?/g;
+
+/**
+ * An identifier written with a Unicode escape.
+ *
+ * JavaScript decodes \u escapes inside identifiers, so pro\u0063ess.arg\u0076
+ * is the argument vector and neither denied word appears in the text. Every
+ * rule in this file reads text, so the escape has to be settled before them.
+ *
+ * Refused rather than decoded. codeOnly has already blanked strings, comments
+ * and regular expressions, so a backslash-u surviving in that copy can only be
+ * an escaped identifier, and no file in the closure contains one. Decoding
+ * would move every offset this function computes for no gain.
+ */
+const ESCAPED_IDENTIFIER = /\\u/;
+
+/**
+ * The properties of an imported node:module binding this scan can read.
+ *
+ * A namespace or default import is tracked by the spelling binding.createRequire,
+ * so binding["create" + "Require"] reaches the same factory under a name the
+ * tracker never sees. Same answer as everywhere else in this file: list what is
+ * readable, refuse the rest.
+ */
+const MODULE_PROPERTY = Object.freeze(["createRequire", "syncBuiltinESMExports"]);
+
+/**
+ * Whether a member call names its method through an expression this scan cannot
+ * read, as in script["run" + "InThisContext"]().
+ *
+ * Narrower than refusing every computed member access, on purpose. Index reads
+ * such as rows[i] or scripts[name] are ordinary and appear across the closure,
+ * while a call through a constructed method name does not appear at all, and it
+ * is the form that turns a permitted object back into a denied verb.
+ */
+function computedMemberCall(code) {
+  for (let index = 0; index < code.length; index += 1) {
+    if (code[index] !== "[") continue;
+    const before = code.slice(0, index).replace(/\s+$/, "");
+    if (!/[A-Za-z0-9_$)\]]$/.test(before)) continue;
+    if (/\b(?:of|in|return|const|let|var|typeof|case|do|else|yield|await|new|delete|void|instanceof)$/.test(before))
+      continue;
+    const close = closingBracket(code, index);
+    if (close === -1) continue;
+    if (!/^\s*\(/.test(code.slice(close + 1))) continue;
+    if (literalKey(code.slice(index + 1, close).trim())) continue;
+    return code.slice(index, close + 1).trim();
+  }
+  return null;
+}
+
+/**
+ * A computed property key in a destructuring pattern, as in
+ * const { ["run" + "InThisContext"]: go } = script.
+ *
+ * The call rule above asks whether the bracket is followed by a parenthesis,
+ * which this form answers no to: the method is pulled out first and called
+ * through a plain name afterwards. The pattern is told from an object literal
+ * by the assignment that follows it, because a literal builds a value and a
+ * pattern reads one, and the worker harness builds { [item.key]: item }.
+ */
+function computedPatternKey(code) {
+  for (const key of code.matchAll(/\]\s*:/g)) {
+    let open = -1;
+    let depth = 0;
+    for (let index = key.index; index >= 0; index -= 1) {
+      if (code[index] === "]") depth += 1;
+      else if (code[index] === "[") {
+        depth -= 1;
+        if (depth === 0) {
+          open = index;
+          break;
+        }
+      }
+    }
+    if (open === -1) continue;
+    if (literalKey(code.slice(open + 1, key.index).trim())) continue;
+    let brace = -1;
+    let braces = 0;
+    for (let index = open; index >= 0; index -= 1) {
+      if (code[index] === "}") braces += 1;
+      else if (code[index] === "{") {
+        braces -= 1;
+        if (braces < 0) {
+          brace = index;
+          break;
+        }
+      }
+    }
+    if (brace === -1) continue;
+    let close = -1;
+    braces = 0;
+    for (let index = brace; index < code.length; index += 1) {
+      if (code[index] === "{") braces += 1;
+      else if (code[index] === "}") {
+        braces -= 1;
+        if (braces === 0) {
+          close = index;
+          break;
+        }
+      }
+    }
+    if (close === -1) continue;
+    if (/^\s*=[^=>]/.test(code.slice(close + 1))) return code.slice(open, key.index + 1).trim();
+  }
+  return null;
+}
+
+/**
+ * The call stack names the file that started the run.
+ *
+ * new Error().stack carries the observation's generated runner path and the
+ * lane's entry frames, which differ, so reading it is reading the invocation.
+ * Same answer as for the argument vector: permission to look is denied.
+ */
+const STACK_SURFACE = /\.\s*stack\b|\b(?:captureStackTrace|prepareStackTrace)\b/;
+
+/**
+ * The operating system's own view of how this process was started.
+ *
+ * /proc/self/cmdline carries the observation's generated runner path and the
+ * lane's test-runner arguments, so reading it is reading the invocation through
+ * a permitted module rather than a denied property. Matched with both slashes,
+ * because a regular expression beginning /process... opens with the same four
+ * letters and one derived test has one.
+ *
+ * This is the spelled form. A path assembled from fragments is the same
+ * residue as a computed key, and 030_detectors.md says so rather than implying
+ * otherwise.
+ */
+const OS_INVOCATION_PATH = /\/proc\//;
+
+/** Index of the bracket closing the one that opens at open, or -1. */
+function closingBracket(code, open) {
+  let depth = 0;
+  for (let index = open; index < code.length; index += 1) {
+    if (code[index] === "[") depth += 1;
+    else if (code[index] === "]") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Whether a bracket key is a single literal whose text the token scan reads.
+ *
+ * codeOnly blanks string contents and keeps the quotes, so a concatenation
+ * still carries inner quotes and fails this test, while one literal does not.
+ * A template counts only without substitution, for the same reason a dynamic
+ * import does.
+ */
+function literalKey(key) {
+  if (/^(["'])[^"']*\1$/.test(key)) return true;
+  return /^`[^`]*`$/.test(key) && !key.includes("${");
+}
+
+/**
+ * The first unreadable route to the invocation in this source, or null.
+ */
+export function observationAccessFault(rawSource) {
+  const source = withoutComments(rawSource);
+  if (OBSERVATION_ROOT_MODULE.test(source))
+    return "the process module is imported, which puts the process object behind a name this scan cannot read";
+  const code = codeOnly(source);
+  if (ESCAPED_IDENTIFIER.test(code))
+    return "an identifier written with a Unicode escape, which this scan reads as text";
+  // The bracket form carries its name inside a string, which codeOnly blanks,
+  // so that one rule reads the copy where string contents survive.
+  for (const [pattern, reason, needsLiterals] of REFLECTIVE_ROUTE)
+    if (pattern.test(needsLiterals ? source : code)) return reason;
+  const dynamicCode = DYNAMIC_CODE_GLOBAL.exec(code);
+  if (dynamicCode) return "the global " + dynamicCode[0] + " runs constructed code";
+  const evaluation = DYNAMIC_EVALUATION.exec(code);
+  if (evaluation) return evaluation[0] + " evaluates a string as code";
+  const computedCall = computedMemberCall(code);
+  if (computedCall !== null)
+    return "a member call through the constructed name " + computedCall;
+  const patternKey = computedPatternKey(code);
+  if (patternKey !== null) return "a destructured property through the constructed name " + patternKey;
+  const stackRead = STACK_SURFACE.exec(code);
+  if (stackRead) return "the call stack through " + stackRead[0].trim() + ", which names the file that started the run";
+  if (OS_INVOCATION_PATH.test(source))
+    return "a path under /proc, which is the operating system's record of how this process was started";
+  for (const match of code.matchAll(IMPORT_META)) {
+    if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
+    if (!IMPORT_META_PROPERTY.includes(match[1]))
+      return "import.meta." + match[1] + " is not one of the permitted properties";
+  }
+  for (const match of code.matchAll(GLOBAL_ROOT)) {
+    const rest = code.slice(match.index + match[0].length);
+    if (/^\s*\[/.test(rest)) return "computed member access on " + match[0];
+    if (/^\s*\./.test(rest)) continue;
+    // Anything but a property read puts the value itself in play, and a value
+    // can be bound, grouped, or handed to a callee that does the computed read
+    // where this rule no longer watches. The argument position used to be
+    // exempt for one spelling in one derived test; that test now saves and
+    // restores through globalThis.fetch like the others, so the exemption is
+    // gone and there is nothing left to tell apart from grouping.
+    return match[0] + " reached as a value rather than read through a property";
+  }
+  for (const match of code.matchAll(PROCESS_ROOT)) {
+    const start = match.index + match[0].length;
+    const rest = code.slice(start);
+    const property = /^\s*\.\s*([A-Za-z_$][\w$]*)/.exec(rest);
+    if (!property) return "process reached in a form this scan cannot read";
+    if (!PROCESS_PROPERTY.includes(property[1]))
+      return "process." + property[1] + " is not one of the permitted properties";
+    if (property[1] !== "env") continue;
+    const afterEnv = rest.slice(property[0].length);
+    // An environment variable name, not any member. process.env.valueOf()
+    // returns the whole object, which can then be enumerated against a name
+    // assembled from fragments, and every variable this repository reads is
+    // spelled in the usual upper-case form.
+    const variable = /^\s*\.\s*([A-Za-z_$][\w$]*)/.exec(afterEnv);
+    if (variable) {
+      if (/^[A-Z][A-Z0-9_]*$/.test(variable[1])) continue;
+      return "process.env." + variable[1] + " is a member of the environment object, not a variable in it";
+    }
+    const bracket = /^\s*\[/.exec(afterEnv);
+    if (!bracket) return "process.env reached in a form this scan cannot read";
+    const open = start + property[0].length + bracket[0].length - 1;
+    const close = closingBracket(code, open);
+    if (close === -1) return "process.env[ with no closing bracket";
+    if (literalKey(code.slice(open + 1, close).trim())) continue;
+    const before = code.slice(0, match.index).replace(/\s+$/, "");
+    const removed = /\bdelete$/.test(before);
+    const assigned = /^\s*=[^=>]/.test(code.slice(close + 1));
+    if (!removed && !assigned) return "computed read of process.env";
+  }
+  return null;
+}
+
+/**
+ * Resolve a relative import the way the loader would, without node:path, so the
+ * self-test can drive it on invented paths. A bare or absolute specifier returns
+ * null: those are packages and built output, not files this repository owns
+ * inside the test tree.
+ */
+export function resolveRelativeImport(fromPath, specifier) {
+  if (typeof specifier !== "string" || !specifier.startsWith(".")) return null;
+  const stack = [];
+  for (const part of [...fromPath.split("/").slice(0, -1), ...specifier.split("/")]) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (stack.length === 0) return null;
+      stack.pop();
+      continue;
+    }
+    stack.push(part);
+  }
+  return stack.join("/");
+}
+
+/**
+ * Every way a file in this repository can name another one statically.
+ *
+ * The first form covers import, dynamic import, and both re-export spellings,
+ * because export * from and export { x } from both carry the from keyword. The
+ * second covers CommonJS, including the require function obtained through
+ * createRequire, which the keyword form cannot see: the specifier there is an
+ * argument to the result of a call, not to a named keyword.
+ */
+// A no-substitution template literal is a valid specifier too, so the quote
+// class has to include it or import(`./helper.mjs`) is invisible.
+const IMPORT_SPECIFIER =
+  /(?:from|import|require)\s*\(?\s*(?:["']([^"']+)["']|`([^`$]+)`)/g;
+const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']/g;
+const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
+/** Node accepts both spellings, so a scan keyed to one of them is bypassable. */
+const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?module["']/g;
+/** import * as x from "node:module" puts the factory behind a member access. */
+const MODULE_NAMESPACE_IMPORT =
+  /import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s*from\s*["'](?:node:)?module["']/g;
+/** The default import reaches the same factory through the same member access. */
+const MODULE_DEFAULT_IMPORT =
+  /import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["'](?:node:)?module["']/g;
+/**
+ * The ambient CommonJS require is itself a loader that can be renamed:
+ * const load = require; load("./helper"). Following only require("./x") reads
+ * the alias as an ordinary assignment and the load disappears.
+ */
+const REQUIRE_ALIAS_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*(?![\s]*\()/g;
+const AMBIENT_REQUIRE_USE = /\brequire\b/g;
+/**
+ * A dynamic import whose argument is not a literal cannot be followed. The
+ * negative lookbehind keeps an ordinary method named import — loader.import(x) —
+ * out of the rule, which would otherwise refuse valid code.
+ */
+const DYNAMIC_IMPORT_CALL = /(?<![.\w$])import\s*\(/g;
+
+/**
+ * Source with comment and string contents blanked out, positions preserved.
+ *
+ * The ambient-require rule asks whether a mention is a call, and prose is full
+ * of the word: a comment reading "these tests require a configured
+ * installation" would otherwise be refused as an unfollowable loader. Only this
+ * rule uses it; the specifier scan needs string contents intact.
+ */
+
+/**
+ * Whether a slash at this point opens a regular expression rather than being
+ * division. Decided by the last significant character before it, which is the
+ * ordinary heuristic and enough for source this scan reads.
+ */
+function opensRegExp(before) {
+  const trimmed = before.replace(/\s+$/, "");
+  const previous = trimmed.slice(-1);
+  if (previous === "") return true;
+  // ++ and -- are postfix here, so the slash after them divides.
+  if (trimmed.endsWith("++") || trimmed.endsWith("--")) return false;
+  // A closing brace, parenthesis or bracket commonly precedes division, and
+  // claiming a pattern there erases the rest of the expression, which is how a
+  // loader call would disappear. Ambiguity resolves toward division.
+  return "(,=:!&|?;+*%~^<>".includes(previous);
+}
+export function codeOnly(source) {
+  let out = "";
+  let index = 0;
+  // One frame per nested construct, innermost last. An interpolation pushes a
+  // code frame, so a brace inside a string inside an interpolation is read as
+  // text rather than as the end of the interpolation. Counting raw braces was
+  // the bug: `${"}" + launch()}` ended the interpolation at the string's brace
+  // and blanked the call after it.
+  const stack = [{ kind: "code", braces: 0 }];
+  const top = () => stack[stack.length - 1];
+  while (index < source.length) {
+    const frame = top();
+    const character = source[index];
+    const two = source.slice(index, index + 2);
+    if (frame.kind === "string" || frame.kind === "template") {
+      if (character === "\\") {
+        out += "  ";
+        index += 2;
+        continue;
+      }
+      if (frame.kind === "template" && two === "${") {
+        out += "${";
+        stack.push({ kind: "code", braces: 0 });
+        index += 2;
+        continue;
+      }
+      if (character === frame.quote) {
+        stack.pop();
+        out += character;
+        index += 1;
+        continue;
+      }
+      out += character === "\n" ? "\n" : " ";
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      stack.push({ kind: "string", quote: character });
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (character === "`") {
+      stack.push({ kind: "template", quote: "`" });
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (two === "//") {
+      while (index < source.length && source[index] !== "\n") {
+        out += " ";
+        index += 1;
+      }
+      continue;
+    }
+    if (two === "/*") {
+      while (index < source.length && source.slice(index, index + 2) !== "*/") {
+        out += source[index] === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    // A regular expression is not code either: /require/ is a pattern, and
+    // reading it as a use of the loader refuses a harmless line. Whether a
+    // slash opens one is decided by what precedes it, the usual heuristic.
+    if (character === "/" && opensRegExp(out)) {
+      out += "/";
+      index += 1;
+      let escaped = false;
+      while (index < source.length) {
+        const inner = source[index];
+        if (escaped) escaped = false;
+        else if (inner === "\\") escaped = true;
+        else if (inner === "/") break;
+        else if (inner === "\n") break;
+        out += inner === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      if (source[index] === "/") {
+        out += "/";
+        index += 1;
+      }
+      continue;
+    }
+    if (character === "{") frame.braces += 1;
+    else if (character === "}") {
+      // The brace that closes an interpolation belongs to the template, not to
+      // the code inside it.
+      if (frame.braces > 0) frame.braces -= 1;
+      else if (stack.length > 1) stack.pop();
+    }
+    out += character;
+    index += 1;
+  }
+  return out;
+}
+/**
+ * Candidates CommonJS resolution would try for a specifier with no extension.
+ * Dropping such a specifier silently is how an extensionless helper escapes.
+ */
+const EXTENSION_CANDIDATES = Object.freeze([
+  ".js",
+  ".cjs",
+  ".mjs",
+  ".ts",
+  ".mts",
+  ".cts",
+  "/index.js",
+  "/index.cjs",
+  "/index.mjs",
+  "/index.ts",
+]);
+const escapeRegExp = (value) => value.replace(/[.*+?^=!:!{}()|[\]/\\$]/g, "\\$&");
+
+
+/**
+ * Source with comments blanked and string contents kept, positions preserved.
+ *
+ * The specifier scans need the literal intact, so they cannot use codeOnly;
+ * they still must not be defeated by a comment sitting between a keyword and
+ * its argument, which is valid and was invisible.
+ */
+export function withoutComments(source) {
+  let out = "";
+  let index = 0;
+  let quote = null;
+  while (index < source.length) {
+    const two = source.slice(index, index + 2);
+    const character = source[index];
+    if (quote) {
+      if (character === "\\") {
+        out += source.slice(index, index + 2);
+        index += 2;
+        continue;
+      }
+      if (character === quote) quote = null;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "\u0060") {
+      quote = character;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (two === "//") {
+      while (index < source.length && source[index] !== "\n") {
+        out += " ";
+        index += 1;
+      }
+      continue;
+    }
+    if (two === "/*") {
+      while (index < source.length && source.slice(index, index + 2) !== "*/") {
+        out += source[index] === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    out += character;
+    index += 1;
+  }
+  return out;
+}
+/** Index just past the parenthesis group that starts at open. */
+function afterGroup(source, open) {
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === "(") depth += 1;
+    else if (source[index] === ")") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Names that stand for createRequire in this file, import alias included.
+ *
+ * An alias is not cosmetic here: importing it under another name defeated every
+ * pattern keyed to the literal spelling, which is the same bypass one rename
+ * further along.
+ */
+export function createRequireNames(source) {
+  const names = new Set(["createRequire"]);
+  for (const statement of source.matchAll(MODULE_NAMED_IMPORT))
+    for (const specifier of statement[1].split(",")) {
+      const parts = specifier.trim().split(/\s+as\s+/);
+      if (parts[0].trim() === "createRequire") names.add((parts[1] ?? parts[0]).trim());
+    }
+  // A namespace import is the same factory under a member access, so the name
+  // this scan looks for is the whole dotted form.
+  for (const statement of source.matchAll(MODULE_NAMESPACE_IMPORT))
+    names.add(statement[1] + ".createRequire");
+  for (const statement of source.matchAll(MODULE_DEFAULT_IMPORT))
+    names.add(statement[1] + ".createRequire");
+  return names;
+}
+
+/**
+ * Every CommonJS specifier this file loads through createRequire, and every use
+ * of it this scan cannot follow.
+ *
+ * Three forms are followed: the immediate call, a loader held in a binding and
+ * called with a literal, and either of those reached through an import alias.
+ * Anything else — a loader handed to another function, called with a computed
+ * specifier, reassigned — is reported as unfollowable rather than counted as
+ * nothing found. A scan that cannot see a load must not read as a clean one.
+ */
+export function analyseRequireUse(rawSource) {
+  // Literals come from a copy with comments blanked and strings intact, so a
+  // comment between a loader and its argument cannot hide the call.
+  const source = withoutComments(rawSource);
+  const specifiers = [];
+  const unfollowable = [];
+  const loaders = new Set();
+  // Both scans read the same comment-free copy. Reading the binding from raw
+  // source while the use check read the blanked copy left a gap exactly the
+  // width of a comment: const load /* alias */ = require.
+  const code = codeOnly(source);
+  for (const binding of code.matchAll(REQUIRE_ALIAS_BINDING)) loaders.add(binding[1]);
+  // A namespace or default import of node:module is tracked further down by the
+  // spelling binding.createRequire. Every other use of that binding is settled
+  // here: a listed property, or unfollowable. Without this, binding["create" +
+  // "Require"] reaches the factory under a name the tracker never sees.
+  let outsideImports = code;
+  const moduleBindings = [];
+  for (const pattern of [MODULE_NAMESPACE_IMPORT, MODULE_DEFAULT_IMPORT])
+    for (const statement of source.matchAll(pattern)) {
+      moduleBindings.push(statement[1]);
+      outsideImports =
+        outsideImports.slice(0, statement.index) +
+        " ".repeat(statement[0].length) +
+        outsideImports.slice(statement.index + statement[0].length);
+    }
+  for (const binding of moduleBindings)
+    for (const use of outsideImports.matchAll(
+      new RegExp("\\b" + escapeRegExp(binding) + "\\b\\s*(?:\\.\\s*([A-Za-z_$][\\w$]*)|(\\[))?", "g"),
+    )) {
+      if (use[2] !== undefined) unfollowable.push(binding + "[ computed ]");
+      else if (use[1] === undefined) unfollowable.push(binding);
+      else if (!MODULE_PROPERTY.includes(use[1])) unfollowable.push(binding + "." + use[1]);
+    }
+  // A named import from node:module was read only for createRequire, so every
+  // other export of that module was implicitly permitted. register installs a
+  // loader hook that runs outside this isolate, where the observation's
+  // instrumentation does not reach, so the list decides here too.
+  for (const statement of source.matchAll(MODULE_NAMED_IMPORT))
+    for (const specifier of statement[1].split(",")) {
+      const imported = specifier.trim().split(/\s+as\s+/)[0].trim();
+      if (imported !== "" && !MODULE_PROPERTY.includes(imported))
+        unfollowable.push("node:module " + imported);
+    }
+  // Every other mention of the ambient require must be a call; handing the
+  // function itself to something else is a load this scan cannot follow.
+  for (const use of code.matchAll(AMBIENT_REQUIRE_USE)) {
+    const before = code.slice(Math.max(0, use.index - 60), use.index);
+    const rest = code.slice(use.index + "require".length);
+    if (/^\s*\(/.test(rest)) continue;
+    if (/(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*$/.test(before)) continue;
+    if (/import[^;]*\{[^}]*$/.test(before)) continue;
+    if (/\.\s*$/.test(before)) continue;
+    unfollowable.push("require");
+  }
+  const names = [...createRequireNames(source)];
+  // Longest first: a dotted name contains the bare one, and matching the bare
+  // one inside it would read a namespace call as an untracked use.
+  names.sort((left, right) => right.length - left.length);
+  const seenAt = new Set();
+  for (const name of names) {
+    const pattern = new RegExp("(?:\\b|\\.)?" + escapeRegExp(name) + "\\b", "g");
+    for (const use of code.matchAll(pattern)) {
+      const at = use.index + (use[0].length - name.length);
+      if (seenAt.has(at)) continue;
+      // A dotted name already covered this position; the bare name inside it is
+      // not a separate use.
+      if ([...seenAt].some((start) => at > start && at < start + 40 && source.slice(start, at).endsWith(".")))
+        continue;
+      seenAt.add(at);
+      const before = code.slice(Math.max(0, at - 120), at);
+      // The import specifier that brings the name in is not a use of it.
+      if (/import[^;]*\{[^}]*$/.test(before)) continue;
+      // A member access is only safe to skip when the object it hangs off is a
+      // name this scan already tracks, because that dotted form was matched on
+      // its own pass. Any other object is a loader this scan cannot follow, and
+      // skipping it silently is the bypass this rule exists to prevent.
+      if (!name.includes(".")) {
+        const member = /([A-Za-z_$][\w$]*)\s*\.\s*$/.exec(before);
+        if (member) {
+          if (names.includes(member[1] + "." + name)) continue;
+          unfollowable.push(member[1] + "." + name);
+          continue;
+        }
+      }
+      const rest = code.slice(at + name.length);
+      if (!/^\s*\(/.test(rest)) {
+        unfollowable.push(name);
+        continue;
+      }
+      const open = at + name.length + rest.indexOf("(");
+      const close = afterGroup(code, open);
+      if (close === -1) {
+        unfollowable.push(name);
+        continue;
+      }
+      const after = source.slice(close);
+      const immediate = /^\s*\(\s*(["'])([^"']*)\1/.exec(after);
+      if (immediate) {
+        specifiers.push(immediate[2]);
+        continue;
+      }
+      if (/^\s*\(/.test(after)) {
+        // Called, but with something this scan cannot read as a specifier.
+        unfollowable.push(name);
+        continue;
+      }
+      const declared = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*$/.exec(before);
+      if (!declared) {
+        unfollowable.push(name);
+        continue;
+      }
+      loaders.add(declared[1]);
+    }
+  }
+  for (const loader of loaders) {
+    const pattern = new RegExp("\\b" + escapeRegExp(loader) + "\\b", "g");
+    for (const use of code.matchAll(pattern)) {
+      const before = code.slice(Math.max(0, use.index - 60), use.index);
+      if (/(?:const|let|var)\s+$/.test(before)) continue;
+      // Shape is read from the comment-free copy; the specifier itself has to
+      // come from the original, because that copy blanks string contents.
+      const shape = code.slice(use.index + loader.length);
+      const rest = source.slice(use.index + loader.length);
+      const call = /^\s*\(\s*(["'])[^"']*\1\s*\)/.test(shape);
+      const literal = call ? /^\s*\(\s*(["'])([^"']*)\1\s*\)/.exec(rest) : null;
+      if (literal) {
+        specifiers.push(literal[2]);
+        continue;
+      }
+      unfollowable.push(loader);
+    }
+  }
+  return { specifiers, unfollowable };
+}
+
+/**
+ * Every file inside the test tree a derived test can reach, entry included.
+ *
+ * The token scan used to read the declared file and stop there, which is exactly
+ * one level short of the thing it was written to prevent: test/helpers holds a
+ * module that starts a process from inside a helper, so a declared test could
+ * import it and still show a clean body. Imports that leave the test tree are not
+ * followed, because product modules legitimately carry that surface and are
+ * covered instead by the runtime observation the self-test performs.
+ */
+function walkDerivedTest(entry, readFile) {
+  const seen = new Set([entry]);
+  const queue = [entry];
+  const visited = [];
+  const external = new Set();
+  const bare = new Set();
+  while (queue.length > 0) {
+    const path = queue.shift();
+    visited.push(path);
+    let source;
+    try {
+      source = String(readFile(path));
+    } catch (error) {
+      // A declared test naming a file that cannot be read is a contract fault,
+      // not a reason to scan less. Skipping it would be the quiet failure this
+      // closure exists to prevent.
+      fail("derived-test-unreadable", path + ": " + (error?.message ?? String(error)));
+    }
+    // Comments are blanked for the specifier scan too: an import with a
+    // comment between the keyword and its argument is valid and was invisible.
+    const scannable = withoutComments(source);
+    for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
+      for (const match of scannable.matchAll(pattern)) {
+        // A template literal carries its specifier in the second group.
+        follow(path, match[1] ?? match[2], readFile, seen, queue, external, bare);
+      }
+    }
+    const required = analyseRequireUse(source);
+    if (required.unfollowable.length > 0)
+      fail(
+        "derived-test-unresolvable-require",
+        path + ": " + [...new Set(required.unfollowable)].join(", ") + " used in an unfollowable form",
+      );
+    // A computed dynamic import is the last way to name a module without
+    // naming it. Refusing it keeps the rule the rest of this scan follows: a
+    // load is either followed or refused, never silently skipped. It also
+    // removes the value of any signal that tells a test it is being observed,
+    // because a conditional load now has to use a specifier this scan reads.
+    for (const call of codeOnly(source).matchAll(DYNAMIC_IMPORT_CALL)) {
+      const rest = codeOnly(source).slice(call.index + call[0].length);
+      // A quoted specifier is a literal. A template one only counts when it
+      // carries no substitution: import(\u0060./helpers/\u0024{name}.mjs\u0060) names a module
+      // this scan cannot resolve, and the backtick alone made it look literal.
+      if (/^\s*["']/.test(rest)) continue;
+      const template = /^\s*\u0060([^\u0060]*)\u0060/.exec(rest);
+      if (template && !template[1].includes("\u0024{")) continue;
+      fail(
+        "derived-test-unresolvable-import",
+        path + ": dynamic import with a specifier this scan cannot resolve",
+      );
+    }
+    for (const specifier of required.specifiers)
+      follow(path, specifier, readFile, seen, queue, external, bare);
+  }
+  return { visited, external: [...external].sort(), bare: [...bare].sort() };
+}
+
+/** Every file inside the test tree a derived test can reach, entry first. */
+export function derivedTestClosure(entry, readFile) {
+  return walkDerivedTest(entry, readFile).visited;
+}
+
+/** Every module outside the test tree that closure names, sorted. */
+export function derivedTestExternalImports(entry, readFile) {
+  return walkDerivedTest(entry, readFile).external;
+}
+
+
+/**
+ * A URL suffix is not part of the file name. Node resolves
+ * ./helper.mjs?cachebust to ./helper.mjs, so an end-anchored extension test on
+ * the raw specifier drops the very import it is meant to follow.
+ */
+export function specifierPath(specifier) {
+  return String(specifier).split("?")[0].split("#")[0];
+}
+
+/** Whether readFile can produce this path's source at all. */
+function readable(path, readFile) {
+  try {
+    readFile(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Queue one specifier, or refuse it.
+ *
+ * Three outcomes, and the third is the one that matters: a specifier this scan
+ * cannot resolve to a readable module is refused rather than dropped, because a
+ * dropped edge cannot be told apart from a clean one.
+ */
+function follow(from, specifier, readFile, seen, queue, external, bare) {
+  const resolved = resolveRelativeImport(from, specifierPath(specifier));
+  // A bare or absolute specifier names something outside this repository. It is
+  // collected rather than dropped: the permitted list decides it after the
+  // token scans have had their say, so a denied surface still reports itself.
+  if (resolved === null) {
+    bare.add(specifierPath(specifier));
+    return;
+  }
+  // Outside the test tree the scan stops reading and starts declaring: product
+  // modules carry the spawn surface by design, so the edge is recorded for the
+  // declaration check rather than dropped.
+  if (!resolved.startsWith("test/")) {
+    external.add(resolved);
+    return;
+  }
+  if (seen.has(resolved)) return;
+  if (FOLLOWABLE.test(resolved)) {
+    seen.add(resolved);
+    queue.push(resolved);
+    return;
+  }
+  // Some other extension is data, not a module that could start anything.
+  if (/\.[A-Za-z0-9]+$/.test(resolved)) return;
+  // No extension: CommonJS resolution would try several. Follow the first that
+  // reads, and refuse when none do.
+  for (const candidate of EXTENSION_CANDIDATES) {
+    const target = resolved + candidate;
+    if (seen.has(target)) return;
+    if (readable(target, readFile)) {
+      seen.add(target);
+      queue.push(target);
+      return;
+    }
+  }
+  fail(
+    "derived-test-unresolvable-require",
+    from + ": no readable module for the extensionless specifier " + specifier,
+  );
+}
 export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
   const names = Object.keys(declared ?? {}).sort();
   if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));
+  // The ceiling and the set it applies to are two literals in this file, so a
+  // derived test added to one and not the other would otherwise be unbounded.
+  if (!sameList(Object.keys(DERIVED_TEST_EXTERNAL_IMPORTS).sort(), [...DERIVED_TESTS]))
+    fail("derived-test-undeclared-import", "the external-import ceiling does not cover DERIVED_TESTS");
+  let scanned = 0;
   for (const path of names) {
     if (!nonEmptyReason(declared[path])) fail("derived-test-reason", path);
     if (baselinePaths.has(path)) fail("derived-test-upstream-collision", path);
     if (!presentPaths.has(path)) fail("derived-test-missing", path);
     if (SAFE_TESTS.includes(path) || EXCLUDED_TESTS.includes(path))
       fail("derived-test-upstream-collision", path);
-    const source = readFile(path);
-    for (const token of SPAWN_SURFACE)
-      if (source.includes(token)) fail("derived-test-spawns", path + " -> " + token);
+    const walk = walkDerivedTest(path, readFile);
+    for (const member of walk.visited) {
+      const source = String(readFile(member));
+      scanned += 1;
+      for (const token of SPAWN_SURFACE)
+        if (source.includes(token))
+          fail(
+            "derived-test-spawns",
+            (member === path ? path : path + " -> " + member) + " -> " + token,
+          );
+      for (const token of OBSERVATION_SIGNAL)
+        if (new RegExp("\\b" + token + "\\b").test(source))
+          fail(
+            "derived-test-observation-signal",
+            (member === path ? path : path + " -> " + member) + " -> " + token,
+          );
+      const runnerName = RUNNER_ENVIRONMENT.exec(source);
+      if (runnerName)
+        fail(
+          "derived-test-observation-signal",
+          (member === path ? path : path + " -> " + member) + " -> " + runnerName[0],
+        );
+      const unreadable = observationAccessFault(source);
+      if (unreadable !== null)
+        fail(
+          "derived-test-computed-observation",
+          (member === path ? path : path + " -> " + member) + " -> " + unreadable,
+        );
+    }
+    // Checked after the token scans so that a closure carrying both a denied
+    // surface and an undeclared edge is reported by the surface, which is the
+    // stronger statement about what the file can do.
+    for (const target of walk.external)
+      if (!DERIVED_TEST_EXTERNAL_IMPORTS[path].includes(externalImportDigest(target)))
+        fail("derived-test-undeclared-import", path + " -> " + target);
+    for (const specifier of walk.bare)
+      if (!PERMITTED_MODULE.includes(specifier))
+        fail("derived-test-unlisted-module", path + " -> " + specifier);
   }
-  return { tests: names.length };
+  return { tests: names.length, scanned };
 }
 
 export function assertFixtureTestContract(declared, baselinePaths) {
