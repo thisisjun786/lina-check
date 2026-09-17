@@ -1,0 +1,1703 @@
+{
+  "note": "One observation of the declared lane, driven through node:test so every file's result is visible. A historical observation, not an expected-output oracle; the gate of record is the lina:test-safe exit code in 030_delivery_gates.md.",
+  "pin": "1ed7bd4e13fb03334798e4d027ba3383ac9e5f01",
+  "concurrency": 8,
+  "rootBatch": {
+    "files": 184,
+    "failures": 0,
+    "elapsedMs": 131722
+  },
+  "fixtureBatches": {
+    "files": 23,
+    "failures": 0,
+    "elapsedMs": 3984
+  },
+  "totals": {
+    "pass": 2579,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0,
+    "files": 207
+  },
+  "files": {
+    "test/actions-checkout-v7.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 13,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/agent-input-scan-fixtures.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/apply-author-pr-budget-policy.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 14414,
+      "where": "repository-root"
+    },
+    "test/apply-close-policy-guards.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 8,
+      "where": "repository-root"
+    },
+    "test/apply-close-retry-policy.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3722,
+      "where": "repository-root"
+    },
+    "test/apply-cursor-trace.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1892,
+      "where": "repository-root"
+    },
+    "test/apply-guard-read-cache.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/apply-label-sync.test.ts": {
+      "pass": 63,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 131531,
+      "where": "repository-root"
+    },
+    "test/apply-live-state.test.ts": {
+      "pass": 34,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 22548,
+      "where": "repository-root"
+    },
+    "test/apply-managed-locale-pr.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 864,
+      "where": "repository-root"
+    },
+    "test/apply-obsolete-fix-pr-policy.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 9476,
+      "where": "repository-root"
+    },
+    "test/apply-pr-coverage-proof-close.test.ts": {
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 24579,
+      "where": "repository-root"
+    },
+    "test/apply-pr-coverage-proof-recheck.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 16404,
+      "where": "repository-root"
+    },
+    "test/apply-pr-duplicate-proof.test.ts": {
+      "pass": 16,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 25406,
+      "where": "repository-root"
+    },
+    "test/apply-pr-duplicate-ref-proof.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 17587,
+      "where": "repository-root"
+    },
+    "test/apply-pr-promotion.test.ts": {
+      "pass": 19,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 22582,
+      "where": "repository-root"
+    },
+    "test/apply-pr-supersession-promotion.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3214,
+      "where": "repository-root"
+    },
+    "test/apply-pr-supersession-safety.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 16045,
+      "where": "repository-root"
+    },
+    "test/apply-product-direction-policy.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1570,
+      "where": "repository-root"
+    },
+    "test/apply-same-author-pair-close.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6985,
+      "where": "repository-root"
+    },
+    "test/apply-stale-version-bug-policy.test.ts": {
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3511,
+      "where": "repository-root"
+    },
+    "test/apply-stalled-pr-policies.test.ts": {
+      "pass": 16,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 11107,
+      "where": "repository-root"
+    },
+    "test/apply-unsponsored-feature-policy.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4067,
+      "where": "repository-root"
+    },
+    "test/assist-artifact.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 134,
+      "where": "pinned-fixture",
+      "fixtureFiles": 57
+    },
+    "test/audit-health-roundtrip.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 9,
+      "where": "repository-root"
+    },
+    "test/automerge-metrics.test.ts": {
+      "pass": 31,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 140,
+      "where": "repository-root"
+    },
+    "test/automerge-workflow-scheduler.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/bay-inline-proof.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 61,
+      "where": "repository-root"
+    },
+    "test/bay-queue-disposition.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 10,
+      "where": "repository-root"
+    },
+    "test/bulk-filer-policy.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/canonical-state-readers.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 11,
+      "where": "pinned-fixture",
+      "fixtureFiles": 57
+    },
+    "test/check-dashboard-strict.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/check-docs.test.ts": {
+      "pass": 32,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 159,
+      "where": "repository-root"
+    },
+    "test/clawsweeper-command-dispatch.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/clawsweeper-record-metadata.test.ts": {
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "repository-root"
+    },
+    "test/clawsweeper-text.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/close-reasons.test.ts": {
+      "pass": 41,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 275,
+      "where": "repository-root"
+    },
+    "test/codex-app-server-output.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 458,
+      "where": "repository-root"
+    },
+    "test/codex-output-last-message.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/command-proof-review.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/compatibility-proof.test.ts": {
+      "pass": 56,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 486,
+      "where": "repository-root"
+    },
+    "test/context.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 16,
+      "where": "repository-root"
+    },
+    "test/dashboard-health.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/dashboard-operational-health.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/dashboard-public-observability.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 18,
+      "where": "repository-root"
+    },
+    "test/dashboard-review-proof-execution.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 24,
+      "where": "repository-root"
+    },
+    "test/dashboard-review-proof-producer-auth.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 40,
+      "where": "repository-root"
+    },
+    "test/dashboard-review-proof-zip.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 12,
+      "where": "repository-root"
+    },
+    "test/decision-parser.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 21,
+      "where": "repository-root"
+    },
+    "test/durable-storage.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/exact-review-health.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "repository-root"
+    },
+    "test/exact-review-lifecycle-bay.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2734,
+      "where": "repository-root"
+    },
+    "test/exact-review-publication-retry.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/exact-review-read-model-equivalence.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 78,
+      "where": "repository-root"
+    },
+    "test/exact-review-scheduled-capacity.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/fixed-sha-pull-resolution.test.ts": {
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 7,
+      "where": "repository-root"
+    },
+    "test/github-json.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/idea-archive-revival.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 22,
+      "where": "repository-root"
+    },
+    "test/label-mutation-batch.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 629,
+      "where": "repository-root"
+    },
+    "test/lina-check-admission.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/live-proof-report.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 118,
+      "where": "repository-root"
+    },
+    "test/live-read-generation.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/manual-publication-authority.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1476,
+      "where": "repository-root"
+    },
+    "test/manual-publication-policy.test.ts": {
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/openclaw-bay-proof-network.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/openclaw-file-role.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/oversized-pr-freshness.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "repository-root"
+    },
+    "test/pages-workflow.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 0,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/parked-command-finalization.test.ts": {
+      "pass": 32,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1531,
+      "where": "repository-root"
+    },
+    "test/pr-admission-input.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/pr-close-coverage-proof.test.ts": {
+      "pass": 28,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 114,
+      "where": "repository-root"
+    },
+    "test/pr-comment-activity-revision.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/pr-hydration-snapshot.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 15,
+      "where": "repository-root"
+    },
+    "test/pr-label-policy.test.ts": {
+      "pass": 49,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 24,
+      "where": "repository-root"
+    },
+    "test/pr-proof-automation.test.ts": {
+      "pass": 43,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 785,
+      "where": "repository-root"
+    },
+    "test/pr-review-comment-risk.test.ts": {
+      "pass": 26,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 278,
+      "where": "repository-root"
+    },
+    "test/pr-review-labels.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 296,
+      "where": "repository-root"
+    },
+    "test/pr-surface-policy.test.ts": {
+      "pass": 201,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 19751,
+      "where": "repository-root"
+    },
+    "test/pr-surface-stats.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/primary-body.test.ts": {
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 28,
+      "where": "repository-root"
+    },
+    "test/queue-pressure.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 26,
+      "where": "repository-root"
+    },
+    "test/recent-durable-publication-events.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/related-context.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/action-session.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 109,
+      "where": "repository-root"
+    },
+    "test/repair/adaptive-review-budget.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/automerge-e2e-container.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/automerge-e2e-workflow.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/automerge-outcome.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/automerge-shepherd.test.ts": {
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/repair/automerge-status-timeline.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/automerge-telemetry-workflow.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/closed-publication-retirement.test.ts": {
+      "pass": 32,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 53,
+      "where": "repository-root"
+    },
+    "test/repair/codex-transient.test.ts": {
+      "pass": 17,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "repository-root"
+    },
+    "test/repair/collect-codex-debug.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 7,
+      "where": "repository-root"
+    },
+    "test/repair/command-ack-convergence.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "repository-root"
+    },
+    "test/repair/command-action-ledger.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 947,
+      "where": "repository-root"
+    },
+    "test/repair/command-ops-action-ledger.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "pinned-fixture",
+      "fixtureFiles": 58
+    },
+    "test/repair/command-proof-batch.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 460,
+      "where": "repository-root"
+    },
+    "test/repair/command-proof-profiles.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "repository-root"
+    },
+    "test/repair/comment-router-config.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 31,
+      "where": "repository-root"
+    },
+    "test/repair/comment-router-core.test.ts": {
+      "pass": 133,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 34,
+      "where": "pinned-fixture",
+      "fixtureFiles": 59
+    },
+    "test/repair/comment-router-ledger-merge.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 548,
+      "where": "repository-root"
+    },
+    "test/repair/comment-router-read-model.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/comment-router-utils.test.ts": {
+      "pass": 52,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 60,
+      "where": "repository-root"
+    },
+    "test/repair/comment-webhook-body.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 9,
+      "where": "repository-root"
+    },
+    "test/repair/conflict-self-heal-core.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/contained-command-sandbox.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/containment-preflight.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/detached-cleanup.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/deterministic-automerge-result.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/direct-re-review-admission.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/endor-autofix-intake.test.ts": {
+      "pass": 22,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 7,
+      "where": "repository-root"
+    },
+    "test/repair/error-fingerprint.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/event-apply-proof.test.ts": {
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/event-record-store.test.ts": {
+      "pass": 20,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 41,
+      "where": "repository-root"
+    },
+    "test/repair/exact-review-batch-publisher.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 16,
+      "where": "repository-root"
+    },
+    "test/repair/exact-review-batch-queue-client.test.ts": {
+      "pass": 45,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 29,
+      "where": "repository-root"
+    },
+    "test/repair/exact-review-command-queue.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 352,
+      "where": "repository-root"
+    },
+    "test/repair/execute-fix-github.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/execute-fix-policy.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/execute-fix-validation.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/execute-fix-worker-errors.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/external-messages.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "repository-root"
+    },
+    "test/repair/fanout-hydration-routing.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 36,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/fix-edit-policy.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/focused-state-hydration.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 26,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/gitcrawl-cluster-history.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/gitcrawl-store.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "pinned-fixture",
+      "fixtureFiles": 64
+    },
+    "test/repair/glob-files.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/repair/issue-implementation-status.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 64,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/issue-source-guard.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/issue-worker-recovery.test.ts": {
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 26,
+      "where": "repository-root"
+    },
+    "test/repair/job-intent.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/live-worker-capacity.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 14,
+      "where": "repository-root"
+    },
+    "test/repair/mechanical-rebase-conflicts.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/notify-events.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5031,
+      "where": "repository-root"
+    },
+    "test/repair/notify-github-activity.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5022,
+      "where": "repository-root"
+    },
+    "test/repair/notify-maintainer-report.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 25,
+      "where": "repository-root"
+    },
+    "test/repair/notify-merge.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 16,
+      "where": "repository-root"
+    },
+    "test/repair/pr-title.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/publish-github-info.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/publish-main.test.ts": {
+      "pass": 15,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 27,
+      "where": "repository-root"
+    },
+    "test/repair/publish-markdown.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/record-tuple.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/repair-branch-push-errors.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/repair-containment-smoke-workflow.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/repair-merge-message.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/replacement-branch-head.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 835,
+      "where": "repository-root"
+    },
+    "test/repair/replacement-labels.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/requeue-job-key.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/resolve-result-targets.test.ts": {
+      "pass": 11,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repair/review-dispatch-coordination.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/security-boundary.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/source-pr-checkout.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/spam-comment-intake.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 13,
+      "where": "repository-root"
+    },
+    "test/repair/spam-scanner-core.test.ts": {
+      "pass": 13,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/state-append-client.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 19,
+      "where": "repository-root"
+    },
+    "test/repair/state-delta-paths.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/state-repo-guardrails.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 15,
+      "where": "repository-root"
+    },
+    "test/repair/state-writer-coordinator.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 4,
+      "where": "repository-root"
+    },
+    "test/repair/state-writer-telemetry-recorder.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/status-check-rollup.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repair/sweep-status-merge.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/tag-clawsweeper-targets.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "pinned-fixture",
+      "fixtureFiles": 57
+    },
+    "test/repair/telegram-proof-evidence.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "repository-root"
+    },
+    "test/repair/telegram-qa-evidence.test.ts": {
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 15,
+      "where": "repository-root"
+    },
+    "test/repair/terminal-command-status-fence.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 18,
+      "where": "repository-root"
+    },
+    "test/repair/text-utils.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/update-review-status.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/repair/url-safety.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "repository-root"
+    },
+    "test/repair/validate-all.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "repository-root"
+    },
+    "test/repair/validation-command-utils.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 7,
+      "where": "repository-root"
+    },
+    "test/repair/workflow-sparse-checkout.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 185,
+      "where": "pinned-fixture",
+      "fixtureFiles": 59
+    },
+    "test/report-evidence-neutralization.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/report-metadata-audit.test.ts": {
+      "pass": 5,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 6,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/repository-managed-pr-policy.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/repository-profiles.test.ts": {
+      "pass": 18,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3,
+      "where": "pinned-fixture",
+      "fixtureFiles": 2
+    },
+    "test/review-activity-cursor.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/review-checkout-access.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/review-comment-markers.test.ts": {
+      "pass": 4,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/review-comment-noise.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/review-comment-noop.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/review-comment-publication.test.ts": {
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 12,
+      "where": "repository-root"
+    },
+    "test/review-comment-rendering.test.ts": {
+      "pass": 55,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 769,
+      "where": "pinned-fixture",
+      "fixtureFiles": 65
+    },
+    "test/review-content-cache.test.ts": {
+      "pass": 42,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 11,
+      "where": "repository-root"
+    },
+    "test/review-coverage-manifest.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/review-history.test.ts": {
+      "pass": 32,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 124,
+      "where": "repository-root"
+    },
+    "test/review-observability.test.ts": {
+      "pass": 7,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 2,
+      "where": "repository-root"
+    },
+    "test/review-placeholder-recovery.test.ts": {
+      "pass": 22,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 48,
+      "where": "repository-root"
+    },
+    "test/review-preparation.test.ts": {
+      "pass": 9,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 131,
+      "where": "repository-root"
+    },
+    "test/review-prompt-context.test.ts": {
+      "pass": 31,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 105,
+      "where": "pinned-fixture",
+      "fixtureFiles": 58
+    },
+    "test/review-prompt-policy.test.ts": {
+      "pass": 78,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 646,
+      "where": "repository-root"
+    },
+    "test/review-proof-client.test.ts": {
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3027,
+      "where": "repository-root"
+    },
+    "test/review-recovery-label-backfill.test.ts": {
+      "pass": 16,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 22,
+      "where": "repository-root"
+    },
+    "test/review-reliability-workflow.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 38,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    },
+    "test/review-retry-fencing-proof.test.ts": {
+      "pass": 1,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 0,
+      "where": "repository-root"
+    },
+    "test/review-run-telemetry.test.ts": {
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 15,
+      "where": "repository-root"
+    },
+    "test/review-state-contract.test.ts": {
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 289,
+      "where": "repository-root"
+    },
+    "test/review-structural-cache.test.ts": {
+      "pass": 47,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 17,
+      "where": "repository-root"
+    },
+    "test/scheduler-policy.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 14,
+      "where": "repository-root"
+    },
+    "test/stable-json.test.ts": {
+      "pass": 6,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 5,
+      "where": "repository-root"
+    },
+    "test/state-writer-coordinator.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 85,
+      "where": "repository-root"
+    },
+    "test/state-writer-telemetry.test.ts": {
+      "pass": 3,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/state-writer-workflow.test.ts": {
+      "pass": 8,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 287,
+      "where": "pinned-fixture",
+      "fixtureFiles": 58
+    },
+    "test/sweep-status.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 1,
+      "where": "repository-root"
+    },
+    "test/worker-records-request.test.ts": {
+      "pass": 24,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 3786,
+      "where": "repository-root"
+    },
+    "test/workflow-runner-labels.test.ts": {
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 126,
+      "where": "pinned-fixture",
+      "fixtureFiles": 56
+    }
+  }
+}
