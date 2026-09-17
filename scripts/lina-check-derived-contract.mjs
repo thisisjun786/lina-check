@@ -1155,13 +1155,13 @@ export function observationAccessFault(rawSource) {
     const rest = code.slice(match.index + match[0].length);
     if (/^\s*\[/.test(rest)) return "computed member access on " + match[0];
     if (/^\s*\./.test(rest)) continue;
-    // Not a member access, so the value itself is in play. An argument is the
-    // one place this repository needs it - t.mock.method(globalThis, "fetch",
-    // ...) - and a binding is where a computed read would continue under a name
-    // this rule no longer watches.
-    const before = code.slice(0, match.index).replace(/\s+$/, "");
-    if (/[(,]$/.test(before)) continue;
-    return match[0] + " bound to a name rather than read through a property";
+    // Anything but a property read puts the value itself in play, and a value
+    // can be bound, grouped, or handed to a callee that does the computed read
+    // where this rule no longer watches. The argument position used to be
+    // exempt for one spelling in one derived test; that test now saves and
+    // restores through globalThis.fetch like the others, so the exemption is
+    // gone and there is nothing left to tell apart from grouping.
+    return match[0] + " reached as a value rather than read through a property";
   }
   for (const match of code.matchAll(PROCESS_ROOT)) {
     const start = match.index + match[0].length;
@@ -1172,7 +1172,15 @@ export function observationAccessFault(rawSource) {
       return "process." + property[1] + " is not one of the permitted properties";
     if (property[1] !== "env") continue;
     const afterEnv = rest.slice(property[0].length);
-    if (/^\s*\.\s*[A-Za-z_$]/.test(afterEnv)) continue;
+    // An environment variable name, not any member. process.env.valueOf()
+    // returns the whole object, which can then be enumerated against a name
+    // assembled from fragments, and every variable this repository reads is
+    // spelled in the usual upper-case form.
+    const variable = /^\s*\.\s*([A-Za-z_$][\w$]*)/.exec(afterEnv);
+    if (variable) {
+      if (/^[A-Z][A-Z0-9_]*$/.test(variable[1])) continue;
+      return "process.env." + variable[1] + " is a member of the environment object, not a variable in it";
+    }
     const bracket = /^\s*\[/.exec(afterEnv);
     if (!bracket) return "process.env reached in a form this scan cannot read";
     const open = start + property[0].length + bracket[0].length - 1;

@@ -33,6 +33,22 @@ const refusals = {
   app: () => githubAppJson("/fixture", "synthetic-token"),
 };
 
+/**
+ * Replace the global fetch for one test and put it back afterwards.
+ *
+ * t.mock.method(globalThis, ...) would do the same, but it hands the global
+ * object to a callee, and the derived-test contract reaches the root only
+ * through a property read. Saving and restoring through globalThis.fetch is
+ * the spelling the other derived suites already use.
+ */
+function stubFetch(t: { after: (cleanup: () => void) => void }, handler: unknown) {
+  const original = globalThis.fetch;
+  globalThis.fetch = handler as typeof globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+}
+
 for (const [name, refuse] of Object.entries(refusals)) {
   test(name + " refuses an unconfigured installation before any request", async (t) => {
     // The excluded suite hung exactly here, so settling is half the assertion.
@@ -40,7 +56,7 @@ for (const [name, refuse] of Object.entries(refusals)) {
     // refusal and rethrows it as "network failure", so the message alone cannot
     // tell a refusal apart from a request that went out and failed.
     let attempts = 0;
-    t.mock.method(globalThis, "fetch", async () => {
+    stubFetch(t, async () => {
       attempts += 1;
       throw new Error("an unconfigured installation must not reach the network");
     });
@@ -63,7 +79,7 @@ for (const [name, read] of Object.entries(readers)) {
         markStarted = resolve;
       });
       let bodyController!: ReadableStreamDefaultController;
-      t.mock.method(globalThis, "fetch", async (_input, init: RequestInit) => {
+      stubFetch(t, async (_input: unknown, init: RequestInit) => {
         const response = new Response(
           new ReadableStream({
             start(controller) {
@@ -103,7 +119,7 @@ for (const [name, read] of Object.entries(readers)) {
   }
 
   test(`${name} preserves JSON parse failures after a successful body read`, async (t) => {
-    t.mock.method(globalThis, "fetch", async () => new Response("not JSON"));
+    stubFetch(t, async () => new Response("not JSON"));
     await assert.rejects(read(), SyntaxError);
   });
 }

@@ -52,7 +52,7 @@
       "file": "test/lina-check-response-deadlines.test.ts",
       "mutation": "claim the refused path attempted a request",
       "fingerprint": "1e76ad3d4712df8c",
-      "suite_digest": "ff494b61590927ceab87006520a9a7e74071ea67e05566000fb0259b8d72cd29",
+      "suite_digest": "d5c51ffab4ff213a37668a6b9f306295cc848e56e8c7e7782f382d8e7448620d",
       "baseline_exit": 0,
       "mutated_exit": 1,
       "mutated_signal": null,

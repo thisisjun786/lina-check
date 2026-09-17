@@ -1018,7 +1018,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 23;
+  observed += 27;
   // A name the scan can read is one thing, a name computed at run time
   // another. process["arg" + "v"] reaches the argument vector and spells
   // neither half of it, so every form this scan cannot read is refused.
@@ -1034,6 +1034,14 @@ function runDerivedTestCases() {
     // computed read one name further along, where it was no longer watched.
     'const root = globalThis;\nconst proc = root["pro" + "cess"];\nconst args = proc["arg" + "v"];\nconst x = args;\n',
     "const { process: captured } = globalThis;\nconst x = captured;\n",
+    // Grouping and a comma expression both put the root in a value position,
+    // and so does handing it to a callee that does the computed read.
+    'const root = (globalThis);\nconst proc = root["pro" + "cess"];\nconst x = proc;\n',
+    "const root = (0, globalThis);\nconst x = root;\n",
+    "const args = read(globalThis);\nconst x = args;\n",
+    // process.env.valueOf() hands back the whole object, which can then be
+    // enumerated against a name assembled from fragments.
+    "const e = process.env.valueOf();\nconst x = e;\n",
     // A dotted property can name the invocation without spelling argv, which
     // is why the permitted properties are a list rather than the leftovers.
     "const how = process.report.getReport().header.commandLine;\n",
@@ -1100,7 +1108,8 @@ function runDerivedTestCases() {
       "  if (value === undefined) {\n    delete process.env[name];\n    return;\n  }\n" +
       "  process.env[name] = value;\n}\n",
     'const home = process.env["LINA_CHECK_HOME"];\nconst x = home;\n',
-    'mock.method(globalThis, "fetch", () => {});\n',
+    // The spelling every derived suite uses: a property read on the root.
+    "const original = globalThis.fetch;\nglobalThis.fetch = original;\n",
     "const command = [process.execPath];\nconst x = command;\n",
     // A class body declares a constructor rather than reading one, and the
     // worker harness the closure reaches defines several.
