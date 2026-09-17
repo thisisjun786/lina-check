@@ -11,6 +11,8 @@
  * accompanying self-test can assert that each rejection path really rejects.
  */
 
+import { createHash } from "node:crypto";
+
 export const TRIPWIRE_ENV = "LINA_CHECK_SPAWN_TRIPWIRE";
 export const PLAN_UNIT = "devlog/_plan/260917_jun135_part_a";
 export const PLAN_UNIT_JUN198 = "devlog/_plan/260917_jun198_install_profile";
@@ -644,6 +646,126 @@ export const DERIVED_TESTS = Object.freeze([
 ]);
 
 /**
+ * The modules outside test/ that each derived test may reach, by digest.
+ *
+ * The closure scan follows imports inside the test tree and reads what it
+ * finds. It cannot do that outside: product modules legitimately carry the
+ * process-starting surface, and one derived test imports the lane runner on
+ * purpose, because that runner's behaviour is the coverage being recovered.
+ * Dropping those edges quietly was the gap - a derived test could reach any
+ * product module at all and nothing recorded it.
+ *
+ * So the edge is declared instead of followed, and the declaration is a
+ * ceiling: an external import fails until its digest is written here, where
+ * it is reviewed.
+ *
+ * Digests rather than paths, because several of these modules are blocked
+ * upstream entrypoints and a derived script may not spell one. That rule is
+ * not worked around here: a digest cannot be handed to a loader, so this file
+ * still cannot reach any of them. The refusal prints the path it read, and
+ * 030_detectors.md carries the list in plain text.
+ *
+ * The check is one-directional on purpose. The self-test's positive controls
+ * replace a declared test's source with two lines, and requiring equality
+ * would fail every one of them for the imports that substitution removed.
+ */
+export const DERIVED_TEST_EXTERNAL_IMPORTS = Object.freeze({
+  "test/lina-check-action-ledger.test.ts": Object.freeze([
+    // action-ledger.js
+    "66c3255a3ba2903ab7954d357677550764d781ad9e005d750e48105d2a5703c1",
+    // clawsweeper-apply-lease-guards.js
+    "958c27ceac4444b619e6119357512b7dbb17ef53b33ada9bcd715f7ed84c8185",
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // github-retry.js
+    "03c185b4e47a2dc0acf3e50a1b4f9dad332b3b8ca973808328c120a9ce9dfee2",
+  ]),
+  "test/lina-check-actions-runtime.test.ts": Object.freeze([
+  ]),
+  "test/lina-check-admission.test.ts": Object.freeze([
+    // hosted-target-admission.js
+    "4b655a11a0f8fb81b2692c9f105ae829e1167625476eb11a4a6150d580591435",
+    // lina-check-installation-contract.js
+    "0dc6a2db497908af56111e6a14bde552d4e51406b54952941706a8e59f8e7dd9",
+    // lina-check-installation.js
+    "7fef8c67b1e73da21b431884aa5cb45e6e1301d146be825e098fd5973d314e58",
+    // comment-webhook.js
+    "7c740526e6ea952ff5bcf2aea2e695c5bdb52ddb26bac9b0e0cab5d14bb4fb2b",
+    // target-fanout.js
+    "f36196b1ac2d92d6177436ab1687f94778287a11416c7c83e410caa7f27d304c",
+  ]),
+  "test/lina-check-close-policy.test.ts": Object.freeze([
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // commit-sweeper.js
+    "105c7300c3163d2782ee8ef796c7e8433329c342b596c0e15576397e71f61db5",
+    // review-activity-cursor.js
+    "ddebf60605ee872990d0e3b9c7245467aa071675d0663705813e32b2c0f9b64d",
+  ]),
+  "test/lina-check-failure-telemetry.test.ts": Object.freeze([
+    // exact-review-direct-publication.ts
+    "c2b20dbf7d247f07f921795056a221013e12854694a6f3fcc256397359b7e647",
+    // exact-review-failure-telemetry.ts
+    "5a144f36afb5c8fafad1211df581fd3ef749460680f01796c5757861b9008786",
+    // exact-review-lifecycle-telemetry.ts
+    "b83f0a5082e0396088193fe7192c70a91760eb6e53a81e4f4c7c4d4e5f82ce86",
+    // exact-review-lifecycle.ts
+    "8419ea22913c7c66c388734da53a0f3fb1c5c4587373ae8914ebe49ad42f3111",
+    // exact-review-publication-batches.ts
+    "0493adb6ffb44ce62a836a1f02ea8a5ccc5396a153d98926b9cce503c9050b91",
+    // exact-review-queue.ts
+    "e5bdadd917f0a8ef9fe68b215dc829fec8c05efa7caa22175cb99b20e5e32865",
+    // live-activity.ts
+    "abc4bd9921834831ef4171ca8717cb5abce0693264dbfa5a14e58494d259e3c1",
+    // worker.ts
+    "0fd97372e43f15e9566104704eedb826e81459de4ada426dcb30816955009cb9",
+    // canonical-record-baseline.js
+    "e02180896a7717c59deabfb3674d12bea48a4eb2e5a66d8946e1c3db5506205b",
+    // publish-main.js
+    "229bfdd401c511fd80f0830cc30f05a2006005de8940c79f7e1d2651ae2c7312",
+  ]),
+  "test/lina-check-github-api.test.ts": Object.freeze([
+    // github-api.ts
+    "b139b8c8ca26956af5fc06004c3591715abae88634282d879a8a97ff19a0f396",
+  ]),
+  "test/lina-check-hosted-admission.test.ts": Object.freeze([
+    // hosted-target-admission.ts
+    "7aaad37da1be2aa308ca4805c9c5c9f6d59a3b5fbb64818a4ed22e3aafc450c6",
+    // lina-check-installation-contract.ts
+    "80f2e2103bc3c74628282b4863103fc4fd83706730ac19f4853f1e51a0b0693e",
+  ]),
+  "test/lina-check-node-test-runner.test.ts": Object.freeze([
+    // run-node-tests.mjs
+    "cf80f818b2664e049804d1cd031cb6828392fc33e66b3670b3615775647a60cb",
+  ]),
+  "test/lina-check-response-deadlines.test.ts": Object.freeze([
+    // exact-review-queue.ts
+    "e5bdadd917f0a8ef9fe68b215dc829fec8c05efa7caa22175cb99b20e5e32865",
+    // github-api.ts
+    "b139b8c8ca26956af5fc06004c3591715abae88634282d879a8a97ff19a0f396",
+  ]),
+  "test/lina-check-scheduled-review.test.ts": Object.freeze([
+    // clawsweeper.js
+    "12c3a7da1057f064ceff94cc92b6a9c5cb00b476de9ca475707a82a1ae153fa5",
+    // classify-scheduled-review-noop.ts
+    "0818365ad1bf903015a2e332abb61551292750fd65528782357c42880cc986b2",
+  ]),
+  "test/lina-check-webhook-admission.test.ts": Object.freeze([
+    // lina-check-installation.js
+    "7fef8c67b1e73da21b431884aa5cb45e6e1301d146be825e098fd5973d314e58",
+    // comment-webhook.js
+    "7c740526e6ea952ff5bcf2aea2e695c5bdb52ddb26bac9b0e0cab5d14bb4fb2b",
+    // repository-profiles.js
+    "1d069a37b325a42eb3578a09ca135f7811547847c3738152b0a10671dfbe2b31",
+  ]),
+});
+
+/** Stable name for one external module, so a ceiling can pin it. */
+export function externalImportDigest(path) {
+  return createHash("sha256").update(String(path)).digest("hex");
+}
+
+/**
  * A derived test may import a blocked entrypoint to inspect its behaviour, which
  * a derived script may not. That difference is only safe while the test cannot
  * start anything, so the process-spawning surface is denied by name. Without
@@ -700,6 +822,96 @@ const OBSERVATION_SIGNAL = Object.freeze([
   // parity between two invocations is unreachable, permission is decidable.
   "NODE_TEST_CONTEXT",
 ]);
+
+/**
+ * Reaching the process object under a name this scan cannot read.
+ *
+ * The token list above asks whether a name appears in the source, and that
+ * question is only decidable while the name is written down. process["arg" +
+ * "v"] reaches the same property and spells neither half of it. Evaluating the
+ * key is not something a text scan can do, so the rule is the one this file
+ * already follows everywhere else: refuse the forms it cannot read, which
+ * leaves exactly the spellings the token list does read.
+ *
+ *   process.<name>          read, because the token list sees <name>
+ *   process.env.<name>      read, same reason
+ *   process.env["<name>"]   read: the literal sits in the scanned source
+ *   process.env[key] = v    allowed, and delete too: a write carries nothing
+ *                           back to the test about how it was started
+ *   anything else           refused
+ *
+ * Bare process is refused because a binding to it moves every question above
+ * one name further along, where this scan no longer asks it. Bracket access on
+ * globalThis and global is refused for the same reason: it is the one form
+ * that can name the process object without writing its name.
+ *
+ * The boundary is stated rather than implied. This does not prove the absence
+ * of reflection over arbitrary objects; it does not have to. Nothing but the
+ * process object tells a module how its process was started, and the process
+ * object is now reachable only through spellings the token scan reads.
+ */
+const OBSERVATION_ROOT_MODULE = /(?:from|import|require)\s*\(?\s*["'](?:node:)?process["']/;
+const GLOBAL_ROOT = /\b(?:globalThis|global)\b/g;
+const PROCESS_ROOT = /\bprocess\b/g;
+
+/** Index of the bracket closing the one that opens at open, or -1. */
+function closingBracket(code, open) {
+  let depth = 0;
+  for (let index = open; index < code.length; index += 1) {
+    if (code[index] === "[") depth += 1;
+    else if (code[index] === "]") {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Whether a bracket key is a single literal whose text the token scan reads.
+ *
+ * codeOnly blanks string contents and keeps the quotes, so a concatenation
+ * still carries inner quotes and fails this test, while one literal does not.
+ * A template counts only without substitution, for the same reason a dynamic
+ * import does.
+ */
+function literalKey(key) {
+  if (/^(["'])[^"']*\1$/.test(key)) return true;
+  return /^`[^`]*`$/.test(key) && !key.includes("${");
+}
+
+/**
+ * The first unreadable route to the invocation in this source, or null.
+ */
+export function observationAccessFault(rawSource) {
+  const source = withoutComments(rawSource);
+  if (OBSERVATION_ROOT_MODULE.test(source))
+    return "the process module is imported, which puts the process object behind a name this scan cannot read";
+  const code = codeOnly(source);
+  for (const match of code.matchAll(GLOBAL_ROOT))
+    if (/^\s*\[/.test(code.slice(match.index + match[0].length)))
+      return "computed member access on " + match[0];
+  for (const match of code.matchAll(PROCESS_ROOT)) {
+    const start = match.index + match[0].length;
+    const rest = code.slice(start);
+    const property = /^\s*\.\s*([A-Za-z_$][\w$]*)/.exec(rest);
+    if (!property) return "process reached in a form this scan cannot read";
+    if (property[1] !== "env") continue;
+    const afterEnv = rest.slice(property[0].length);
+    if (/^\s*\.\s*[A-Za-z_$]/.test(afterEnv)) continue;
+    const bracket = /^\s*\[/.exec(afterEnv);
+    if (!bracket) return "process.env reached in a form this scan cannot read";
+    const open = start + property[0].length + bracket[0].length - 1;
+    const close = closingBracket(code, open);
+    if (close === -1) return "process.env[ with no closing bracket";
+    if (literalKey(code.slice(open + 1, close).trim())) continue;
+    const before = code.slice(0, match.index).replace(/\s+$/, "");
+    const removed = /\bdelete$/.test(before);
+    const assigned = /^\s*=[^=>]/.test(code.slice(close + 1));
+    if (!removed && !assigned) return "computed read of process.env";
+  }
+  return null;
+}
 
 /**
  * Resolve a relative import the way the loader would, without node:path, so the
@@ -1100,10 +1312,11 @@ export function analyseRequireUse(rawSource) {
  * followed, because product modules legitimately carry that surface and are
  * covered instead by the runtime observation the self-test performs.
  */
-export function derivedTestClosure(entry, readFile) {
+function walkDerivedTest(entry, readFile) {
   const seen = new Set([entry]);
   const queue = [entry];
   const visited = [];
+  const external = new Set();
   while (queue.length > 0) {
     const path = queue.shift();
     visited.push(path);
@@ -1122,7 +1335,7 @@ export function derivedTestClosure(entry, readFile) {
     for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
       for (const match of scannable.matchAll(pattern)) {
         // A template literal carries its specifier in the second group.
-        follow(path, match[1] ?? match[2], readFile, seen, queue);
+        follow(path, match[1] ?? match[2], readFile, seen, queue, external);
       }
     }
     const required = analyseRequireUse(source);
@@ -1149,9 +1362,20 @@ export function derivedTestClosure(entry, readFile) {
         path + ": dynamic import with a specifier this scan cannot resolve",
       );
     }
-    for (const specifier of required.specifiers) follow(path, specifier, readFile, seen, queue);
+    for (const specifier of required.specifiers)
+      follow(path, specifier, readFile, seen, queue, external);
   }
-  return visited;
+  return { visited, external: [...external].sort() };
+}
+
+/** Every file inside the test tree a derived test can reach, entry first. */
+export function derivedTestClosure(entry, readFile) {
+  return walkDerivedTest(entry, readFile).visited;
+}
+
+/** Every module outside the test tree that closure names, sorted. */
+export function derivedTestExternalImports(entry, readFile) {
+  return walkDerivedTest(entry, readFile).external;
 }
 
 
@@ -1181,9 +1405,19 @@ function readable(path, readFile) {
  * cannot resolve to a readable module is refused rather than dropped, because a
  * dropped edge cannot be told apart from a clean one.
  */
-function follow(from, specifier, readFile, seen, queue) {
+function follow(from, specifier, readFile, seen, queue, external) {
   const resolved = resolveRelativeImport(from, specifierPath(specifier));
-  if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) return;
+  // A bare or absolute specifier is a package or a builtin, and the dangerous
+  // builtins are denied by name already.
+  if (resolved === null) return;
+  // Outside the test tree the scan stops reading and starts declaring: product
+  // modules carry the spawn surface by design, so the edge is recorded for the
+  // declaration check rather than dropped.
+  if (!resolved.startsWith("test/")) {
+    external.add(resolved);
+    return;
+  }
+  if (seen.has(resolved)) return;
   if (FOLLOWABLE.test(resolved)) {
     seen.add(resolved);
     queue.push(resolved);
@@ -1210,6 +1444,10 @@ function follow(from, specifier, readFile, seen, queue) {
 export function assertDerivedTestContract({ declared, baselinePaths, presentPaths, readFile }) {
   const names = Object.keys(declared ?? {}).sort();
   if (!sameList(names, [...DERIVED_TESTS])) fail("derived-test-set", names.join(","));
+  // The ceiling and the set it applies to are two literals in this file, so a
+  // derived test added to one and not the other would otherwise be unbounded.
+  if (!sameList(Object.keys(DERIVED_TEST_EXTERNAL_IMPORTS).sort(), [...DERIVED_TESTS]))
+    fail("derived-test-undeclared-import", "the external-import ceiling does not cover DERIVED_TESTS");
   let scanned = 0;
   for (const path of names) {
     if (!nonEmptyReason(declared[path])) fail("derived-test-reason", path);
@@ -1217,7 +1455,8 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
     if (!presentPaths.has(path)) fail("derived-test-missing", path);
     if (SAFE_TESTS.includes(path) || EXCLUDED_TESTS.includes(path))
       fail("derived-test-upstream-collision", path);
-    for (const member of derivedTestClosure(path, readFile)) {
+    const walk = walkDerivedTest(path, readFile);
+    for (const member of walk.visited) {
       const source = String(readFile(member));
       scanned += 1;
       for (const token of SPAWN_SURFACE)
@@ -1232,7 +1471,19 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
             "derived-test-observation-signal",
             (member === path ? path : path + " -> " + member) + " -> " + token,
           );
+      const unreadable = observationAccessFault(source);
+      if (unreadable !== null)
+        fail(
+          "derived-test-computed-observation",
+          (member === path ? path : path + " -> " + member) + " -> " + unreadable,
+        );
     }
+    // Checked after the token scans so that a closure carrying both a denied
+    // surface and an undeclared edge is reported by the surface, which is the
+    // stronger statement about what the file can do.
+    for (const target of walk.external)
+      if (!DERIVED_TEST_EXTERNAL_IMPORTS[path].includes(externalImportDigest(target)))
+        fail("derived-test-undeclared-import", path + " -> " + target);
   }
   return { tests: names.length, scanned };
 }

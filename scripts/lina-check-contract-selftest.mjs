@@ -33,6 +33,7 @@ import {
   BOUNDARY_PROBE_SCRIPTS,
   DerivedContractError,
   DERIVED_TESTS,
+  DERIVED_TEST_EXTERNAL_IMPORTS,
   EXCLUDED_TESTS,
   FORBIDDEN_INSTALLATION_LITERALS,
   GUARD_SHA256,
@@ -62,6 +63,8 @@ import {
   classifyBuildPair,
   describeLaunchOutcome,
   derivedTestClosure,
+  derivedTestExternalImports,
+  externalImportDigest,
   reapLaunchGroup,
   resolveRelativeImport,
   interruptExitCode,
@@ -1012,6 +1015,74 @@ function runDerivedTestCases() {
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
   observed += 20;
+  // A name the scan can read is one thing, a name computed at run time
+  // another. process["arg" + "v"] reaches the argument vector and spells
+  // neither half of it, so every form this scan cannot read is refused.
+  for (const unreadable of [
+    'const how = process["arg" + "v"][1];\n',
+    'const p = process;\nconst k = "ar" + "gv";\nconst how = p[k];\n',
+    'const env = process.env;\nconst k = "NODE_TEST" + "_CONTEXT";\nif (env[k]) skip();\n',
+    'const k = "NODE_TEST" + "_CONTEXT";\nif (process.env[k]) skip();\n',
+    'const k = "proc" + "ess";\nconst p = globalThis[k];\nconst x = p;\n',
+    'import proc from "node:process";\nconst x = proc;\n',
+    "const { env } = process;\nconst x = env;\n",
+  ]) {
+    const computed = base();
+    const rest4 = computed.readFile;
+    computed.readFile = (path) => (path === DERIVED_TESTS[0] ? unreadable : rest4(path));
+    assert.throws(
+      () => assertDerivedTestContract(computed),
+      { code: "derived-test-computed-observation" },
+      unreadable,
+    );
+  }
+  // The rule refuses unreadable forms, it does not ban the process object. A
+  // rule that refused these would be unusable, and this repository uses each.
+  for (const readable of [
+    "function restoreEnv(name, value) {\n" +
+      "  if (value === undefined) {\n    delete process.env[name];\n    return;\n  }\n" +
+      "  process.env[name] = value;\n}\n",
+    'const home = process.env["LINA_CHECK_HOME"];\nconst x = home;\n',
+    'mock.method(globalThis, "fetch", () => {});\n',
+    'process.stdout.write("x");\n',
+  ]) {
+    const permittedAccess = base();
+    const rest5 = permittedAccess.readFile;
+    permittedAccess.readFile = (path) => (path === DERIVED_TESTS[0] ? readable : rest5(path));
+    assertDerivedTestContract(permittedAccess);
+  }
+  // Outside the test tree the scan declares instead of following, so the
+  // declaration has to be a real ceiling. The dashboard module below is the one
+  // external edge this file may spell: the rest are blocked upstream
+  // entrypoints, which is why the ceiling holds digests rather than paths.
+  const API_TEST = "test/lina-check-github-api.test.ts";
+  const API_MODULE = "dashboard/github-api.ts";
+  const undeclared = base();
+  const rest6 = undeclared.readFile;
+  undeclared.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import { githubApiUrl } from "../' + API_MODULE + '";\nconst x = githubApiUrl;\n'
+      : rest6(path);
+  assert.throws(() => assertDerivedTestContract(undeclared), {
+    code: "derived-test-undeclared-import",
+  });
+  // The same import from the test whose ceiling carries it is accepted, so the
+  // rule is a ceiling and not a ban on reaching product code.
+  const declaredImport = base();
+  const rest7 = declaredImport.readFile;
+  declaredImport.readFile = (path) =>
+    path === API_TEST
+      ? 'import { githubApiUrl } from "../' + API_MODULE + '";\nconst x = githubApiUrl;\n'
+      : rest7(path);
+  assertDerivedTestContract(declaredImport);
+  // A collector that returned nothing would satisfy every check above, so the
+  // real edge is read once from the real files and matched against the ceiling.
+  assert.deepEqual(derivedTestExternalImports(API_TEST, readFile), [API_MODULE]);
+  assert.ok(
+    DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
+    "the ceiling must pin the edge the collector reads",
+  );
+  observed += 15;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

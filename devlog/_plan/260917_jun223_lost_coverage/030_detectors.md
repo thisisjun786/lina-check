@@ -37,13 +37,100 @@
 부르면 정적 스캔은 따라갈 수 없다. 그 경우를 "못 찾았다" 로 읽지 않고 거부한다. 따라가거나 거부하거나
 둘 중 하나이고, 조용한 통과는 없다.
 
-거부 코드는 셋이다.
+거부 코드는 일곱이다. 앞의 넷이 적재와 표면, 뒤의 셋이 관측과 경계다.
 
 | 코드 | 언제 |
 | -- | -- |
 | `derived-test-spawns` | closure 안의 어떤 파일이든 금지 표면을 갖고 있을 때. 메시지가 그 파일을 지목한다 |
 | `derived-test-unreadable` | 선언된 테스트가 읽을 수 없는 파일을 가리킬 때. 덜 훑는 대신 멈춘다 |
 | `derived-test-unresolvable-require` | 따라갈 수 없는 로더 형태를 썼을 때 |
+| `derived-test-unresolvable-import` | 동적 import 의 지정자가 리터럴이 아닐 때 |
+| `derived-test-observation-signal` | 관측 신호 이름이 소스에 있을 때 |
+| `derived-test-computed-observation` | process 객체에 이 스캔이 읽을 수 없는 형태로 닿을 때 |
+| `derived-test-undeclared-import` | 테스트 트리 밖 적재가 선언된 천장에 없을 때 |
+
+## 관측 신호 — 이름을 읽을 수 없으면 거부
+
+관측 실행과 레인 실행은 어딘가에서 반드시 다르다. 그래서 구별 불가능을 쫓는 대신 파생 테스트가
+구별에 쓸 수 있는 것을 읽지 못하게 했다. `argv`·`execArgv`·`NODE_OPTIONS`·
+`LINA_CHECK_LAUNCH_LOG`·`FORCE_COLOR`·`NO_COLOR`·`NODE_TEST_CONTEXT` 는 식별자
+경계로 금지된다. `process.execPath` 는 허용이다. 그건 호출 방식이 아니라 인터프리터 경로이고,
+회복한 러너 케이스가 필요로 한다.
+
+이름을 보는 검사는 이름이 소스에 적혀 있는 동안에만 결정 가능하다. `process["arg" + "v"]` 는
+같은 속성에 닿으면서 두 조각 어느 쪽도 그 이름이 아니다. 키를 평가하는 것은 텍스트 스캔이 할 수
+있는 일이 아니므로, 이 파일이 다른 자리에서 쓰는 규칙을 그대로 적용했다. **읽을 수 없는 형태를
+거부해서, 토큰 검사가 읽을 수 있는 철자만 남긴다.**
+
+| 형태 | 처분 |
+| -- | -- |
+| `process.<name>` | 허용. 토큰 검사가 `<name>` 을 읽는다 |
+| `process.env.<name>` | 허용. 같은 이유 |
+| `process.env["<name>"]` | 허용. 리터럴이 스캔되는 소스에 그대로 있다 |
+| `process.env[key] = v`, `delete process.env[key]` | 허용. 쓰기와 삭제는 테스트에게 아무것도 돌려주지 않는다 |
+| `process[...]`, 맨 `process`, `const { ... } = process` | 거부 |
+| `globalThis[...]`, `global[...]` | 거부 |
+| `import ... from "node:process"` | 거부 |
+
+맨 `process` 를 거부하는 이유는 바인딩 하나가 위의 모든 질문을 한 이름 뒤로 옮기기 때문이다.
+`globalThis` 의 대괄호 접근을 거부하는 이유도 같다. 이름을 적지 않고 process 객체를 가리킬 수
+있는 유일한 형태다.
+
+경계는 적어 둔다. 이건 임의 객체에 대한 리플렉션이 없다는 증명이 아니다. 그럴 필요도 없다.
+프로세스가 어떻게 시작됐는지 알려 주는 것은 process 객체뿐이고, 그 객체는 이제 토큰 검사가 읽는
+철자로만 닿을 수 있다.
+
+양성 대조는 거부 일곱 개와 허용 네 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
+계산된 접근, `node:process` import, `process` 구조 분해다. 허용 쪽은 이 저장소가 실제로 쓰는
+네 형태다. 계산된 키로 하는 환경 변수 복원(쓰기와 삭제), 리터럴 키 읽기,
+`t.mock.method(globalThis, "fetch", ...)`, `process.stdout.write`. 허용 대조가 없으면
+위 규칙은 process 금지와 구분되지 않는다.
+
+## 테스트 트리 밖 적재 — 선언하거나 거부
+
+closure 는 `test/` 안에서만 따라간다. 밖에서는 따라갈 수 없다. 제품 모듈은 정당하게 프로세스
+기동 표면을 갖고 있고, 파생 러너 테스트는 `../scripts/run-node-tests.mjs` 를 일부러 import
+한다. 그 모듈의 동작이 회복 대상이기 때문이다.
+
+문제는 그 간선을 조용히 버리고 있었다는 점이다. 파생 테스트가 어떤 제품 모듈에 닿아도 아무 데도
+기록되지 않았다. 이제 따라가는 대신 선언한다. `DERIVED_TEST_EXTERNAL_IMPORTS` 가 파생 테스트별로
+허용된 외부 모듈을 고정 리터럴로 들고 있고, 거기 없는 외부 적재는
+`derived-test-undeclared-import` 로 거부된다. 선언은 천장이다. 새 외부 import 는 여기에 적히기
+전까지 실패하고, 적히는 자리가 리뷰되는 자리다.
+
+천장은 경로가 아니라 sha256 다이제스트를 담는다. 여기 오는 모듈 중 여럿이 파킹된 upstream
+진입점이고, 파생 스크립트는 그 경로를 소스에 적을 수 없다(`script-blocked-target`). 그 규칙을
+우회한 것이 아니다. 다이제스트는 로더에 넘길 수 없어서 이 파일은 여전히 그 진입점에 닿지 못한다.
+거부 메시지는 읽은 경로를 그대로 찍고, 사람이 읽을 목록은 아래에 있다. 이 문서는 마크다운이라
+같은 스캔 대상이 아니다.
+
+| 파생 테스트 | 테스트 트리 밖 적재 |
+| -- | -- |
+| `lina-check-action-ledger` | `dist/action-ledger.js`, `dist/clawsweeper-apply-lease-guards.js`, `dist/clawsweeper.js`, `dist/github-retry.js` |
+| `lina-check-actions-runtime` | 없음 |
+| `lina-check-admission` | `dist/hosted-target-admission.js`, `dist/lina-check-installation-contract.js`, `dist/lina-check-installation.js`, `dist/repair/comment-webhook.js`, `dist/repair/target-fanout.js` |
+| `lina-check-close-policy` | `dist/clawsweeper.js`, `dist/commit-sweeper.js`, `dist/review-activity-cursor.js` |
+| `lina-check-failure-telemetry` | `dashboard/exact-review-direct-publication.ts`, `dashboard/exact-review-failure-telemetry.ts`, `dashboard/exact-review-lifecycle-telemetry.ts`, `dashboard/exact-review-lifecycle.ts`, `dashboard/exact-review-publication-batches.ts`, `dashboard/exact-review-queue.ts`, `dashboard/live-activity.ts`, `dashboard/worker.ts`, `dist/repair/canonical-record-baseline.js`, `dist/repair/publish-main.js` |
+| `lina-check-github-api` | `dashboard/github-api.ts` |
+| `lina-check-hosted-admission` | `src/hosted-target-admission.ts`, `src/lina-check-installation-contract.ts` |
+| `lina-check-node-test-runner` | `scripts/run-node-tests.mjs` |
+| `lina-check-response-deadlines` | `dashboard/exact-review-queue.ts`, `dashboard/github-api.ts` |
+| `lina-check-scheduled-review` | `dist/clawsweeper.js`, `scripts/classify-scheduled-review-noop.ts` |
+| `lina-check-webhook-admission` | `dist/lina-check-installation.js`, `dist/repair/comment-webhook.js`, `dist/repository-profiles.js` |
+
+간선 33개, 서로 다른 모듈 30개다. `test/dashboard-worker-harness.ts` 를 거쳐 닿는 것도 포함한
+전이 폐포다.
+
+검사는 한 방향이다. 선언에 있는데 지금 소스에 없는 것은 실패로 보지 않는다. selftest 의 양성 대조가
+선언된 테스트의 본문을 두 줄로 갈아 끼우기 때문이고, 양방향이면 그 대조들이 전부 엉뚱한 이유로
+실패한다.
+
+양성 대조는 셋이고 전부 `dashboard/github-api.ts` 를 쓴다. 파킹된 진입점이 아니라서 selftest 가
+그 경로를 적을 수 있는 유일한 외부 모듈이다. 그 import 를 ledger 테스트에 심으면 거부되고, 그
+천장에 실제로 들어 있는 github-api 테스트에 심으면 통과한다. 수집기가 빈 배열만 돌려줘도 앞의 두
+대조는 만족되므로, 실제 파일에서 github-api 테스트의 외부 간선을 한 번 읽어 천장이 그 다이제스트를
+갖고 있는지 단언한다.
 
 ### 양성 대조
 
@@ -61,7 +148,8 @@
 
 ## 런타임 탐지기 — 기동 0건 관측
 
-선언된 파생 테스트 열한 개를 한 프로세스에서 import 해 실행하고, 그 프로세스에
+선언된 파생 테스트 열한 개를 파일마다 프로세스 하나씩 띄워 실행하고(레인이 `node --test` 로 하는
+것과 같은 모양이다), 그 프로세스에
 `node:child_process` 의 일곱 진입점(`spawn`·`spawnSync`·`exec`·`execFile`·
 `execFileSync`·`execSync`·`fork`)을 감싼 preload 를 얹는다. 기록은 시도 시점에 남기므로 예외를
 삼켜도 남고, `syncBuiltinESMExports()` 로 ESM 바인딩까지 바꾸므로 named import 로 붙잡아 둔 참조도
@@ -71,7 +159,7 @@
 기록하는지 확인한다. 그 다음에야 0건을 증거로 받아들인다. selftest 요약의 `launchControl=1` 이 그것이고,
 `derivedLaunches=0` 이 관측 결과다.
 
-실행됐는지도 같이 본다. 관측 실행이 exit 0 이고, 통과 케이스 수가 기록된 하한(140) 이상이며, 실패가
+실행됐는지도 같이 본다. 관측 실행이 exit 0 이고, 통과 케이스 수가 기록된 하한(147) 이상이며, 실패가
 0이어야 한다. 그러지 않으면 "아무것도 안 띄웠다" 가 "아무것도 안 돌았다" 와 구분되지 않는다.
 
 ## 대응표를 실행에 묶는다
@@ -95,8 +183,8 @@ skip 되고 다른 한 건이 추가되는 교환도 못 잡는다. 그래서 �
 ## 이 탐지기들이 보지 못하는 것
 
 계측은 Node 안쪽에 건다. 계측이 얹히기 전에 함수 참조를 붙잡아 둔 코드, 감싼 함수를 다시 덮어쓰는
-코드, 그리고 `worker_threads`·`dgram` 은 빠진다. 이건 적대적 코드에 대한 방어가 아니라 우리가 쓴
-파생 테스트와 고정된 pin 에 대한 관측이다.
+코드, 그리고 `dgram` 은 빠진다(`worker_threads` 는 18라운드에서 금지 표면에 들어갔다). 이건
+적대적 코드에 대한 방어가 아니라 우리가 쓴 파생 테스트와 고정된 pin 에 대한 관측이다.
 
 런타임 관측은 `lina:contract-selftest` 안에서만 돈다. `lina:test-safe` 는 파생 테스트를 계측 없이
 돌린다. 둘 다 필수 게이트라 위반은 머지 전에 걸리지만, 레인 자체가 계측되는 것은 아니다.

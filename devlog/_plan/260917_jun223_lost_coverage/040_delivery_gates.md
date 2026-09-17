@@ -275,10 +275,10 @@ lint 가 exit 1 이었는데 마지막 줄만 보고 커밋했다. 앞의 것은
 리뷰어가 짚어 준 게 아니라 내가 다시 열어 보고 찾은 것이고, 그래서 더 적어 둘 필요가 있다.
 표에 "부분" 으로 굳었으면 아무도 다시 안 열어 봤을 자리다.
 
-## 최종 head 기준 재측정 — 아래가 현재 값이다
+## 5라운드 시점 재측정 (head `212c52a0`)
 
-인도 시점 head `212c52a0` 에서 여덟 게이트 전부 exit 0, 레인 134초다. selftest 요약은
-다음과 같다.
+그 시점 head 에서 여덟 게이트 전부 exit 0, 레인 134초다. selftest 요약은 다음과 같다.
+현재 값은 이 문서 마지막 절에 있다.
 
 ```
 [lina-check-contract-selftest] derivedTestContract=34 derivedCases=147 derivedLaunches=0 launchControl=1 coverageMap=verified
@@ -508,3 +508,69 @@ A의 기록이 버려진다.
 이것으로 적재 경로는 네 갈래로 정리된다. 정적 import·재수출(따라간다), CommonJS 와 createRequire
 계열(따라가거나 거부한다), 동적 import(리터럴만 따라가고 나머지는 거부한다), 런타임 해석 메커니즘
 (막는다). 조용히 건너뛰는 경로가 없다는 것이 이 PR 이 주장하는 전부다.
+
+### 20라운드 — 계산된 접근과 테스트 트리 밖 적재
+
+부모가 head `e387382c` 에서 게이트 여덟 개를 별도 체크아웃에서 재현하고 스레드 미해결 0건을
+확인한 뒤, 새 지적 한 건이 왔다. Codex, `scripts/lina-check-derived-contract.mjs:1230`,
+"Reject computed observation-signal access". 두 갈래다.
+
+**첫째, 단어 기반 스캔이 계산된 멤버 접근을 통과시킨다.** `process["arg" + "v"]` 는 인자 벡터에
+닿으면서 `argv` 라는 철자를 소스에 남기지 않는다. 15라운드에서 `const { argv } = process` 와
+`process["argv"]` 를 막았지만, 그건 이름이 여전히 적혀 있는 형태였다.
+
+키를 평가하는 것은 텍스트 스캔의 일이 아니다. 그래서 16~19라운드에서 세운 원칙을 그대로 적용했다.
+읽을 수 없는 형태를 거부한다. process 객체는 이제 `process.<이름>` 과 `process.env.<이름>`,
+그리고 리터럴 키로 하는 `process.env["<이름>"]` 로만 닿을 수 있다. 계산된 키는 쓰기와 삭제일
+때만 허용한다. 대입은 테스트에게 아무것도 돌려주지 않기 때문이고, 이 저장소의 환경 변수 복원
+헬퍼가 그 형태다. 맨 `process`, `process` 구조 분해, `globalThis[...]`,
+`node:process` import 는 전부 거부다. 바인딩 하나가 모든 질문을 한 이름 뒤로 옮기기 때문이다.
+거부 코드는 `derived-test-computed-observation` 이다.
+
+경계는 코드 주석과 `030_detectors.md` 에 적었다. 이건 임의 객체 리플렉션이 없다는 증명이 아니다.
+프로세스가 어떻게 시작됐는지 알려 주는 것은 process 객체뿐이고, 그 객체가 이제 토큰 검사가 읽는
+철자로만 닿는다는 것까지가 주장이다.
+
+**둘째, 테스트 트리 밖 적재를 따라가지 않으면서 기록도 하지 않았다.** 파생 테스트가
+`../scripts/run-node-tests.mjs` 를 정적 import 해도 closure 는 그 간선을 조용히 버렸다.
+제품 모듈을 따라갈 수는 없다. 제품은 정당하게 기동 표면을 갖고 있고, 파생 러너 테스트는 그 러너를
+일부러 import 한다. 그 동작이 회복 대상이다.
+
+따라가는 대신 선언한다. `DERIVED_TEST_EXTERNAL_IMPORTS` 가 파생 테스트 열한 개의 외부 적재를
+고정 리터럴로 들고 있고(간선 33개), 거기 없는 외부 적재는 `derived-test-undeclared-import`
+로 거부된다. 검사는 한 방향이다. 양성 대조가 선언된 테스트의 본문을 두 줄로 갈아 끼우기 때문에
+양방향이면 기존 대조들이 엉뚱한 이유로 실패한다. 그 이유도 코드에 적었다.
+
+여기서 `check:scaffold` 가 한 번 빨간불을 켰다. 처음에는 천장을 경로 문자열로 적었는데, 그중
+여럿이 파킹된 upstream 진입점이라 `script-blocked-target` 으로 거부됐다. 파생 스크립트가 블록된
+진입점을 소스에 적으면 안 된다는 규칙이고, 그건 우회할 규칙이 아니다. 그래서 천장을 sha256
+다이제스트로 바꿨다. 다이제스트는 로더에 넘길 수 없으므로 이 파일은 여전히 그 진입점에 닿지 못하고,
+사람이 읽을 목록은 `030_detectors.md` 의 표에 있다. 거부 메시지는 실행 중에 읽은 경로를 그대로
+찍는다.
+
+수집기가 빈 배열만 돌려줘도 위 검사는 전부 만족되므로, 실제 파일에서 github-api 테스트의 외부 간선을
+한 번 읽어 천장이 그 다이제스트를 갖고 있는지 단언한다. 그게 이 검사의 양성 대조다.
+
+파생 계약 대조가 81건에서 96건으로 늘었다. 거부 대조 열, 허용 대조 넷, 수집기 대조 하나다.
+
+## 20라운드 head 기준 재측정 — 아래가 현재 값이다
+
+여덟 게이트 전부 exit 0. selftest 요약은 다음과 같다.
+
+```
+[lina-check-contract-selftest] derivedTestContract=96 derivedCases=147 derivedLaunches=0 launchControl=1 coverageMap=verified failureControls=46
+[lina-check-coverage-map] current: 144 records, 129 recovered, 2 partial, 13 lost
+```
+
+대응표는 그대로다. 이 라운드는 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
+
+레인은 133초다. 가드 유발도 이 head 에서 다시 쟀고 복원은 `trap restore EXIT INT TERM` 으로
+걸었다.
+
+| 값 | |
+| -- | -- |
+| 변조 전 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` |
+| 변조 후 sha256 | `a8687fa58f6c491bcf0a82bb96fef4a03827ef405b2380e49648d4a0685f5761` |
+| 변조 상태 `check:scaffold` | exit 1, `Upstream bytes changed: src/clawsweeper-text.ts` |
+| 복원 후 sha256 | `fa23270af2e1c53b2ffac74f63476ec3974dd26e4258b10427990d0841782a0c` (변조 전과 동일) |
+| 복원 후 `check:scaffold` | exit 0 |
