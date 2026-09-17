@@ -230,6 +230,7 @@ export const WRANGLER_PATH = "dashboard/wrangler.toml";
  * previous edit; the history is in the plan unit.
  */
 export const MODIFIED_UPSTREAM_FILES = Object.freeze([
+  "dashboard/dashboard-pages.ts",
   "dashboard/exact-review-queue.ts",
   "dashboard/github-api.ts",
   "dashboard/worker.ts",

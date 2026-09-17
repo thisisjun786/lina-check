@@ -210,6 +210,7 @@
       "test/lina-check-admission.test.ts": { "reason": "Covers the shared Worker and queue decision, the Node webhook classifier and target fanout, including that an unconfigured installation admits nothing and that transport permission is not the admission gate." }
     },
     "modifiedUpstreamFiles": {
+      "dashboard/dashboard-pages.ts": { "reason": "Fell back to the upstream fleet domain whenever the Worker variable was blank, so emptying that variable did not actually unconfigure the rendered link." },
       "dashboard/exact-review-queue.ts": { "reason": "Resolved hosted eligibility on its own without installation input, so gating only the Worker would have left this path granting." },
       "dashboard/github-api.ts": { "reason": "Defines githubApiUrl, the single place every Worker, queue and App GitHub request builds its URL, so the transport refusal belongs here." },
       "dashboard/worker.ts": { "reason": "Admitted two upstream owner names by literal comparison and fell back to upstream repositories whenever configuration was empty." },

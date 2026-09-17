@@ -113,6 +113,11 @@ export async function resolveHostedTargetEligibility(
       ? { outcome: "eligible" }
       : { outcome: "terminal" };
   }
+  // An explicit grant needs no registry, and the production callers pass only an
+  // installation, so this must be decided before the registry requirement below.
+  // Checking it after meant a fork configured with LINA_CHECK_TARGET_REPOS alone
+  // returned terminal for every repository it had explicitly admitted.
+  if (installationAdmitsRepository(installation, normalized)) return { outcome: "eligible" };
   // No registry means no request. Upstream defaulted to its own repository here,
   // so an unconfigured fork would have asked the upstream project which targets
   // it may act on.

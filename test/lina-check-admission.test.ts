@@ -110,9 +110,18 @@ test("the Worker and queue resolver defers to the installation", async () => {
     "terminal",
     "no installation means no registry request and no eligibility",
   );
+  // The production call shape: Worker and queue pass an installation and nothing
+  // else. Asserting with configuredRepositories took a branch only tests use and
+  // hid the fact that an explicit grant was returning terminal here.
   assert.equal(
-    (await resolve("acme/granted", { installation: named, configuredRepositories: [] })).outcome,
+    (await resolve("acme/granted", { installation: named })).outcome,
     "eligible",
+    "an explicit grant must be admitted without a registry on the production path",
+  );
+  assert.equal(
+    (await resolve("acme/notgranted", { installation: named })).outcome,
+    "terminal",
+    "a repository the installation never named is still refused",
   );
   assert.equal(
     (

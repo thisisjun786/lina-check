@@ -1,6 +1,9 @@
 export type DashboardEnv = Record<string, unknown>;
 
-const DEFAULT_CRABFLEET_URL = "https://crabfleet.openclaw.ai";
+// Emptying the Worker variable did not unconfigure this: the blank value fell
+// through to an upstream default and the rendered link still sent users there.
+// With no default there is nothing to fall back to, and the link is omitted.
+const DEFAULT_CRABFLEET_URL = "";
 
 function issueTriagePageConfig() {
   return {
@@ -1732,7 +1735,7 @@ a.pill:hover { color: var(--claw); text-decoration: none; }
       <a class="top-link" href="/bay">OpenClaw Bay</a>
       <a class="top-link" href="/triage">Issue triage</a>
       <a class="top-link" href="/pr-proof-triage">PR proof triage</a>
-      <a class="top-link" href="${escapeHtml(crabfleetUrl)}">Live terminals</a>
+      ${crabfleetUrl ? `<a class="top-link" href="${escapeHtml(crabfleetUrl)}">Live terminals</a>` : ""}
       ${dashboardThemeControlHtml()}
       <span class="muted mono" id="updated"></span>
     </div>
