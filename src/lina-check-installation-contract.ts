@@ -168,13 +168,12 @@ function readList(
   const list: string[] = [];
   for (const entry of raw) {
     if (typeof entry !== "string") return refuse(shapeCode, label + " entry is not a string");
-    // Test the value as written, not a lowercased copy. The schema patterns are
-    // lowercase-only, so silently folding case here would accept configuration
-    // the published contract rejects.
-    const normalized = entry.trim();
-    if (!pattern.test(normalized)) return refuse(shapeCode, label + " entry is malformed: " + entry);
-    if (list.includes(normalized)) return refuse(duplicateCode, label + " repeats " + normalized);
-    list.push(normalized);
+    // Test the value exactly as written: no case folding, no trimming. The
+    // schema patterns are anchored and lowercase-only, so normalising first
+    // would turn a typo the published contract rejects into a stored grant.
+    if (!pattern.test(entry)) return refuse(shapeCode, label + " entry is malformed: " + entry);
+    if (list.includes(entry)) return refuse(duplicateCode, label + " repeats " + entry);
+    list.push(entry);
   }
   return { list, code: null, detail: "" };
 }

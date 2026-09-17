@@ -574,6 +574,25 @@ async function runInstallationCases() {
       "installation-repository-shape",
       { ...shipped, targets: { ...shipped.targets, repositories: ["Acme/Tool"] } },
     ],
+    // Whitespace is not normalised either. The schema patterns are anchored, so
+    // trimming first would turn a typo the published contract rejects into a
+    // stored grant.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: [" acme"] } },
+    ],
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["acme "] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: [" acme/granted "] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\t"] } },
+    ],
     // additionalProperties:false in every schema object. The dangerous direction
     // is a dropped restriction: a deny list written under a name this build does
     // not know would be ignored while the grant beside it stood.

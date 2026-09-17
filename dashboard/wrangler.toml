@@ -46,6 +46,14 @@ LINA_CHECK_INSTALLATION_CONFIGURED = ""
 LINA_CHECK_TARGET_OWNERS = ""
 LINA_CHECK_TARGET_REPOS = ""
 LINA_CHECK_TARGET_REGISTRY_URL = ""
+# Branding. installationFromEnv reads these, so they belong in the documented
+# variable list rather than only in source; an operator cannot configure what the
+# configuration file never mentions.
+LINA_CHECK_PRODUCT_NAME = ""
+LINA_CHECK_SHORT_NAME = ""
+LINA_CHECK_USER_AGENT = ""
+LINA_CHECK_DASHBOARD_HOST = ""
+LINA_CHECK_BOT_LOGIN = ""
 CLAWSWEEPER_REPO = ""
 CLAWSWEEPER_DASHBOARD_WORKFLOW_SOURCE = "poll"
 CLAWSWEEPER_APP_CLIENT_ID = ""

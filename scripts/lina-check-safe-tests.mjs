@@ -190,15 +190,23 @@ export function makeUpstreamFixture(testPath, pin) {
   const files = UPSTREAM_FIXTURE_TESTS[testPath];
   if (!files) throw new Error("no upstream fixture declared for " + testPath);
   const dir = mkdtempSync(join(tmpdir(), "lina-check-upstream-"));
-  for (const file of files) {
-    const bytes = execFileSync("git", ["-C", root, "show", pin + ":" + file], {
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    const target = join(dir, file);
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, bytes);
+  // The caller only learns the directory name on a successful return, so a
+  // throw partway through would strand whatever was already written. Clean up
+  // here and let the original error through.
+  try {
+    for (const file of files) {
+      const bytes = execFileSync("git", ["-C", root, "show", pin + ":" + file], {
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      const target = join(dir, file);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, bytes);
+    }
+    return dir;
+  } catch (error) {
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
   }
-  return dir;
 }
 
 export function launchTests(paths, concurrency, options = {}) {
