@@ -201,6 +201,23 @@
       "schema/lina-check-installation.schema.json": { "reason": "Schema for the installation entry point, including the owner and target-repository shapes." },
       "src/lina-check-installation-contract.ts": { "reason": "Pure installation contract: parsing, denial codes, admission helpers and branding. Safe inside the Worker import graph." },
       "src/lina-check-installation.ts": { "reason": "Node-side loader for the installation profile. Kept out of the Worker import graph because it reads the filesystem." }
+      ,
+      "docs/lina-check/github-app-permissions.md": { "reason": "GitHub App permission scope derived from the calls this source actually makes, staged so a dormant install grants nothing." }
+    },
+    "modifiedUpstreamFiles": {
+      "dashboard/exact-review-queue.ts": { "reason": "Resolved hosted eligibility on its own without installation input, so gating only the Worker would have left this path granting." },
+      "dashboard/github-api.ts": { "reason": "Defines githubApiUrl, the single place every Worker, queue and App GitHub request builds its URL, so the transport refusal belongs here." },
+      "dashboard/worker.ts": { "reason": "Admitted two upstream owner names by literal comparison and fell back to upstream repositories whenever configuration was empty." },
+      "dashboard/wrangler.toml": { "reason": "Carried the upstream Cloudflare account, custom domain, App client, state repository and target lists." },
+      "src/hosted-target-admission.ts": { "reason": "Held the hardcoded fallback-owner set and defaulted the profile registry to the upstream repository." },
+      "src/repair/comment-webhook.ts": { "reason": "Treated a successful profile lookup as repository eligibility, admitting every inherited profile." },
+      "src/repair/target-fanout.ts": { "reason": "Built its hosted policy from the registry alone, so fanout could act on repositories this installation never named." }
+    },
+    "upstreamFixtureTests": {
+      "test/repository-profiles.test.ts": {
+        "reason": "Asserts the dashboard target variables still name the upstream project's repositories. Emptying them is the point of this change, so this suite runs against pinned upstream bytes; the fork's own settings are asserted separately by check:scaffold.",
+        "files": ["config/target-repositories.json", "dashboard/wrangler.toml"]
+      }
     },
     "scripts": {
       "lina:test-safe": { "command": "node scripts/lina-check-safe-tests.mjs run", "reason": "Execute the declared restored upstream tests." },

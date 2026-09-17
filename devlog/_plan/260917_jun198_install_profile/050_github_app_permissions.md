@@ -22,10 +22,21 @@
 
 ## 결과
 
-wp4 에서 채운다. 표 형식은 아래와 같다.
+`docs/lina-check/github-app-permissions.md` 에 있다. 계획 문서가 아니라 운영자가 읽을 자리에
+두었다. 표는 단계로 나눴다.
 
-| 권한 | 수준 | 근거 호출 | 표면 상태 |
-| -- | -- | -- | -- |
+| 단계 | 내용 |
+| -- | -- |
+| 0 · 출고 상태 | 없음. App 도 설치도 자격증명도 없다 |
+| 1 · 읽기 | Metadata, Issues, Pull requests, Actions, Checks, Commit statuses 전부 read |
+| 2 · 대상 저장소 쓰기 | Issues write, Pull requests write |
+| 3 · 제어·상태 저장소 | Contents write. 대상 저장소와 별도 설치 범위로 둔다 |
+
+3단계를 나눈 것이 이 도출의 실질이다. 제어 저장소가 dispatch 를 받으려면 Contents write 가
+필요한데, 그것을 대상 저장소 전체에 주면 호출이 요구하는 것보다 훨씬 넓어진다.
+
+호출 근거는 각 행에 엔드포인트로 적었다. 호출이 없는 권한은 넣지 않았다.
+웹훅 이벤트 9개도 분류기가 실제로 받는 것만 적었다.
 
 ## 근거 원칙
 

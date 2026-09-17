@@ -49,9 +49,19 @@ export type InstallationProfile = {
   appBotLogin: string;
 };
 
-export type InstallationParse =
-  | { ok: true; profile: InstallationProfile }
-  | { ok: false; code: InstallationDenialCode; detail: string };
+/**
+ * Deliberately not a discriminated union. This module is compiled by the
+ * dashboard project too, which runs with strict off, and narrowing on a literal
+ * discriminant needs strictNullChecks. A flat shape that always carries a
+ * profile also removes the failure mode where a caller reads a profile that is
+ * not there: on refusal the profile is the unconfigured one, which grants nothing.
+ */
+export type InstallationParse = {
+  ok: boolean;
+  profile: InstallationProfile;
+  code: InstallationDenialCode | null;
+  detail: string;
+};
 
 const OWNER = /^[a-z0-9_.-]+$/;
 const TARGET_REPO = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/;
@@ -92,7 +102,7 @@ function asString(value: unknown): string {
 }
 
 function deny(code: InstallationDenialCode, detail: string): InstallationParse {
-  return { ok: false, code, detail };
+  return { ok: false, profile: UNCONFIGURED_INSTALLATION, code, detail };
 }
 
 function readList(
@@ -101,17 +111,18 @@ function readList(
   shapeCode: InstallationDenialCode,
   duplicateCode: InstallationDenialCode,
   label: string,
-): { ok: true; list: string[] } | { ok: false; code: InstallationDenialCode; detail: string } {
-  if (!Array.isArray(raw)) return { ok: false, code: shapeCode, detail: label + " must be an array" };
+): { list: string[]; code: InstallationDenialCode | null; detail: string } {
+  const refuse = (code: InstallationDenialCode, detail: string) => ({ list: [], code, detail });
+  if (!Array.isArray(raw)) return refuse(shapeCode, label + " must be an array");
   const list: string[] = [];
   for (const entry of raw) {
-    if (typeof entry !== "string") return { ok: false, code: shapeCode, detail: label + " entry is not a string" };
+    if (typeof entry !== "string") return refuse(shapeCode, label + " entry is not a string");
     const normalized = entry.trim().toLowerCase();
-    if (!pattern.test(normalized)) return { ok: false, code: shapeCode, detail: label + " entry is malformed: " + entry };
-    if (list.includes(normalized)) return { ok: false, code: duplicateCode, detail: label + " repeats " + normalized };
+    if (!pattern.test(normalized)) return refuse(shapeCode, label + " entry is malformed: " + entry);
+    if (list.includes(normalized)) return refuse(duplicateCode, label + " repeats " + normalized);
     list.push(normalized);
   }
-  return { ok: true, list };
+  return { list, code: null, detail: "" };
 }
 
 /**
@@ -143,7 +154,7 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
     "installation-owner-duplicate",
     "targets.fallback_owners",
   );
-  if (!owners.ok) return deny(owners.code, owners.detail);
+  if (owners.code !== null) return deny(owners.code, owners.detail);
   const repositories = readList(
     targetsRecord.repositories,
     TARGET_REPO,
@@ -151,7 +162,7 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
     "installation-repository-duplicate",
     "targets.repositories",
   );
-  if (!repositories.ok) return deny(repositories.code, repositories.detail);
+  if (repositories.code !== null) return deny(repositories.code, repositories.detail);
 
   const registryUrl = asString(targetsRecord.registry_url);
   if (registryUrl !== "" && !registryUrl.startsWith("https://"))
@@ -169,6 +180,8 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
 
   return {
     ok: true,
+    code: null,
+    detail: "",
     profile: {
       schemaVersion: LINA_CHECK_INSTALLATION_SCHEMA_VERSION,
       configured: root.configured,
@@ -186,8 +199,7 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
 
 /** A parse failure is a denial, not an exception: callers must not treat it as a pass. */
 export function profileOrUnconfigured(value: unknown): InstallationProfile {
-  const parsed = parseInstallationProfile(value);
-  return parsed.ok ? parsed.profile : UNCONFIGURED_INSTALLATION;
+  return parseInstallationProfile(value).profile;
 }
 
 export function installationConfigured(profile: InstallationProfile | null | undefined): boolean {
@@ -238,6 +250,32 @@ export function resolveBranding(
 }
 
 /** User-Agent for outbound requests, so the fork does not announce the upstream product. */
+export function hasGithubCredential(env: Record<string, unknown>): boolean {
+  const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+  return (
+    text(env.GITHUB_TOKEN) !== "" ||
+    text(env.CLAWSWEEPER_TOKEN) !== "" ||
+    text(env.CLAWSWEEPER_APP_PRIVATE_KEY) !== ""
+  );
+}
+
+/**
+ * Whether a GitHub request may be built at all.
+ *
+ * Emptying configuration does not stop a request; it only makes the request
+ * useless. An installation with neither configuration nor any credential has
+ * nothing to ask and no way to authenticate, so the request is refused before
+ * it is constructed rather than sent and failed.
+ *
+ * This is narrower than refusing on configuration alone, and the narrower claim
+ * is the one recorded in the plan. A deployment carrying credentials can still
+ * reach GitHub; what it cannot do is act on a target, because admission is
+ * gated separately and denies without an installation profile.
+ */
+export function githubTransportAllowed(env: Record<string, unknown>): boolean {
+  return installationConfigured(installationFromEnv(env)) || hasGithubCredential(env);
+}
+
 export function brandedUserAgent(
   profile: InstallationProfile | null | undefined,
   suffix: string,
@@ -262,7 +300,7 @@ export function installationFromEnv(env: Record<string, unknown>): InstallationP
       .split(",")
       .map((value) => value.trim().toLowerCase())
       .filter((value) => value !== "");
-  const parsed = parseInstallationProfile({
+  return parseInstallationProfile({
     schema_version: LINA_CHECK_INSTALLATION_SCHEMA_VERSION,
     configured: envString(env.LINA_CHECK_INSTALLATION_CONFIGURED) === "1",
     branding: {
@@ -284,6 +322,5 @@ export function installationFromEnv(env: Record<string, unknown>): InstallationP
       client_id: envString(env.CLAWSWEEPER_APP_CLIENT_ID),
       bot_login: envString(env.LINA_CHECK_BOT_LOGIN),
     },
-  });
-  return parsed.ok ? parsed.profile : UNCONFIGURED_INSTALLATION;
+  }).profile;
 }

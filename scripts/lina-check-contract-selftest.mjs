@@ -34,15 +34,21 @@ import {
   FORBIDDEN_INSTALLATION_LITERALS,
   GUARD_SHA256,
   INSTALLATION_CONFIG_PATH,
+  MODIFIED_UPSTREAM_FILES,
   SAFE_TESTS,
   TRIPWIRE_ENV,
+  UPSTREAM_FIXTURE_TESTS,
+  WRANGLER_PATH,
   assertDerivedContract,
+  assertFixtureTestContract,
   assertGuardIntact,
+  assertModifiedUpstreamContract,
   assertNoForbiddenInstallationLiterals,
   assertNoLifecycleHooks,
   assertPinnedPnpm,
   assertProbeTargetGuarded,
   assertShippedInstallationEmpty,
+  assertWranglerUnconfigured,
   assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
@@ -58,7 +64,7 @@ const BASELINE_ASSERTION_CALLS = 23;
 // not the historical baseline: a floor of 23 would let the 26-assertion
 // validator shed three and still pass whenever the baseline object is absent.
 // Adding assertions legitimately raises this number; it never lowers.
-const VALIDATOR_ASSERTION_FLOOR = 27;
+const VALIDATOR_ASSERTION_FLOOR = 29;
 const ASSERTION_CALL = /^\s*assert(\.|\()/;
 const VALIDATOR = "scripts/check-scaffold.mjs";
 const DOCS = ["README.md", "AGENTS.md", "CONTRIBUTING.md", "VISION.md"];
@@ -355,6 +361,96 @@ function runAssertionIntegrity() {
 }
 
 /**
+ * The upstream-modification exception. Permission to change a file is the most
+ * dangerous thing this contract hands out, so every way the declaration can be
+ * wrong is fed in and observed to be refused.
+ */
+function runModifiedUpstreamCases() {
+  const base = () => ({
+    declared: structuredClone(config.derived.modifiedUpstreamFiles),
+    baselinePaths: new Set(MODIFIED_UPSTREAM_FILES),
+    presentPaths: new Set(MODIFIED_UPSTREAM_FILES),
+    changed: () => true,
+    isRegularFile: () => true,
+  });
+  const first = MODIFIED_UPSTREAM_FILES[0];
+  let observed = 0;
+
+  // Clean control: the real declaration must pass, or every rejection below
+  // would be satisfied by a checker that simply refuses everything.
+  assertModifiedUpstreamContract(base());
+
+  const cases = [
+    ["modified-upstream-shape", (i) => (i.declared = null)],
+    ["modified-upstream-set", (i) => delete i.declared[first]],
+    [
+      "modified-upstream-set",
+      (i) => (i.declared["src/clawsweeper.ts"] = { reason: "sneaking one in" }),
+    ],
+    ["modified-upstream-reason", (i) => (i.declared[first] = { reason: "  " })],
+    ["modified-upstream-unknown", (i) => i.baselinePaths.delete(first)],
+    ["modified-upstream-missing", (i) => i.presentPaths.delete(first)],
+    ["modified-upstream-symlink", (i) => (i.isRegularFile = () => false)],
+    // The one that keeps a stale exception from becoming permanent.
+    ["modified-upstream-unchanged", (i) => (i.changed = () => false)],
+  ];
+  for (const [code, mutate] of cases) {
+    const input = base();
+    mutate(input);
+    assert.throws(() => assertModifiedUpstreamContract(input), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // Worker settings. Ordinary repository names are not forbidden literals, so
+  // these are the assertions that notice a target list still pointing somewhere.
+  const wrangler = readFileSync(join(root, WRANGLER_PATH), "utf8");
+  assertWranglerUnconfigured(wrangler);
+  const wranglerCases = [
+    ["wrangler-nonempty-var", wrangler.replace('TARGET_REPOS = ""', 'TARGET_REPOS = "a/b"')],
+    ["wrangler-nonempty-var", wrangler.replace('PUBLIC_BAY_REPOS = ""', 'PUBLIC_BAY_REPOS = "a/b"')],
+    ["wrangler-missing-var", wrangler.replace('CLAWSWEEPER_REPO = ""', "")],
+    ["wrangler-configured-key", wrangler + "\naccount_id = \"deadbeef\"\n"],
+    ["wrangler-configured-key", wrangler + "\ncustom_domain = true\n"],
+  ];
+  for (const [code, source] of wranglerCases) {
+    assert.throws(() => assertWranglerUnconfigured(source), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // Fixture tests run against pinned bytes, so the mapping decides what a green
+  // result actually means. Both the test set and its file list are compared.
+  const fixtureBaseline = new Set(Object.values(UPSTREAM_FIXTURE_TESTS).flat());
+  assertFixtureTestContract(config.derived.upstreamFixtureTests, fixtureBaseline);
+  const fixtureCases = [
+    ["fixture-test-set", {}],
+    [
+      "fixture-test-files",
+      {
+        "test/repository-profiles.test.ts": { reason: "x", files: ["dashboard/wrangler.toml"] },
+      },
+    ],
+    [
+      "fixture-test-reason",
+      {
+        "test/repository-profiles.test.ts": {
+          reason: " ",
+          files: [...UPSTREAM_FIXTURE_TESTS["test/repository-profiles.test.ts"]],
+        },
+      },
+    ],
+  ];
+  for (const [code, declared] of fixtureCases) {
+    assert.throws(
+      () => assertFixtureTestContract(declared, fixtureBaseline),
+      { code },
+      "expected " + code,
+    );
+    observed += 1;
+  }
+  return observed;
+}
+
+/**
  * Installation profile. Two different questions are checked here, and they are
  * deliberately not the same check.
  *
@@ -534,6 +630,7 @@ try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
   const installation = await runInstallationCases();
+  const upstream = runModifiedUpstreamCases();
   const controls = runTripwireControls();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
@@ -544,6 +641,8 @@ try {
       helpers +
       " installation=" +
       installation +
+      " modifiedUpstream=" +
+      upstream +
       " tripwireControls=" +
       controls.ran +
       " routing=" +

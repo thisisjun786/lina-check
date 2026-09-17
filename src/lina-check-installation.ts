@@ -54,9 +54,11 @@ export function loadInstallationProfile(
     };
   }
   const parsed = parseInstallationProfile(raw);
-  return parsed.ok
-    ? { profile: parsed.profile, denied: null }
-    : { profile: UNCONFIGURED_INSTALLATION, denied: { code: parsed.code, detail: parsed.detail } };
+  if (parsed.code === null) return { profile: parsed.profile, denied: null };
+  return {
+    profile: UNCONFIGURED_INSTALLATION,
+    denied: { code: parsed.code, detail: parsed.detail },
+  };
 }
 
 let cached: InstallationLoad | null = null;

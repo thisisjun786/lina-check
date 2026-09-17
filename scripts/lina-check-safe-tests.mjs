@@ -40,14 +40,31 @@
  * divergence is visible rather than silent.
  */
 
-import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { availableParallelism } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { SAFE_TESTS, TRIPWIRE_ENV, classifyBuildPair } from "./lina-check-derived-contract.mjs";
+import {
+  SAFE_TESTS,
+  TRIPWIRE_ENV,
+  UPSTREAM_FIXTURE_TESTS,
+  UPSTREAM_FIXTURE_TEST_NAMES,
+  classifyBuildPair,
+} from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-safe-tests]";
@@ -76,7 +93,13 @@ function declaredTests() {
     return { error: "declared restored tests differ from the SAFE_TESTS literal" };
   const missing = paths.filter((value) => !existsSync(join(root, value)));
   if (missing.length > 0) return { error: "declared test file is absent: " + missing.join(", ") };
-  return { paths };
+  // The pin comes from the same declaration the validator checks against its own
+  // literal, so a fixture cannot be built from some other commit.
+  const pin = config.upstream && config.upstream.commit;
+  if (typeof pin !== "string" || pin.length !== 40) {
+    return { error: "declaration is missing a usable upstream.commit" };
+  }
+  return { paths, pin };
 }
 
 function childEnv() {
@@ -133,7 +156,28 @@ function distState() {
  * control through the CLI made it depend on the built-output preflight, which
  * refuses earlier and would let a broken tripwire pass unnoticed.
  */
-export function launchTests(paths, concurrency) {
+/**
+ * Materialise the pinned upstream copies a fixture test needs, outside the
+ * repository. Read straight from the pin with git show rather than copied by
+ * hand, so the fixture cannot drift from upstream, and placed under the system
+ * temporary directory so the working tree is untouched.
+ */
+export function makeUpstreamFixture(testPath, pin) {
+  const files = UPSTREAM_FIXTURE_TESTS[testPath];
+  if (!files) throw new Error("no upstream fixture declared for " + testPath);
+  const dir = mkdtempSync(join(tmpdir(), "lina-check-upstream-"));
+  for (const file of files) {
+    const bytes = execFileSync("git", ["-C", root, "show", pin + ":" + file], {
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    const target = join(dir, file);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, bytes);
+  }
+  return dir;
+}
+
+export function launchTests(paths, concurrency, options = {}) {
   if (process.env[TRIPWIRE_ENV])
     throw new Error(
       TRIPWIRE_ENV + " tripped: launchTests() was reached, so this was not a preview",
@@ -147,7 +191,7 @@ export function launchTests(paths, concurrency) {
       "\n",
   );
   return spawnSync(process.execPath, ["--test", "--test-concurrency=" + concurrency, ...paths], {
-    cwd: root,
+    cwd: options.cwd ?? root,
     stdio: "inherit",
     env,
   });
@@ -189,6 +233,7 @@ export function main(argv, deps = {}) {
       distPairs: dist.pairs,
       command,
       upstreamTarget: "unit-subset",
+      upstreamFixtureTests: [...UPSTREAM_FIXTURE_TEST_NAMES],
     };
     if (json) {
       process.stdout.write(JSON.stringify(report) + "\n");
@@ -220,14 +265,34 @@ export function main(argv, deps = {}) {
     return 3;
   }
   process.stderr.write(LABEL + " files=" + paths.length + " concurrency=" + concurrency + "\n");
-  const outcome = launchTests(paths, concurrency);
-  if (outcome.error)
-    throw new Error("could not start the node test runner", { cause: outcome.error });
-  if (outcome.signal) {
-    process.stderr.write(LABEL + " terminated by signal " + outcome.signal + "\n");
-    return 1;
+  // Most tests run at the repository root. A declared fixture test runs against
+  // pinned upstream bytes instead, because it asserts upstream operational
+  // values this fork deliberately no longer carries.
+  const fixtureNames = paths.filter((value) => Boolean(UPSTREAM_FIXTURE_TESTS[value]));
+  const rootPaths = paths.filter((value) => !UPSTREAM_FIXTURE_TESTS[value]);
+  const outcomes = [];
+  if (rootPaths.length > 0) outcomes.push(launchTests(rootPaths, concurrency));
+  for (const name of fixtureNames) {
+    const directory = makeUpstreamFixture(name, declaration.pin);
+    process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
+    try {
+      // Absolute path: the test resolves imports relative to its own file, while
+      // its two direct reads follow the working directory into the fixture.
+      outcomes.push(launchTests([join(root, name)], 1, { cwd: directory }));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   }
-  return outcome.status === null ? 1 : outcome.status;
+  for (const outcome of outcomes) {
+    if (outcome.error)
+      throw new Error("could not start the node test runner", { cause: outcome.error });
+    if (outcome.signal) {
+      process.stderr.write(LABEL + " terminated by signal " + outcome.signal + "\n");
+      return 1;
+    }
+    if (outcome.status !== 0) return outcome.status === null ? 1 : outcome.status;
+  }
+  return 0;
 }
 
 /**

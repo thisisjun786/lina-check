@@ -22,6 +22,7 @@ import {
   type HostedTargetAdmission,
   type HostedTargetPolicy,
 } from "../hosted-target-admission.js";
+import { installationProfile } from "../lina-check-installation.js";
 import { fetchExactReviewQueuePressure } from "../queue-pressure.js";
 import { coverageTrackedCountsFromManifest } from "../review-coverage-manifest.js";
 import { parseArgs, repoRoot } from "./lib.js";
@@ -336,7 +337,10 @@ export function readInventoryConfig(
   const parsed = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
   const config = record(parsed, "target repository config");
   const inventory = record(config.target_inventory, "target_inventory");
-  const hostedTargetPolicy = hostedTargetPolicyFromRegistry(parsed);
+  // The inventory file describes targets; it does not authorize them. Pair it
+  // with the installation profile so fanout cannot act on a repository this
+  // installation never named.
+  const hostedTargetPolicy = hostedTargetPolicyFromRegistry(parsed, installationProfile());
   if (!hostedTargetPolicy) throw new Error("target repository config has invalid hosted policy");
   return {
     owners: stringArray(inventory.owners, "target_inventory.owners").map((owner) =>
