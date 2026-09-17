@@ -949,6 +949,8 @@ function runDerivedTestCases() {
     "if (!process.execArgv.includes('--import')) start();\n",
     "const how = process.argv[1];\n",
     "const options = process.env.NODE_OPTIONS;\n",
+    "if (process.env.NO_COLOR) skip();\n",
+    "const forced = process.env.FORCE_COLOR;\n",
   ]) {
     const looking = base();
     const rest2 = looking.readFile;
@@ -964,7 +966,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 15;
+  observed += 17;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
@@ -1094,7 +1096,11 @@ function observeDerivedTests(directory) {
         cwd: root,
         encoding: "utf8",
         timeout: 600_000,
-        env: { ...process.env, [LAUNCH_LOG_ENV]: log, FORCE_COLOR: "0", NO_COLOR: "1" },
+        // Nothing is added to the environment except the log path the preload
+        // deletes. Pinning colour here would be a variable the lane does not
+        // set, which is one more way for a test to tell it is being observed;
+        // the reporter's colour is stripped when the output is read instead.
+        env: { ...process.env, [LAUNCH_LOG_ENV]: log },
       },
     );
     const launches = readFileSync(log, "utf8").split("\n").filter(Boolean).map(JSON.parse);

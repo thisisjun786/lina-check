@@ -673,6 +673,8 @@ const OBSERVATION_SIGNAL = Object.freeze([
   "process.execArgv",
   "NODE_OPTIONS",
   "LINA_CHECK_LAUNCH_LOG",
+  "FORCE_COLOR",
+  "NO_COLOR",
 ]);
 
 /**

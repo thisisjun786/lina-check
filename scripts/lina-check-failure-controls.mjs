@@ -209,13 +209,20 @@ function acquireCheckout() {
       return {
         // Refreshed between controls so the bound measures silence, not length.
         beat: () => {
-          if (!existsSync(RUN_OWNER)) return;
+          // Losing the lock has to be loud. A contender that judged this run
+          // stale can have moved the directory aside between beats, and
+          // continuing to mutate test files after that is exactly the
+          // interleaving the lock exists to prevent.
+          let held = null;
           try {
-            const held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
-            if (held.pid !== process.pid) return;
+            held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
           } catch {
-            return;
+            held = null;
           }
+          if (held?.pid !== process.pid)
+            throw new Error(
+              "lost the checkout lock at " + RUN_LOCK + "; another run took it over",
+            );
           writeFileSync(RUN_OWNER, record());
         },
         release: () => {
@@ -247,12 +254,38 @@ function acquireCheckout() {
       // same lock stale can each delete the other's fresh one. Moving the
       // directory aside is a single step: exactly one contender succeeds, and
       // the loser sees ENOENT and re-reads what is there now.
+      // Move it aside first, then judge what was moved. The read above can be
+      // stale by the time the rename lands: the owner may have refreshed in
+      // between. Renaming is atomic, so exactly one contender ends up holding
+      // the directory and can decide on its real contents; if it turns out to
+      // be live, it goes straight back.
       const aside = RUN_LOCK + "." + process.pid + "." + Date.now() + ".stale";
       try {
         renameSync(RUN_LOCK, aside);
       } catch (moveError) {
         if (moveError?.code !== "ENOENT") throw moveError;
         continue;
+      }
+      let moved = null;
+      try {
+        moved = JSON.parse(readFileSync(join(aside, "owner.json"), "utf8"));
+      } catch {
+        moved = null;
+      }
+      if (!lockIsStale(moved)) {
+        try {
+          renameSync(aside, RUN_LOCK);
+        } catch {
+          // Someone created a fresh lock while this one was aside; theirs wins
+          // and this copy is discarded rather than clobbering it.
+          rmSync(aside, { recursive: true, force: true });
+        }
+        throw new Error(
+          "another failure-control run holds this checkout (pid " +
+            String(moved?.pid) +
+            "); wait for it rather than interleaving mutations",
+          { cause: error },
+        );
       }
       rmSync(aside, { recursive: true, force: true });
     }
@@ -263,7 +296,7 @@ const pending = new Map();
 
 function park(path, source) {
   pending.set(path, source);
-  writeFileSync(LOCK, JSON.stringify({ path, source }));
+  writeFileSync(LOCK, JSON.stringify({ path, source, pid: process.pid, at: Date.now() }));
 }
 
 function unpark(path) {
@@ -275,15 +308,23 @@ export function recoverInterrupted() {
   const restored = [];
   for (const name of readdirSync(tmpdir())) {
     if (!name.startsWith(LOCK_PREFIX) || !name.endsWith(".lock.json")) continue;
-    // A record whose owner is still running belongs to that run. Restoring from
-    // it would undo a mutation mid-flight and drop the only way to repair it.
-    const owner = Number(name.slice(LOCK_PREFIX.length).replace(".lock.json", ""));
-    if (owner !== process.pid && processAlive(owner)) continue;
     const lock = join(tmpdir(), name);
+    let parked = null;
     try {
-      const parked = JSON.parse(readFileSync(lock, "utf8"));
-      writeFileSync(parked.path, parked.source);
-      restored.push(parked.path);
+      parked = JSON.parse(readFileSync(lock, "utf8"));
+    } catch {
+      parked = null;
+    }
+    // A record whose owner is still running belongs to that run: restoring from
+    // it would undo a mutation mid-flight and drop the only way to repair it.
+    // Staleness is judged the same way as the checkout lock, so a recycled pid
+    // cannot make a leftover mutation unrecoverable.
+    if (parked && !lockIsStale({ pid: parked.pid, at: parked.at })) continue;
+    try {
+      if (parked) {
+        writeFileSync(parked.path, parked.source);
+        restored.push(parked.path);
+      }
     } catch {
       // A truncated record cannot be restored from; removing it is still right,
       // because leaving it would make every later run report the same failure.
