@@ -421,6 +421,9 @@ export async function main(argv, deps = {}) {
   const onStop = (signal) => {
     pendingInterrupt = signal;
   };
+  // A stop belongs to one run. Left set, it would make every later call in this
+  // process reap its first launch and quit before the second.
+  pendingInterrupt = null;
   for (const signal of stopSignals) process.on(signal, onStop);
   try {
     if (rootPaths.length > 0) {
@@ -433,6 +436,10 @@ export async function main(argv, deps = {}) {
       const directory = fixture(name, declaration.pin);
       process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
       try {
+        // Building the fixture is the longest gap between the check above and
+        // the launch below, so the stop is read again rather than acted on
+        // stale. Breaking here still runs the cleanup in finally.
+        if (interruptedBy()) break;
         // Absolute path: the test resolves imports relative to its own file, while
         // its declared reads follow the working directory into the fixture.
         const outcome = launch([join(root, name)], 1, { cwd: directory });

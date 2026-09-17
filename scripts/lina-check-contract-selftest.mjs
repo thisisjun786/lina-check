@@ -542,6 +542,32 @@ async function runLaneShapeCases() {
     "a real SIGINT during a launch must stop the lane and report 130, saw: " + child.stdout,
   );
   observed += 2;
+
+  // A stop that lands while the fixture is being built must not still start
+  // that fixture's test. The gap between the loop's check and the launch is the
+  // fixture build, which is where this one arrives.
+  const lateLaunched = [];
+  let lateStop = null;
+  const lateExit = await runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => {
+      lateLaunched.push(1);
+      return { pid: 8080, status: 0 };
+    },
+    makeFixture: () => {
+      lateStop = "SIGTERM";
+      return mkdtempSync(join(tmpdir(), "lina-check-selftest-"));
+    },
+    reap: () => ({ reaped: true, group: -8080 }),
+    interrupted: () => lateStop,
+  });
+  assert.equal(lateExit, 143, "a stop during the fixture build still reports the interrupt");
+  assert.equal(
+    lateLaunched.length,
+    1,
+    "only the root batch may have launched; the fixture's test must not start",
+  );
+  observed += 2;
   return observed;
 }
 
