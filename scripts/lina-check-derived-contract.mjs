@@ -13,6 +13,14 @@
 
 export const TRIPWIRE_ENV = "LINA_CHECK_SPAWN_TRIPWIRE";
 export const PLAN_UNIT = "devlog/_plan/260917_jun135_part_a";
+export const PLAN_UNIT_JUN198 = "devlog/_plan/260917_jun198_install_profile";
+
+/**
+ * Plan units whose documents may be declared as derived files. Listing them here
+ * rather than widening the pattern to all of devlog/_plan keeps a new directory
+ * name from silently becoming an accepted location.
+ */
+export const PLAN_UNITS = Object.freeze([PLAN_UNIT, PLAN_UNIT_JUN198]);
 
 export const DERIVED_SCRIPT_NAMES = Object.freeze([
   "lina:boundary-probe",
@@ -137,7 +145,11 @@ export const BOUNDARY_WORKFLOWS = Object.freeze([
 
 const DERIVED_FILE_PATTERNS = Object.freeze([
   /^scripts\/lina-check-[a-z-]+\.mjs$/,
-  /^devlog\/_plan\/260917_jun135_part_a\/(evidence\/)?[0-9a-z_-]+\.(md|json)$/,
+  new RegExp(
+    "^(" +
+      PLAN_UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
+      ")\\/(evidence\\/)?[0-9a-z_-]+\\.(md|json)$",
+  ),
 ]);
 const DERIVED_SCRIPT_COMMAND = /^node (scripts\/lina-check-[a-z-]+\.mjs)(?: [a-z-]+)*$/;
 const BLOCKED_NODE_TARGET = /\bnode ([\w./-]+\.(?:js|mjs|cjs|ts|mts))\b/g;

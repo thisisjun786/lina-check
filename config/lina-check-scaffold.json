@@ -187,6 +187,15 @@
       "devlog/_plan/260917_jun135_part_a/060_results_original_vs_derived.md": { "reason": "Original-baseline results kept separate from results after the derived change." },
       "devlog/_plan/260917_jun135_part_a/evidence/boundary-probe.json": { "reason": "Captured boundary-probe output from one observed run. A historical observation, not an expected-output oracle." },
       "devlog/_plan/260917_jun135_part_a/070_delivery_gates.md": { "reason": "Delivery gate results at a named SHA, the hosted-check situation, and the per-finding review receipts." }
+      ,
+      "devlog/_plan/260917_jun198_install_profile/000_plan.md": { "reason": "JUN-198 plan of record: contract C1-C8, acceptance A1-A9, and the four audit rounds that reshaped it." },
+      "devlog/_plan/260917_jun198_install_profile/010_hardcoding_inventory.md": { "reason": "Full sweep of personal-owner and upstream-operational literals, classified by whether each one actually decides admission." },
+      "devlog/_plan/260917_jun198_install_profile/020_installation_profile.md": { "reason": "Installation profile schema, the two entry points, and every rejection the loader must produce." },
+      "devlog/_plan/260917_jun198_install_profile/030_validator_extension.md": { "reason": "Declared modified-upstream layer: what the code literal owns and what configuration may only justify." },
+      "devlog/_plan/260917_jun198_install_profile/040_worker_state_queue.md": { "reason": "Worker and R2 structure preserved while unconfigured, the shared transport boundary, and the deferred Node transports." },
+      "devlog/_plan/260917_jun198_install_profile/050_github_app_permissions.md": { "reason": "Method for deriving App permission scope from real source calls instead of copying the upstream manifest." },
+      "devlog/_plan/260917_jun198_install_profile/060_restored_test_compatibility.md": { "reason": "Why one restored test runs against pinned upstream bytes, and what that run does and does not prove." },
+      "devlog/_plan/260917_jun198_install_profile/070_delivery_gates.md": { "reason": "Delivery gate results, boundary observations, commit identity rule, and per-finding review receipts." }
     },
     "scripts": {
       "lina:test-safe": { "command": "node scripts/lina-check-safe-tests.mjs run", "reason": "Execute the declared restored upstream tests." },
