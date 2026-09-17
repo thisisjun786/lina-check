@@ -83,8 +83,10 @@ export const CONTROLS = Object.freeze([
   {
     file: "test/lina-check-close-policy.test.ts",
     what: "read the unparked workflow spelling again",
-    from: ".github/workflows/sweep.yml.disabled",
-    to: ".github/workflows/sweep.yml",
+    // The bare path appears twice in this suite, so the anchor carries the test
+    // it belongs to. A control names one occurrence or it names nothing.
+    from: 'policy", () => {\n  const sweepWorkflow = readFileSync(\n    new URL("../.github/workflows/sweep.yml.disabled"',
+    to: 'policy", () => {\n  const sweepWorkflow = readFileSync(\n    new URL("../.github/workflows/sweep.yml"',
   },
   {
     file: "test/lina-check-action-ledger.test.ts",
@@ -368,8 +370,20 @@ export function runControls(controls = CONTROLS) {
     const path = join(root, control.file);
     const before = digest(path);
     const source = readFileSync(path, "utf8");
-    if (!source.includes(control.from))
-      throw new Error("anchor not found in " + control.file + ": " + control.what);
+    // Exactly one, not merely present. String.replace changes the first match,
+    // so a repeated anchor mutates an occurrence the control did not name, and
+    // a failure from that other place still reads as detection. The receipt
+    // would then claim sensitivity for an assertion that never ran.
+    const occurrences = source.split(control.from).length - 1;
+    if (occurrences !== 1)
+      throw new Error(
+        "anchor matches " +
+          occurrences +
+          " times in " +
+          control.file +
+          ", expected exactly one: " +
+          control.what,
+      );
     const baseline = runSuite(control.file);
     // Each suite run can take the whole per-run timeout, so the lease is
     // refreshed between them as well as before them.

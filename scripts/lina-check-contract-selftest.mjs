@@ -1667,9 +1667,13 @@ function runFailureControlCases() {
     );
   for (const control of FAILURE_CONTROLS) {
     const source = readFileSync(join(root, control.file), "utf8");
-    assert.ok(
-      source.includes(control.from),
-      "control anchor is gone, so the receipt is stale: " + control.file + " :: " + control.what,
+    // Exactly one occurrence, because the mutation replaces the first match.
+    // A repeated anchor moves the mutation to a place the control never named,
+    // and a failure from there still reads as detection.
+    assert.equal(
+      source.split(control.from).length - 1,
+      1,
+      "control anchor must match exactly once: " + control.file + " :: " + control.what,
     );
     observed += 1;
   }

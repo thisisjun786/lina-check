@@ -93,7 +93,7 @@
     {
       "file": "test/lina-check-close-policy.test.ts",
       "mutation": "read the unparked workflow spelling again",
-      "fingerprint": "c8a75bbf1d42ee2b",
+      "fingerprint": "37e4a1f4ca6a28d9",
       "suite_digest": "fd572df86b386a599fd53a4c3ca45aa919042975ca0847e8e3169fa498553fa1",
       "baseline_exit": 0,
       "mutated_exit": 1,
