@@ -138,7 +138,7 @@ function declaredDerivedTests() {
   return { paths: names };
 }
 
-function childEnv() {
+export function childEnv() {
   const env = { ...process.env };
   const removed = [];
   for (const key of Object.keys(env))

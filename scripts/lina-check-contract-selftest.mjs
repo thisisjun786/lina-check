@@ -66,7 +66,7 @@ import {
   resolveRelativeImport,
   interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
-import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
+import { childEnv, launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 import {
   declarations as coverageDeclarations,
   executedNames as coverageExecutedNames,
@@ -1075,47 +1075,53 @@ function runDerivedTestObservation() {
   }
 }
 
+/** The lane's filtered environment, with a credential-shaped name planted first. */
+function plantedCredential() {
+  const saved = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = "ghp_probe";
+  try {
+    return childEnv().env;
+  } finally {
+    if (saved === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = saved;
+  }
+}
+
 function observeDerivedTests(directory) {
   const preload = join(directory, "preload.mjs");
   const sentinel = join(directory, "sentinel.test.mjs");
   writeFileSync(preload, PRELOAD_SOURCE);
   writeFileSync(sentinel, SENTINEL_SOURCE);
-  const observe = (name, source) => {
+  const observe = (name, imports) => {
     const log = join(directory, name + ".jsonl");
     writeFileSync(log, "");
-    // Run a real module rather than --import plus -e. Both of those are visible
-    // to the code under observation through process.execArgv and process.argv,
-    // which would let a test behave one way here and another in the lane. The
-    // preload is imported statically by the runner, so it still installs before
-    // any test module loads.
+    // A real module rather than --import plus -e: both are visible to the code
+    // under observation. The preload is imported statically, so it installs
+    // before any test module loads.
     const runner = join(directory, name + ".runner.mjs");
     writeFileSync(
       runner,
-      "import " + JSON.stringify(pathToFileURL(preload).href) + ";\n" + source + "\n",
+      "import " +
+        JSON.stringify(pathToFileURL(preload).href) +
+        ";\n" +
+        imports.map((path) => "await import(" + JSON.stringify(pathToFileURL(path).href) + ");").join("\n") +
+        "\n",
     );
-    const result = spawnSync(
-      process.execPath,
-      [runner],
-      {
-        cwd: root,
-        encoding: "utf8",
-        timeout: 600_000,
-        // Nothing is added to the environment except the log path the preload
-        // deletes. Pinning colour here would be a variable the lane does not
-        // set, which is one more way for a test to tell it is being observed;
-        // the reporter's colour is stripped when the output is read instead.
-        env: { ...process.env, [LAUNCH_LOG_ENV]: log },
-      },
-    );
+    // The lane strips credential-shaped names before launching tests, so the
+    // observation uses the lane's own filter rather than a copy of the idea.
+    const { env: filtered } = childEnv();
+    const result = spawnSync(process.execPath, [runner], {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 600_000,
+      env: { ...filtered, [LAUNCH_LOG_ENV]: log },
+    });
     const launches = readFileSync(log, "utf8").split("\n").filter(Boolean).map(JSON.parse);
     return { result: { ...result, stdout: stripAnsi(result.stdout) }, launches };
   };
 
-  const control = observe("control", "await import(" + JSON.stringify(sentinel) + ");");
-  // Nothing in the observed process may advertise the observation. A test that
-  // can tell it is being watched can behave one way here and another in the
-  // lane, so the runner is an ordinary module and the log variable is gone by
-  // the time any test loads. This is checked by asking the observed process.
+  const control = observe("control", [sentinel]);
+  // Nothing in the observed process may advertise the observation.
   const tell = join(directory, "tell.jsonl");
   const probe = join(directory, "tell.runner.mjs");
   writeFileSync(
@@ -1125,13 +1131,15 @@ function observeDerivedTests(directory) {
       ";\n" +
       "process.stdout.write(JSON.stringify({ execArgv: process.execArgv, argv: process.argv.slice(1), log: process.env." +
       LAUNCH_LOG_ENV +
-      " ?? null }));\n",
+      " ?? null, token: process.env.GITHUB_TOKEN ?? null }));\n",
   );
   writeFileSync(tell, "");
   const told = spawnSync(process.execPath, [probe], {
     cwd: root,
     encoding: "utf8",
-    env: { ...process.env, [LAUNCH_LOG_ENV]: tell },
+    // The credential is planted in this process's environment, because that is
+    // what the filter reads. Adding it after filtering would prove nothing.
+    env: { ...plantedCredential(), [LAUNCH_LOG_ENV]: tell },
   });
   assert.equal(told.status, 0, "the observation probe must run: " + String(told.stderr).slice(-300));
   const seen = JSON.parse(told.stdout);
@@ -1143,6 +1151,12 @@ function observeDerivedTests(directory) {
     "the observed process must not advertise how it was started",
   );
   assert.equal(
+    seen.token,
+    null,
+    "a credential-shaped variable must be filtered the way the lane filters it",
+  );
+
+  assert.equal(
     control.result.status,
     0,
     "positive control: the sentinel must run: " + String(control.result.stderr).slice(-400),
@@ -1153,40 +1167,48 @@ function observeDerivedTests(directory) {
   );
   assert.ok(
     control.launches.some((entry) => entry.name === "spawnSync"),
-    "positive control: the sentinel's launch must be recorded by name",
+    "positive control: the sentinel\u0027s launch must be recorded by name",
   );
-
-  const imports = DERIVED_TESTS.map(
-    // A Windows path is not a URL: embedding C:\... in import() makes Node read
-    // the drive letter as a scheme, so the observation would never start there.
-    (path) => "await import(" + JSON.stringify(pathToFileURL(join(root, path)).href) + ");",
-  ).join("\n");
-  const observed = observe("derived", imports);
   assert.equal(
-    observed.result.status,
-    0,
-    "the derived tests must pass under observation: " + String(observed.result.stderr).slice(-600),
-  );
-  const passed = /pass (\d+)/.exec(observed.result.stdout);
-  assert.ok(passed, "could not read a pass count from the observed run");
-  assert.ok(
-    Number(passed[1]) >= DERIVED_TEST_CASE_FLOOR,
-    "observed " + passed[1] + " derived cases, below the floor of " + DERIVED_TEST_CASE_FLOOR,
-  );
-  assert.match(observed.result.stdout, /fail 0/, "the observed run reported failures");
-  assert.deepEqual(
-    observed.launches,
-    [],
-    "a derived test started a process: " + JSON.stringify(observed.launches),
+    stripAnsi(
+      String.fromCharCode(27) +
+        "[32m\u2714 a coloured case (1.2ms)" +
+        String.fromCharCode(27) +
+        "[39m",
+    ),
+    "\u2714 a coloured case (1.2ms)",
   );
 
-  // Bind the coverage map to this run. A name parsed out of a file is not a case
-  // that executed: a mapped case declared with { skip: true } still parses, and
-  // an aggregate pass count can be held up by some other case. Every record the
-  // map calls recovered has to appear here as a case that actually passed.
-  const passing = new Set(
-    passingCaseNames(observed.result.stdout),
+  // One process per declared file, the way the lane runs them, so a fixture or
+  // a band left behind by one derived test cannot change another's result here
+  // while leaving the lane unaffected.
+  const launches = [];
+  const passing = new Set();
+  let cases = 0;
+  DERIVED_TESTS.forEach((path, index) => {
+    const observed = observe("derived-" + index, [join(root, path)]);
+    assert.equal(
+      observed.result.status,
+      0,
+      path + " must pass under observation: " + String(observed.result.stderr).slice(-600),
+    );
+    const passed = /pass (\d+)/.exec(observed.result.stdout);
+    assert.ok(passed, "could not read a pass count for " + path);
+    cases += Number(passed[1]);
+    assert.match(observed.result.stdout, /fail 0/, path + " reported failures");
+    for (const name of passingCaseNames(observed.result.stdout)) passing.add(name);
+    launches.push(...observed.launches);
+  });
+  assert.ok(
+    cases >= DERIVED_TEST_CASE_FLOOR,
+    "observed " + cases + " derived cases, below the floor of " + DERIVED_TEST_CASE_FLOOR,
   );
+  assert.deepEqual(
+    launches,
+    [],
+    "a derived test started a process: " + JSON.stringify(launches),
+  );
+
   const recovered = coverageGenerate().receipt.records.filter(
     (record) => record.disposition === "recovered",
   );
@@ -1198,9 +1220,10 @@ function observeDerivedTests(directory) {
       missing.join(" | "),
   );
   assert.ok(recovered.length > 0, "the map recovered nothing, so this control proves nothing");
+
   return {
-    cases: Number(passed[1]),
-    launches: observed.launches.length,
+    cases,
+    launches: launches.length,
     control: control.launches.length,
     boundRecords: recovered.length,
   };
