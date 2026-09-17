@@ -34,10 +34,12 @@ import {
   FORBIDDEN_INSTALLATION_LITERALS,
   GUARD_SHA256,
   INSTALLATION_CONFIG_PATH,
+  LANE_TIMEOUT_MS,
   MODIFIED_UPSTREAM_FILES,
   SAFE_TESTS,
+  SAFE_TEST_COUNT,
   TRIPWIRE_ENV,
-  UPSTREAM_FIXTURE_TESTS,
+  UPSTREAM_FIXTURE_TEST_NAMES,
   WRANGLER_PATH,
   assertDerivedContract,
   assertFixtureTestContract,
@@ -47,12 +49,14 @@ import {
   assertNoLifecycleHooks,
   assertPinnedPnpm,
   assertProbeTargetGuarded,
+  assertSafeTestListShape,
   assertShippedInstallationEmpty,
   assertWranglerUnconfigured,
   assertWorkflowsParked,
   assertWorktreeUnchanged,
   blockedNodeTargets,
   classifyBuildPair,
+  describeLaunchOutcome,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
 
@@ -287,6 +291,75 @@ function runHelperCases() {
   return 18;
 }
 
+/**
+ * The lane's own invariants. The restored-test count used to be an inline
+ * comparison inside the contract module, which meant the only way to exercise it
+ * was to break the module; growing the lane from 13 tests to 206 made that cost real.
+ * Both invariants are now functions, and every refusal is fed a case here.
+ */
+function runLaneShapeCases() {
+  let observed = 0;
+  // Clean control first: a checker that refuses everything would satisfy every
+  // rejection below and prove nothing.
+  assert.equal(assertSafeTestListShape([...SAFE_TESTS], SAFE_TEST_COUNT), SAFE_TEST_COUNT);
+  const shapeCases = [
+    ["safe-test-shape", "not a list"],
+    ["safe-test-count", [...SAFE_TESTS].slice(1)],
+    ["safe-test-count", [...SAFE_TESTS, "test/zzz-widened.test.ts"]],
+    ["safe-test-order", [...SAFE_TESTS].reverse()],
+    ["safe-test-order", [SAFE_TESTS[0], SAFE_TESTS[0], ...SAFE_TESTS.slice(2)]],
+  ];
+  for (const [code, list] of shapeCases) {
+    assert.throws(() => assertSafeTestListShape(list, SAFE_TEST_COUNT), { code }, "expected " + code);
+    observed += 1;
+  }
+
+  // A launch that never started and a launch stopped at the lane bound both carry
+  // a status a bare success check would misread, so every branch is named. The
+  // timeout case is written the way spawnSync actually reports one, which is all
+  // three signals at once: a null status, a SIGTERM, and an ETIMEDOUT error. A
+  // hand-written signal-only object passes against a classifier that reads the
+  // error first and calls a timeout a failed launch, so it would have proved
+  // nothing.
+  const timedOut = Object.assign(new Error("spawnSync ETIMEDOUT"), { code: "ETIMEDOUT" });
+  const outcomes = [
+    [{ status: 0 }, "ok", 0],
+    [{ status: 3 }, "failed", 3],
+    [{ status: null }, "failed", 1],
+    [{ status: null, signal: "SIGTERM", error: timedOut }, "timeout", 1],
+    [{ signal: "SIGTERM" }, "signal", 1],
+    [{ error: new Error("spawn ENOENT") }, "unstarted", null],
+    [null, "unusable", 1],
+  ];
+  for (const [outcome, kind, exitCode] of outcomes) {
+    const verdict = describeLaunchOutcome(outcome, LANE_TIMEOUT_MS);
+    assert.equal(verdict.kind, kind, "expected " + kind);
+    assert.equal(verdict.exitCode, exitCode, "exit code for " + kind);
+    observed += 1;
+  }
+  assert.ok(
+    describeLaunchOutcome(
+      { status: null, signal: "SIGTERM", error: timedOut },
+      LANE_TIMEOUT_MS,
+    ).detail.includes(String(LANE_TIMEOUT_MS)),
+    "a launch stopped at the bound must name the bound",
+  );
+  observed += 1;
+  // The shape is reproduced rather than asserted from memory: spawnSync is the
+  // only thing that decides what a timeout looks like.
+  const observedTimeout = spawnSync(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    timeout: 100,
+  });
+  assert.equal(observedTimeout.error?.code, "ETIMEDOUT", "spawnSync must report a timeout error");
+  assert.equal(
+    describeLaunchOutcome(observedTimeout, LANE_TIMEOUT_MS).kind,
+    "timeout",
+    "a real spawnSync timeout must be classified as one",
+  );
+  observed += 1;
+  return observed;
+}
+
 function runTripwireControls() {
   const env = { ...process.env, [TRIPWIRE_ENV]: "1" };
   const script = "scripts/lina-check-safe-tests.mjs";
@@ -418,30 +491,97 @@ function runModifiedUpstreamCases() {
   }
 
   // Fixture tests run against pinned bytes, so the mapping decides what a green
-  // result actually means. Both the test set and its file list are compared.
-  const fixtureBaseline = new Set(Object.values(UPSTREAM_FIXTURE_TESTS).flat());
-  assertFixtureTestContract(config.derived.upstreamFixtureTests, fixtureBaseline);
+  // result actually means. The contract resolves the .github tree from the pin
+  // rather than from a copied list, so the control needs the real listing.
+  const listed = spawnSync(
+    "git",
+    ["-C", root, "ls-tree", "-r", "--name-only", "-z", config.upstream.commit],
+    { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  assert.equal(listed.status, 0, "could not list the pinned upstream tree");
+  const fixtureBaseline = new Set(listed.stdout.split("\u0000").filter(Boolean));
+  const declaredFixtures = config.derived.upstreamFixtureTests;
+  const fixtureSummary = assertFixtureTestContract(declaredFixtures, fixtureBaseline);
+  assert.equal(fixtureSummary.tests, UPSTREAM_FIXTURE_TEST_NAMES.length);
+  const clone = () => structuredClone(declaredFixtures);
+  const named = UPSTREAM_FIXTURE_TEST_NAMES[0];
+  const walker = UPSTREAM_FIXTURE_TEST_NAMES.find((name) => declaredFixtures[name].githubTree);
+  assert.ok(walker, "expected at least one fixture test to declare the pinned .github tree");
   const fixtureCases = [
-    ["fixture-test-set", {}],
+    ["fixture-test-set", {}, fixtureBaseline],
+    [
+      "fixture-test-set",
+      { ...clone(), "test/stable-json.test.ts": { reason: "x", githubTree: false, files: [] } },
+      fixtureBaseline,
+    ],
     [
       "fixture-test-files",
-      {
-        "test/repository-profiles.test.ts": { reason: "x", files: ["dashboard/wrangler.toml"] },
-      },
+      (() => {
+        const declared = clone();
+        declared[named].files = [...declared[named].files, "package.json"];
+        return declared;
+      })(),
+      fixtureBaseline,
+    ],
+    // An absent or null list must not read as an empty one. The entries that
+    // declare no extra reads are exactly the ones where that coercion would be
+    // invisible, so both spellings are fed in against such an entry.
+    [
+      "fixture-test-files",
+      (() => {
+        const declared = clone();
+        const empty = UPSTREAM_FIXTURE_TEST_NAMES.find((n) => declared[n].files.length === 0);
+        assert.ok(empty, "expected a fixture entry declaring no extra reads");
+        delete declared[empty].files;
+        return declared;
+      })(),
+      fixtureBaseline,
+    ],
+    [
+      "fixture-test-files",
+      (() => {
+        const declared = clone();
+        const empty = UPSTREAM_FIXTURE_TEST_NAMES.find((n) => declared[n].files.length === 0);
+        declared[empty].files = null;
+        return declared;
+      })(),
+      fixtureBaseline,
+    ],
+    // The flag is what decides whether a traversal sees every pinned workflow, so
+    // dropping it must be refused as loudly as dropping a named file.
+    [
+      "fixture-test-tree-flag",
+      (() => {
+        const declared = clone();
+        declared[walker].githubTree = false;
+        return declared;
+      })(),
+      fixtureBaseline,
     ],
     [
       "fixture-test-reason",
-      {
-        "test/repository-profiles.test.ts": {
-          reason: " ",
-          files: [...UPSTREAM_FIXTURE_TESTS["test/repository-profiles.test.ts"]],
-        },
-      },
+      (() => {
+        const declared = clone();
+        declared[named].reason = " ";
+        return declared;
+      })(),
+      fixtureBaseline,
+    ],
+    // A named read that is not in the pin, and a .github tree that lost a file.
+    [
+      "fixture-test-path",
+      clone(),
+      new Set([...fixtureBaseline].filter((path) => path !== "config/target-repositories.json")),
+    ],
+    [
+      "fixture-github-tree",
+      clone(),
+      new Set([...fixtureBaseline].filter((path) => path !== ".github/workflows/sweep.yml")),
     ],
   ];
-  for (const [code, declared] of fixtureCases) {
+  for (const [code, declared, baseline] of fixtureCases) {
     assert.throws(
-      () => assertFixtureTestContract(declared, fixtureBaseline),
+      () => assertFixtureTestContract(declared, baseline),
       { code },
       "expected " + code,
     );
@@ -712,6 +852,7 @@ function runAssertionIntegrityInner() {
 try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
+  const laneShape = runLaneShapeCases();
   const installation = await runInstallationCases();
   const upstream = runModifiedUpstreamCases();
   const controls = runTripwireControls();
@@ -722,6 +863,8 @@ try {
       declarations +
       " helpers=" +
       helpers +
+      " laneShape=" +
+      laneShape +
       " installation=" +
       installation +
       " modifiedUpstream=" +

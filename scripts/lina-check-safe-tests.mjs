@@ -30,8 +30,13 @@
  *   the limit is named rather than hidden: after any artifact restoration, run
  *   build:all before trusting a result.
  *
- * A broken declaration is a configuration fault, not a test failure, so it exits
- * 2 even when the failure surfaces as a thrown read or parse error.
+* A broken declaration is a configuration fault, not a test failure, so it exits
+* 2 even when the failure surfaces as a thrown read or parse error.
+*
+* Every launch carries LANE_TIMEOUT_MS. A declared test that never returns would
+* otherwise hang the lane rather than fail it, and a hung lane is the one result
+* nobody can tell apart from work still in progress. A launch stopped at that
+* bound is reported by name and exits 1.
  *
  * The child environment drops credential-shaped variables. That filter is
  * deliberately broad in the safety direction, so it can also drop non-credential
@@ -62,9 +67,12 @@ import {
   SAFE_TESTS,
   TRIPWIRE_ENV,
   DERIVED_TESTS,
+  LANE_TIMEOUT_MS,
   UPSTREAM_FIXTURE_TESTS,
   UPSTREAM_FIXTURE_TEST_NAMES,
   classifyBuildPair,
+  describeLaunchOutcome,
+  resolveFixtureFiles,
 } from "./lina-check-derived-contract.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -186,18 +194,48 @@ function distState() {
  * hand, so the fixture cannot drift from upstream, and placed under the system
  * temporary directory so the working tree is untouched.
  */
+/**
+ * One pin, one set of bytes. Twenty-two fixture tests sharing the pinned .github
+ * tree would otherwise mean more than a thousand git invocations for content
+ * that cannot differ between them. The caches live for one process, so a run
+ * still reads the pin fresh rather than trusting anything left on disk.
+ */
+const pinnedPathCache = new Map();
+const pinnedByteCache = new Map();
+
+function pinnedPaths(pin) {
+  if (!pinnedPathCache.has(pin))
+    pinnedPathCache.set(
+      pin,
+      execFileSync("git", ["-C", root, "ls-tree", "-r", "--name-only", "-z", pin], {
+        maxBuffer: 64 * 1024 * 1024,
+      })
+        .toString()
+        .split("\u0000")
+        .filter(Boolean),
+    );
+  return pinnedPathCache.get(pin);
+}
+
+function pinnedBytes(pin, file) {
+  const key = pin + ":" + file;
+  if (!pinnedByteCache.has(key))
+    pinnedByteCache.set(
+      key,
+      execFileSync("git", ["-C", root, "show", key], { maxBuffer: 16 * 1024 * 1024 }),
+    );
+  return pinnedByteCache.get(key);
+}
+
 export function makeUpstreamFixture(testPath, pin) {
-  const files = UPSTREAM_FIXTURE_TESTS[testPath];
-  if (!files) throw new Error("no upstream fixture declared for " + testPath);
+  const files = resolveFixtureFiles(testPath, pinnedPaths(pin));
   const dir = mkdtempSync(join(tmpdir(), "lina-check-upstream-"));
   // The caller only learns the directory name on a successful return, so a
   // throw partway through would strand whatever was already written. Clean up
   // here and let the original error through.
   try {
     for (const file of files) {
-      const bytes = execFileSync("git", ["-C", root, "show", pin + ":" + file], {
-        maxBuffer: 16 * 1024 * 1024,
-      });
+      const bytes = pinnedBytes(pin, file);
       const target = join(dir, file);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, bytes);
@@ -226,6 +264,10 @@ export function launchTests(paths, concurrency, options = {}) {
     cwd: options.cwd ?? root,
     stdio: "inherit",
     env,
+    // The lane had no bound at all. One declared test that never returned would
+    // have hung it instead of failing it, which is the one result a lane must
+    // never produce, because nobody can tell it apart from work in progress.
+    timeout: LANE_TIMEOUT_MS,
   });
 }
 
@@ -338,13 +380,12 @@ export function main(argv, deps = {}) {
     }
   }
   for (const outcome of outcomes) {
-    if (outcome.error)
+    const verdict = describeLaunchOutcome(outcome, LANE_TIMEOUT_MS);
+    if (verdict.kind === "ok") continue;
+    if (verdict.kind === "unstarted")
       throw new Error("could not start the node test runner", { cause: outcome.error });
-    if (outcome.signal) {
-      process.stderr.write(LABEL + " terminated by signal " + outcome.signal + "\n");
-      return 1;
-    }
-    if (outcome.status !== 0) return outcome.status === null ? 1 : outcome.status;
+    process.stderr.write(LABEL + " " + verdict.detail + "\n");
+    return verdict.exitCode;
   }
   return 0;
 }
