@@ -300,7 +300,7 @@ function runHelperCases() {
  * was to break the module; growing the lane from 13 tests to 206 made that cost real.
  * Both invariants are now functions, and every refusal is fed a case here.
  */
-function runLaneShapeCases() {
+async function runLaneShapeCases() {
   let observed = 0;
   // Clean control first: a checker that refuses everything would satisfy every
   // rejection below and prove nothing.
@@ -404,7 +404,7 @@ function runLaneShapeCases() {
   const reaped = [];
   const launched = [];
   const directories = [];
-  const exitCode = runnerMain(["run"], {
+  const exitCode = await runnerMain(["run"], {
     distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     launchTests: (paths) => {
       launched.push(paths.length);
@@ -452,7 +452,7 @@ function runLaneShapeCases() {
   // processes its tests started keep running, so this path reaps too.
   const signalled2 = { pid: 6260, status: null, signal: "SIGKILL" };
   const signalReaped = [];
-  const signalExit = runnerMain(["run"], {
+  const signalExit = await runnerMain(["run"], {
     distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     launchTests: () => signalled2,
     makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
@@ -465,7 +465,7 @@ function runLaneShapeCases() {
   assert.equal(signalReaped.length, 24, "every signalled launch must be reaped");
   // An ordinary failure has no group left to reap and must not be signalled.
   const quietReaped = [];
-  const quietExit = runnerMain(["run"], {
+  const quietExit = await runnerMain(["run"], {
     distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     launchTests: () => ({ pid: 6261, status: 2 }),
     makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
@@ -487,7 +487,7 @@ function runLaneShapeCases() {
   const stopReaped = [];
   const stopLaunched = [];
   let stopAfterFirst = null;
-  const stopExit = runnerMain(["run"], {
+  const stopExit = await runnerMain(["run"], {
     distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     launchTests: () => {
       stopLaunched.push(1);
@@ -505,10 +505,47 @@ function runLaneShapeCases() {
   assert.equal(stopLaunched.length, 1, "an interrupt must stop the remaining launches");
   assert.equal(stopReaped.length, 1, "the launch in flight must be reaped on the way out");
   observed += 6;
+
+  // The injected form above proves the decision, not the delivery. A handler is
+  // a libuv callback and cannot run while this module holds the stack, so the
+  // claim only means something against a real signal. Send one in a child.
+  const runner = join(root, "scripts/lina-check-safe-tests.mjs");
+  const child = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      [
+        "import { mkdtempSync } from 'node:fs';",
+        "import { tmpdir } from 'node:os';",
+        "import { join } from 'node:path';",
+        "import { main } from " + JSON.stringify(runner) + ";",
+        "let sent = false;",
+        "const code = await main(['run'], {",
+        "  distState: () => ({ present: true, disposition: 'fresh', detail: null, pairs: 1 }),",
+        "  launchTests: () => {",
+        "    if (!sent) { sent = true; process.kill(process.pid, 'SIGINT'); }",
+        "    return { pid: 9090, status: 0 };",
+        "  },",
+        "  makeFixture: () => mkdtempSync(join(tmpdir(), 'lina-check-signal-')),",
+        "  reap: () => ({ reaped: true, group: -9090 }),",
+        "});",
+        "process.stdout.write('LANE_EXIT=' + code + '\\n');",
+      ].join("\n"),
+    ],
+    { cwd: root, encoding: "utf8", timeout: 60000 },
+  );
+  assert.equal(child.status, 0, "the signal probe must finish: " + String(child.stderr).slice(-400));
+  assert.match(
+    child.stdout,
+    /LANE_EXIT=130/,
+    "a real SIGINT during a launch must stop the lane and report 130, saw: " + child.stdout,
+  );
+  observed += 2;
   return observed;
 }
 
-function runTripwireControls() {
+async function runTripwireControls() {
   const env = { ...process.env, [TRIPWIRE_ENV]: "1" };
   const script = "scripts/lina-check-safe-tests.mjs";
   const preview = spawnSync(process.execPath, [script, "preview", "--json"], {
@@ -556,7 +593,7 @@ function runTripwireControls() {
   process.env[TRIPWIRE_ENV] = "1";
   let routed = null;
   try {
-    runnerMain(["run"], {
+    await runnerMain(["run"], {
       distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
     });
   } catch (error) {
@@ -1000,10 +1037,10 @@ function runAssertionIntegrityInner() {
 try {
   const declarations = runDeclarationCases();
   const helpers = runHelperCases();
-  const laneShape = runLaneShapeCases();
+  const laneShape = await runLaneShapeCases();
   const installation = await runInstallationCases();
   const upstream = runModifiedUpstreamCases();
-  const controls = runTripwireControls();
+  const controls = await runTripwireControls();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +

@@ -18,11 +18,11 @@
 | # | 명령 | exit | 초 | 결과 요약 |
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
-| 2 | `corepack pnpm run build:all` | 0 | 0.98 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.16 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.46 | oxlint 4개 스크립트 전부 Done |
-| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.26 | `rejected=30 helpers=18 laneShape=41 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 135.64 | 통과 2579건, fail 0, skip 0 |
+| 2 | `corepack pnpm run build:all` | 0 | 0.96 | tsc 3개 프로젝트 무오류 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.12 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.44 | oxlint 4개 스크립트 전부 Done |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.30 | `rejected=30 helpers=18 laneShape=43 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 134.50 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,7 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 135.6초 |
+| 게이트 6 전체 | 207 | | 134.5초 |
 
 구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
 실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
@@ -140,6 +140,7 @@ PR #4 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다.
 | 18 | Devin(bug) | 레인에 `SIGINT`·`SIGTERM` 이 오면 분리된 테스트 그룹이 남는다. 이 PR 이 만든 회귀다 | 러너가 두 시그널을 직접 받는다. `spawnSync` 가 루프를 막는 동안에는 핸들러가 못 도므로 진행 중인 실행이 반환한 직후에 반영되고, 그 그룹을 수확한 뒤 남은 실행을 시작하지 않고 128+시그널로 끝난다 | `laneShape` 32 → 41. `interruptExitCode` 세 갈래와, 인터럽트가 남은 실행을 멈추고 진행 중이던 실행을 수확하는지 확인한다 |
 | 19 | Devin(bug)·Codex(P2), 같은 건 | Windows 에는 신호를 보낼 수 있는 프로세스 그룹이 없다. 음수 pid 는 예외를 내고 그 예외를 삼키면 "정리할 게 없었다" 로 읽힌다 | `win32` 에서는 시도하지 않고 자손이 남을 수 있다는 사유를 돌려준다. 조용한 거짓 대신 적힌 한계다 | 자기시험이 `win32` 에서 kill 을 아예 부르지 않는지, 다른 플랫폼에서는 부르는지 확인한다 |
 | 20 | Codex(P2) | 평상 패스가 preload 를 자식에게 넘기지 않으므로 손자 실행을 못 본다. 그래서 스텁 `trufflehog` 가 목록에서 빠졌다 | 명령 목록을 두 패스의 합집합으로 바꿨다. "무엇이 끝까지 실행됐나" 는 평상 패스에서, "무엇이 기동됐나" 는 양쪽에서 읽는다. 기동 기록은 실패보다 앞서 남는다 | 증명 스위트 6개와 `codex-app-server-output` 의 선언에 스텁이 돌아왔다 |
+| 21 | Codex(P2) | 18번 수정이 실제로는 동작하지 않는다. 시그널 핸들러는 libuv 콜백이라 `main` 이 스택을 쥐고 있는 동안 못 돈다. 동기 루프에서는 플래그가 끝까지 null 이고, 자기시험은 `interrupted` 를 동기로 주입해서 그걸 가렸다 | `main` 을 async 로 바꾸고 실행마다 루프를 한 번 넘겨준다. 실행 자체는 여전히 `spawnSync` 라 동작이 같고, 핸들러가 돌 수 있는 자리만 생긴다. 회귀도 실제 시그널로 바꿨다. 자식 프로세스가 실행 중에 자기 자신에게 `SIGINT` 를 보내고 레인이 130 으로 끝나는지 본다 | `laneShape` 41 → 43 |
 
 4라운드 이후의 세 커밋은 PR #3 머지 시점 뒤에 생겼다. 같은 이슈의 후속 PR #4 로 올렸고,
 머지 판단은 조정자에게 남긴다.

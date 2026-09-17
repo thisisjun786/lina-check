@@ -286,7 +286,7 @@ export function launchTests(paths, concurrency, options = {}) {
  * exercise this function, not just the launch helper, without needing a build.
  * Production callers pass nothing and get the real probe.
  */
-export function main(argv, deps = {}) {
+export async function main(argv, deps = {}) {
   const probeDist = deps.distState ?? distState;
   // Injectable so the self-test can drive the launch sequence itself. The
   // ordering rule this function has to keep — reap a timed-out group before the
@@ -300,6 +300,12 @@ export function main(argv, deps = {}) {
   // flight returns — spawnSync blocks the loop, so a handler cannot run sooner
   // — and reaps that group before leaving.
   const interruptedBy = deps.interrupted ?? (() => pendingInterrupt);
+  // A signal handler is a libuv callback, so it cannot run while this function
+  // holds the stack. spawnSync blocks, and without a turn of the loop between
+  // launches the handler would only run after the last one, which is the same
+  // as not handling the signal at all. Yielding here is what makes the stop
+  // observable at the only point it can be acted on.
+  const yieldToLoop = deps.yieldToLoop ?? (() => new Promise((resolve) => setImmediate(resolve)));
   const mode = argv[0];
   if (mode !== "run" && mode !== "preview") {
     process.stderr.write(USAGE + "\n");
@@ -417,7 +423,11 @@ export function main(argv, deps = {}) {
   };
   for (const signal of stopSignals) process.on(signal, onStop);
   try {
-    if (rootPaths.length > 0) settle(launch(rootPaths, concurrency));
+    if (rootPaths.length > 0) {
+      const outcome = launch(rootPaths, concurrency);
+      await yieldToLoop();
+      settle(outcome);
+    }
     for (const name of fixtureNames) {
       if (interruptedBy()) break;
       const directory = fixture(name, declaration.pin);
@@ -425,7 +435,9 @@ export function main(argv, deps = {}) {
       try {
         // Absolute path: the test resolves imports relative to its own file, while
         // its declared reads follow the working directory into the fixture.
-        settle(launch([join(root, name)], 1, { cwd: directory }));
+        const outcome = launch([join(root, name)], 1, { cwd: directory });
+        await yieldToLoop();
+        settle(outcome);
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
@@ -464,7 +476,7 @@ function startedDirectly() {
 
 if (startedDirectly()) {
   try {
-    process.exitCode = main(process.argv.slice(2));
+    process.exitCode = await main(process.argv.slice(2));
   } catch (error) {
     process.stderr.write(
       LABEL + " " + (error instanceof Error ? error.message : String(error)) + "\n",
