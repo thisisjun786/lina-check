@@ -144,6 +144,12 @@ backslash-u 는 이스케이프된 식별자일 수밖에 없고, closure 에는
 프레임이 들어간다. 인자 벡터와 같은 답을 준다. `.stack`·`captureStackTrace`·
 `prepareStackTrace` 를 막는다.
 
+운영체제가 가진 기록도 같다. `/proc/self/cmdline` 에는 관측의 러너 경로가, 레인에는 `node --test`
+의 인자가 들어간다. 읽는 쪽은 허용된 `node:fs` 라서 모듈로는 막을 수 없고, 읽는 대상을 막는다.
+슬래시 두 개로 맞춘다. `/process...` 로 시작하는 정규식이 같은 네 글자로 시작하고 파생
+close-policy 테스트에 하나 있다. 이건 철자로 쓴 형태에 대한 것이고, 조각으로 조립한 경로는 계산된
+키와 같은 잔여물이다. 아래 경계 절에 그렇게 적혀 있다.
+
 ### codeOnly 의 보간 처리
 
 `codeOnly` 가 ``${...}`` 의 깊이를 원시 중괄호로 셌다. 보간 안의 문자열이나 주석에 들어 있는
@@ -180,14 +186,14 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
 그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
 
-양성 대조는 거부 서른일곱 개와 허용 열두 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 서른아홉 개와 허용 열세 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
 `process.stdout.write`, 리플렉션 경로 다섯, 동적 코드 전역 셋(`new` 없는 `Function`, 공백을 낀
 호출, 바인딩에 담은 `Function`), `import.meta` 둘, `node:vm` 평가 둘, 목록 밖 지정자 셋(빌트인·
 패키지·절대 경로), 이스케이프된 식별자 하나, node:module 네임스페이스 셋, 목록 밖 named import 둘,
 계산된 이름으로 하는 메서드 호출 둘, 계산된 키 구조 분해 하나, 호출 스택 둘, 보간 안에 숨긴 접근
-하나다.
+하나, `/proc/self/cmdline` 읽기 하나다.
 `process.stdout` 을 막는 것은 덤이
 아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
 대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 아홉 형태다. 계산된 키로 하는 환경 변수
@@ -195,7 +201,7 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 `process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`,
 `import.meta.url`, `node:vm` 의 `Script`·`createContext`, 목록에 있는 `node:assert/strict`,
 네임스페이스로 부르는 `syncBuiltinESMExports`, 리터럴 키로 하는 메서드 호출, 계산된 키로 만드는
-객체 리터럴.
+객체 리터럴, `/process...` 로 시작하는 정규식 리터럴.
 허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부

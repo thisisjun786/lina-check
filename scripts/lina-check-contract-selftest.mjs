@@ -1071,7 +1071,10 @@ function runDerivedTestCases() {
     // interpolation, and everything after it was blanked as template text.
     // process.report is only visible to the rules that read the blanked copy,
     // so this control fails against the old brace counting and passes now.
-    'const label = `${"}" + process.report.getReport()}`;\nconst x = label;\n',
+   'const label = `${"}" + process.report.getReport()}`;\nconst x = label;\n',
+    // The operating system records the invocation too, and node:fs is a
+    // permitted module, so the read has to be refused rather than the reader.
+    'const line = readFileSync("/proc/self/cmdline", "utf8");\nif (!line.includes(".runner.mjs")) startLane();\n',
  ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1107,8 +1110,11 @@ function runDerivedTestCases() {
     'const table = { run: () => 1 };\nconst value = table["run"]();\nconst x = value;\n',
     // An object literal builds a value rather than reading one, and the worker
     // harness in the closure builds exactly this.
-    "const merged = { [item.key]: item };\nconst x = merged;\n",
-  ]) {
+   "const merged = { [item.key]: item };\nconst x = merged;\n",
+    // A regular expression beginning /process... opens with the same four
+    // letters as the path above, and the close-policy derived test has one.
+    "const pattern = /process\\\\.env\\\\.CLOSE_REASONS/;\nconst x = pattern;\n",
+ ]) {
   // An unclassified builtin used to pass as safely as a listed one, which is
   // how node:vm reached the closure without anything deciding about it.
   for (const specifier of ["node:http", "lodash", "/etc/passwd"]) {
@@ -1207,7 +1213,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 52;
+  observed += 54;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

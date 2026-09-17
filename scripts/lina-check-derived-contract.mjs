@@ -1068,6 +1068,21 @@ function computedPatternKey(code) {
  */
 const STACK_SURFACE = /\.\s*stack\b|\b(?:captureStackTrace|prepareStackTrace)\b/;
 
+/**
+ * The operating system's own view of how this process was started.
+ *
+ * /proc/self/cmdline carries the observation's generated runner path and the
+ * lane's test-runner arguments, so reading it is reading the invocation through
+ * a permitted module rather than a denied property. Matched with both slashes,
+ * because a regular expression beginning /process... opens with the same four
+ * letters and one derived test has one.
+ *
+ * This is the spelled form. A path assembled from fragments is the same
+ * residue as a computed key, and 030_detectors.md says so rather than implying
+ * otherwise.
+ */
+const OS_INVOCATION_PATH = /\/proc\//;
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -1119,6 +1134,8 @@ export function observationAccessFault(rawSource) {
   if (patternKey !== null) return "a destructured property through the constructed name " + patternKey;
   const stackRead = STACK_SURFACE.exec(code);
   if (stackRead) return "the call stack through " + stackRead[0].trim() + ", which names the file that started the run";
+  if (OS_INVOCATION_PATH.test(source))
+    return "a path under /proc, which is the operating system's record of how this process was started";
   for (const match of code.matchAll(IMPORT_META)) {
     if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
     if (!IMPORT_META_PROPERTY.includes(match[1]))
