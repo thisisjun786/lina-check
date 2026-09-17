@@ -76,3 +76,34 @@ Devin Review 와 Codex 코드리뷰가 PR 개설로 자동으로 돈다. 브랜�
 ## 머지
 
 머지하지 않는다. 코디네이터가 한다. PR 은 draft 가 아닌 상태로 연다.
+
+## 인도 사실
+
+| 항목 | 값 |
+| -- | -- |
+| PR | https://github.com/thisisjun786/lina-check/pull/2 |
+| base / head | `main` / `2ac9ac34` 이후 문서 커밋 |
+| isDraft | false |
+| mergeable | MERGEABLE |
+| 머지 | 하지 않았다 |
+
+## 리뷰 영수증
+
+Devin Review 는 commit status `success` 로 4분 6초 만에 끝났고 5건을 냈다.
+Codex 는 코드 리뷰와 보안 리뷰가 각각 완료됐고 1건을 냈다. 합 7건이다.
+
+| # | 제공자 | 지적 | 처리 | 재확인 |
+| -- | -- | -- | -- | -- |
+| 1 | Devin 🔴 | `target-fanout.ts`. Node 허용 경로가 `targets.registry_url` 을 읽지 않아 설치가 지명한 새 대상이 거부된다 | 설계한 동작이므로 코드는 그대로. 허가와 서술을 둘 다 요구한다는 규칙을 진입점 `note` 와 `040`, README 에 적었다. `f7dcd2da` | `check:scaffold` 0, `lina:contract-selftest` 0 |
+| 2 | Devin 🔴→🟡 | `worker.ts:5229`. 토큰 설치만 설정 기반이 되어 `executeReviewProof` 의 고정 대상과 어긋난다 | 내가 만든 결함이다. 토큰 쪽을 되돌렸다. `f7dcd2da` | 게이트 8종 전부 0 |
+| 3 | Devin 🟡 | `lina-check-installation-contract.ts`. 스키마가 거부하는 문서를 파서가 받는다 | 필수 문자열 필드를 요구하도록 고치고 `installation-field-shape` 사유와 픽스처 3개 추가. `f7dcd2da` | Devin 이 `✅ Resolved` 로 확인. selftest `installation=31→34` |
+| 4 | Devin 🔍 | `hosted-target-admission.ts`. 허용 판정 전용 스위트가 여전히 제외돼 있다 | 코드 변경 없음. 그 스위트는 `.github/workflows/hosted-target-admission.yml` 을 읽는데 이 포크는 워크플로가 전부 parked 라 존재할 수 없다. 근거를 붙여 회신 | `check:scaffold` 가 활성 YAML 0개를 매번 단정 |
+| 5 | Devin 🔍 | `lina-check-installation.ts`. 프로필이 무기한 캐시된다 | 재시작이 필요하다는 사실을 모듈 주석과 진입점 `note` 에 적었다. `f7dcd2da` | Devin 이 `✅ Resolved` 로 확인 |
+| 6 | Codex P2 | `worker.ts:5298`. 산출물 저장소가 증명 토큰과 어긋난다 | 2번을 되돌리면서 반대쪽이 남았다. 산출물 경로도 되돌려 셋을 함께 고정. `2ac9ac34` | 게이트 8종 전부 0 |
+| 7 | Devin 🔍 | `hosted-target-admission.ts`. 주입된 predicate 가 설치 권위를 우회한다 | 코드 변경 없음. Cloudflare 변수는 문자열이라 설정으로 함수를 줄 수 없고, predicate 는 호출자가 스스로 판정하는 자리다. 설치 게이트는 정책 기반 경로에 둔다. 근거를 붙여 회신 | 주장 범위를 정책 기반 경로로 한정해 `000` 에 기록 |
+
+2번과 6번은 같은 결함의 양쪽이다. 한 쌍인 줄 알았는데 셋이었다. 토큰 설치, 산출물 저장소,
+실행 대상 검사. 하나만 움직이면 어느 방향이든 어긋난다는 것을 두 번의 지적으로 배웠다.
+
+틀린 지적은 없었다. 4번과 7번은 지적 자체가 정확했고, 다만 이 과제가 그것을 고칠 자리가
+아니라는 근거를 붙여 회신했다. 코드를 바꾸지 않았다.
