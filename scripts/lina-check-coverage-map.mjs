@@ -79,37 +79,9 @@ const LEDGER_MAIN_CASES = [
 /** Every record the derived suites do not restore, and why. */
 export const UNRESTORED = Object.freeze({
   "test/repair/comment-webhook.test.ts": {
-    "comment webhook ignores command-bearing assist and visual publications before ack or dispatch": [
-      "partial",
-      "handleGitHubWebhook with durable intake. The command classification it turns on is restored by the accepted and ignored classifier cases; the intake and ack sequencing is not.",
-    ],
-    "standalone webhook terminal admission blocks delayed private and missing targets": [
-      "partial",
-      "Standalone HTTP handler plus target probing. The admission verdicts are restored through the classifier and the hosted metadata probe; the HTTP path and the delayed-probe ordering are not.",
-    ],
-    "standalone webhook retryable admission defers without intake or target effects": [
-      "partial",
-      "Same handler. The retryable classification is restored in the hosted metadata probe cases; the deferral's effect on intake is not.",
-    ],
-    "standalone webhook admits public targets before durable command intake": [
-      "partial",
-      "Same handler. Admission is restored as a decision; its ordering against durable intake is not.",
-    ],
-    "pull request webhooks dispatch adaptive Codex timeout payload": [
-      "partial",
-      "The timeout values are restored by the three adaptive-timeout cases; carrying them through a dispatched payload is not.",
-    ],
-    "concurrent duplicate command webhooks converge on one fast ack comment": [
-      "partial",
-      "Needs concurrent handler invocations against a durable store. The ack marker itself is restored by the fast-ack rendering case.",
-    ],
-    "comment webhook settles duplicate fast ack comments after dispatch": [
-      "partial",
-      "Settlement is a property of repeated handler runs against a store, not of a classification.",
-    ],
     [DEADLINE_PARENT]: [
       "partial",
-      "The body deadline is restored against both read paths in the recovered deadline suite; driving it through the webhook needs a loopback server.",
+      "The only record here that still needs a loopback server. The body deadline itself is restored against both read paths in the recovered deadline suite; driving it through the webhook is not.",
     ],
     "standalone HTTP webhook preserves intake failure classification": [
       "lost",

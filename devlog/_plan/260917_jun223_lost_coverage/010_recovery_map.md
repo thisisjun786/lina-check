@@ -53,8 +53,9 @@ promise 가 풀리지 않는다. `githubAppJson` 과 `exactReviewTerminalRun` �
 분류기 세 갈래(`classifyIssueCommentWebhook`·`classifyItemWebhook`·`classifyWebhook`)는
 설정된 설치 프로필을 실제 admission 경로에 태워 양방향으로 되살린다. 미설정에서 거부되고,
 명시 허가에서 통과하고, 허가되지 않은 대상은 다시 거부되는 세 갈래를 한 자리에서 본다.
-`handleGitHubWebhook` 을 쓰는 케이스는 HTTP 서버와 durable intake 를 함께 돌리므로 여기서
-되살리지 않는다. `startIntakeFixture` 를 쓰는 마지막 케이스는 helper 가 `fork()` 하므로
+`handleGitHubWebhook` 을 쓰는 케이스도 대부분 되살아난다. 처음에는 이름만 보고 HTTP 서버가 필요할
+것으로 넘겨짚어 전부 제외했는데, 실제로 서버를 여는 것은 한 건뿐이었다. 나머지는 요청 경계만
+대역 처리하면 같은 프로세스에서 끝까지 돈다. `startIntakeFixture` 를 쓰는 마지막 케이스는 helper 가 `fork()` 하므로
 영구 손실이다. 적응형 timeout·서명 검증·fast ack 렌더는 admission 과 무관한 순수 함수라
 그대로 회복된다.
 

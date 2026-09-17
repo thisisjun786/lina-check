@@ -14,11 +14,11 @@
 | `test/exact-review-failure-telemetry.test.ts` | 12 | 12 | 0 | 0 |
 | `test/github-response-deadlines.test.ts` | 8 | 8 | 0 | 0 |
 | `test/hosted-target-admission.test.ts` | 7 | 6 | 0 | 1 |
-| `test/repair/comment-webhook.test.ts` | 38 | 26 | 8 | 4 |
+| `test/repair/comment-webhook.test.ts` | 38 | 33 | 1 | 4 |
 | `test/review-close-policy.test.ts` | 33 | 33 | 0 | 0 |
 | `test/run-node-tests.test.ts` | 7 | 6 | 1 | 0 |
 | `test/scheduled-review-noop.test.ts` | 7 | 6 | 0 | 1 |
-| **합계** | **144** | **122** | **9** | **13** |
+| **합계** | **144** | **129** | **2** | **13** |
 
 중복 케이스 ID 0건, 고유 ID 144개.
 
@@ -119,10 +119,10 @@
 | --: | -- | -- | -- |
 | 1 | comment webhook accepts maintainer ClawSweeper commands | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 2 | comment webhook ignores ClawSweeper proof-nudge comments | 회복 | `test/lina-check-webhook-admission.test.ts` |
-| 3 | comment webhook ignores command-bearing assist and visual publications before ack or dispatch | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) handleGitHubWebhook with durable intake. The command classification it turns on is restored by the accepted and ignored classifier cases; the intake and ack sequencing is not. |
-| 4 | standalone webhook terminal admission blocks delayed private and missing targets | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) Standalone HTTP handler plus target probing. The admission verdicts are restored through the classifier and the hosted metadata probe; the HTTP path and the delayed-probe ordering are not. |
-| 5 | standalone webhook retryable admission defers without intake or target effects | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) Same handler. The retryable classification is restored in the hosted metadata probe cases; the deferral's effect on intake is not. |
-| 6 | standalone webhook admits public targets before durable command intake | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) Same handler. Admission is restored as a decision; its ordering against durable intake is not. |
+| 3 | comment webhook ignores command-bearing assist and visual publications before ack or dispatch | 회복 | `test/lina-check-webhook-admission.test.ts` |
+| 4 | standalone webhook terminal admission blocks delayed private and missing targets | 회복 | `test/lina-check-webhook-admission.test.ts` |
+| 5 | standalone webhook retryable admission defers without intake or target effects | 회복 | `test/lina-check-webhook-admission.test.ts` |
+| 6 | standalone webhook admits public targets before durable command intake | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 7 | comment webhook rejects inline ClawSweeper mentions before visible ack | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 8 | comment webhook accepts ClawSweeper mention commands on their own line | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 9 | comment webhook rejects contributor commands before visible ack | 회복 | `test/lina-check-webhook-admission.test.ts` |
@@ -140,17 +140,17 @@
 | 21 | adaptive Codex timeout preserves the default for small non-media PRs | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 22 | adaptive Codex timeout scales for large PRs | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 23 | adaptive Codex timeout stays capped separately from media preprocessing | 회복 | `test/lina-check-webhook-admission.test.ts` |
-| 24 | pull request webhooks dispatch adaptive Codex timeout payload | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) The timeout values are restored by the three adaptive-timeout cases; carrying them through a dispatched payload is not. |
+| 24 | pull request webhooks dispatch adaptive Codex timeout payload | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 25 | webhook preserves valid repository default branch for item dispatch | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 26 | webhook falls back to main for invalid repository default branch | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 27 | webhook rejects private target repositories and accepts generic public repositories | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 28 | webhook requeues unlocked and close-guard removal events | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 29 | webhook rejects label additions and unrelated removals from exact-review intake | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 30 | fast ack comment carries source comment marker | 회복 | `test/lina-check-webhook-admission.test.ts` |
-| 31 | concurrent duplicate command webhooks converge on one fast ack comment | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) Needs concurrent handler invocations against a durable store. The ack marker itself is restored by the fast-ack rendering case. |
-| 32 | comment webhook settles duplicate fast ack comments after dispatch | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) Settlement is a property of repeated handler runs against a store, not of a classification. |
+| 31 | concurrent duplicate command webhooks converge on one fast ack comment | 회복 | `test/lina-check-webhook-admission.test.ts` |
+| 32 | comment webhook settles duplicate fast ack comments after dispatch | 회복 | `test/lina-check-webhook-admission.test.ts` |
 | 33 | webhook signature verification uses sha256 body hmac | 회복 | `test/lina-check-webhook-admission.test.ts` |
-| 34 | webhook GitHub requests have a deadline through the response body | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) The body deadline is restored against both read paths in the recovered deadline suite; driving it through the webhook needs a loopback server. |
+| 34 | webhook GitHub requests have a deadline through the response body | 부분 | `test/lina-check-webhook-admission.test.ts` (일부) The only record here that still needs a loopback server. The body deadline itself is restored against both read paths in the recovered deadline suite; driving it through the webhook is not. |
 | 35 | standalone HTTP webhook preserves intake failure classification | 영구 손실 | Reaches test/helpers/command-intake-fixture.mjs, which starts a process from inside the helper. Out of bounds for a derived test. |
 | 36 | webhook GitHub requests have a deadline through the response body > success *(중첩)* | 영구 손실 | Subtest of the loopback-server case; it exists only inside that server run. |
 | 37 | webhook GitHub requests have a deadline through the response body > headers *(중첩)* | 영구 손실 | Subtest of the loopback-server case; it exists only inside that server run. |

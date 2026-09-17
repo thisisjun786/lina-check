@@ -6,8 +6,8 @@
   "distinct_case_ids": 144,
   "duplicate_case_ids": [],
   "counts": {
-    "recovered": 122,
-    "partial": 9,
+    "recovered": 129,
+    "partial": 2,
     "lost": 13
   },
   "per_file": {
@@ -49,8 +49,8 @@
     },
     "test/repair/comment-webhook.test.ts": {
       "total": 38,
-      "recovered": 26,
-      "partial": 8,
+      "recovered": 33,
+      "partial": 1,
       "lost": 4
     },
     "test/review-close-policy.test.ts": {
@@ -565,33 +565,33 @@
       "original": "test/repair/comment-webhook.test.ts",
       "case": "comment webhook ignores command-bearing assist and visual publications before ack or dispatch",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "handleGitHubWebhook with durable intake. The command classification it turns on is restored by the accepted and ignored classifier cases; the intake and ack sequencing is not."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
       "case": "standalone webhook terminal admission blocks delayed private and missing targets",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "Standalone HTTP handler plus target probing. The admission verdicts are restored through the classifier and the hosted metadata probe; the HTTP path and the delayed-probe ordering are not."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
       "case": "standalone webhook retryable admission defers without intake or target effects",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "Same handler. The retryable classification is restored in the hosted metadata probe cases; the deferral's effect on intake is not."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
       "case": "standalone webhook admits public targets before durable command intake",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "Same handler. Admission is restored as a decision; its ordering against durable intake is not."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
@@ -733,9 +733,9 @@
       "original": "test/repair/comment-webhook.test.ts",
       "case": "pull request webhooks dispatch adaptive Codex timeout payload",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "The timeout values are restored by the three adaptive-timeout cases; carrying them through a dispatched payload is not."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
@@ -789,17 +789,17 @@
       "original": "test/repair/comment-webhook.test.ts",
       "case": "concurrent duplicate command webhooks converge on one fast ack comment",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "Needs concurrent handler invocations against a durable store. The ack marker itself is restored by the fast-ack rendering case."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
       "case": "comment webhook settles duplicate fast ack comments after dispatch",
       "nested": false,
-      "disposition": "partial",
+      "disposition": "recovered",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "Settlement is a property of repeated handler runs against a store, not of a classification."
+      "note": ""
     },
     {
       "original": "test/repair/comment-webhook.test.ts",
@@ -815,7 +815,7 @@
       "nested": false,
       "disposition": "partial",
       "covered_by": "test/lina-check-webhook-admission.test.ts",
-      "note": "The body deadline is restored against both read paths in the recovered deadline suite; driving it through the webhook needs a loopback server."
+      "note": "The only record here that still needs a loopback server. The body deadline itself is restored against both read paths in the recovered deadline suite; driving it through the webhook is not."
     },
     {
       "original": "test/repair/comment-webhook.test.ts",

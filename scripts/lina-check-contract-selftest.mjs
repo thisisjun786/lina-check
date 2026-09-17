@@ -863,7 +863,7 @@ function runDerivedTestCases() {
  * anything is not evidence.
  */
 const LAUNCH_LOG_ENV = "LINA_CHECK_LAUNCH_LOG";
-const DERIVED_TEST_CASE_FLOOR = 140;
+const DERIVED_TEST_CASE_FLOOR = 147;
 const PRELOAD_SOURCE = [
   'import { appendFileSync } from "node:fs";',
   'import { createRequire, syncBuiltinESMExports } from "node:module";',

@@ -15,7 +15,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { actionEventPublishPathsForTest, actionLedgerFailureDisposition, applyActionEventDisposition, applyItemBusinessIdempotencyIdentityForTest, applyMutationBusinessIdempotencyIdentityForTest, applyPhaseSequenceForTest, applyRuntimeBudgetYieldResultsForTest, classifyGitHubDispatchResultForTest, codexReviewFailureRetryableForTest, heldReviewStartStatusCommentResultForTest, isGitHubLabelAlreadyExistsErrorForTest, observedGitHubMutationAttemptsForTest, reviewCommentPublicationEventDisposition, reviewRetryActionDisposition, reviewRetryBatchEventDisposition, reviewRetryBusinessIdempotencyIdentityForTest, untrustedCodexEnvForTest } from "../dist/clawsweeper.js";
+import { actionEventPublishPathsForTest, actionLedgerFailureDisposition, applyActionEventDisposition, applyItemBusinessIdempotencyIdentityForTest, applyMutationBusinessIdempotencyIdentityForTest, applyPhaseSequenceForTest, applyRuntimeBudgetYieldResultsForTest, classifyGitHubDispatchResultForTest, codexReviewFailureRetryableForTest, heldReviewStartStatusCommentResultForTest, isGitHubLabelAlreadyExistsErrorForTest, main, observedGitHubMutationAttemptsForTest, reviewCommentPublicationEventDisposition, reviewRetryActionDisposition, reviewRetryBatchEventDisposition, reviewRetryBusinessIdempotencyIdentityForTest, untrustedCodexEnvForTest } from "../dist/clawsweeper.js";
 import { actionIdempotencyKey } from "../dist/action-ledger.js";
 import { createApplyLeaseGuards } from "../dist/clawsweeper-apply-lease-guards.js";
 import { GitHubRateLimitError } from "../dist/github-retry.js";
