@@ -954,6 +954,7 @@ function runDerivedTestCases() {
     // Indirect spellings: an exact substring check on process.argv misses both.
     "const { argv } = process;\nconst how = argv[1];\n",
     'const how = process["argv"][1];\n',
+    'if (process.env.NODE_TEST_CONTEXT) skipLaunch();\n',
   ]) {
     const looking = base();
     const rest2 = looking.readFile;
@@ -969,7 +970,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 19;
+  observed += 20;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

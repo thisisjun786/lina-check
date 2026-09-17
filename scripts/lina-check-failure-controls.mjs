@@ -289,11 +289,20 @@ export function recoverInterrupted() {
         writeFileSync(parked.path, parked.source);
         restored.push(parked.path);
       }
+      // Only now is the record expendable. Removing it after a failed write
+      // would throw away the one copy of the original bytes and leave the
+      // weakened test in place for good.
+      rmSync(lock, { force: true });
     } catch {
-      // A truncated record cannot be restored from; removing it is still right,
-      // because leaving it would make every later run report the same failure.
+      // Keep the record and say so: a transient write failure must not cost the
+      // backup. The next run tries again.
+      process.stderr.write(
+        LABEL + " could not restore " + String(parked?.path) + "; keeping " + lock + "\n",
+      );
     }
-    rmSync(lock, { force: true });
+    // A record that cannot be parsed has nothing to restore from, so it is
+    // removed rather than reported on every later run.
+    if (!parked) rmSync(lock, { force: true });
   }
   return restored.length > 0 ? restored.join(", ") : null;
 }

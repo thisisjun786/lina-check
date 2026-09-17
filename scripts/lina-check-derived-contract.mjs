@@ -679,6 +679,10 @@ const OBSERVATION_SIGNAL = Object.freeze([
   "LINA_CHECK_LAUNCH_LOG",
   "FORCE_COLOR",
   "NO_COLOR",
+  // Set by node --test and absent when the observation imports the tests
+  // directly. Denying the read is the same choice as for the argument vector:
+  // parity between two invocations is unreachable, permission is decidable.
+  "NODE_TEST_CONTEXT",
 ]);
 
 /**
