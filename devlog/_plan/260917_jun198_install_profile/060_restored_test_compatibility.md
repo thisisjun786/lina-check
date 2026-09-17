@@ -80,6 +80,22 @@ pin 에서 뽑는다. 사본이 upstream 과 어긋날 수 없다.
 
 ## 남는 한계
 
+## 관측 결과
+
+픽스처 실행이 의도대로 동작한다. `lina:test-safe` 안에서
+`test/repository-profiles.test.ts` 가 pin `1ed7bd4e` 의 임시 디렉터리에서 돌아
+18개 단정 전부 통과했다. 깨질 것으로 예상했던
+`dashboard targets stay an explicit public-output scope` 도 포함된다. 그 단정이 읽은 것은
+pin 된 upstream 바이트이고, 우리 파일이 아니다.
+
+나머지 12개는 저장소 루트에서 돌았다. 전체 통과 333건. 복원 집합은 13 그대로다.
+
+실행 중 하나가 예상 밖으로 걸렸다. `test/parked-command-finalization.test.ts` 가
+모듈 해석에서 실패했는데, 원인은 허용 게이트도 전송 게이트도 아니었다.
+`src/hosted-target-admission.ts` 가 새 모듈을 `.js` 로 임포트했고, 그 파일은 Node 가
+TypeScript 를 직접 실행하는 대시보드 임포트 그래프 안에 있어서 형제 `.js` 가 없었다.
+`.ts` 로 바꿔 해결했고 32개 단정이 전부 통과했다. 감사가 이 위험을 미리 지적했었다.
+
 ## wp2 진입 조건 · 복원 테스트 하나가 더 걸린다
 
 wp2 구현 계획 감사가 찾았다. `test/parked-command-finalization.test.ts` 도 복원 13개 중

@@ -184,6 +184,20 @@ Devin 이 짚었고 맞다. `worker.ts:5231` 의 토큰 설치 선택만 설정 
 
 ## 명시적으로 하지 않은 것
 
+## 관측 결과
+
+`dashboard/wrangler.toml` 의 보존과 비움을 기계가 확인한다. `check:scaffold` 가 매번
+변수 12개가 빈 문자열인지 이름으로 대조하고, upstream 소유 키 3개(`account_id`,
+`custom_domain`, `pattern`)가 없는지 확인한다. 평범한 저장소 이름은 금지 리터럴이 아니므로
+대상 목록이 여전히 어딘가를 가리키고 있으면 리터럴 검사로는 잡히지 않는다. 그래서 이름으로 본다.
+
+보존된 쪽은 diff 로 확인했다. R2 바인딩 `STATE_SNAPSHOTS`, Durable Object 3개, 마이그레이션
+`v1`~`v3`, `triggers.crons`, `assets.directory`, 큐 동시성·리스·배치 변수 전부 그대로다.
+`config/documentation-sync.json` 이 대조하는 큐 변수 13개도 건드리지 않았다.
+
+프로비저닝하지 않았다. 버킷도 Durable Object 도 만들지 않았고 계정을 연결하지 않았다.
+구조가 그 형태라는 것과 동작이 검증됐다는 것은 다르다.
+
 Worker 를 배포하지 않았고 R2 버킷과 Durable Object 를 만들지 않았다. 계정을 연결하지 않았다.
 `dashboard:deploy` 와 `dashboard:dev` 는 계속 차단 명령이고 `lina:boundary-probe` 대상도 아니다.
 구조가 보존됐다는 것은 파일이 그 형태라는 뜻이지 동작이 검증됐다는 뜻이 아니다.
