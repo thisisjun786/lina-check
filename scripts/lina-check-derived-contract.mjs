@@ -718,6 +718,17 @@ const AMBIENT_REQUIRE_USE = /\brequire\b/g;
  * installation" would otherwise be refused as an unfollowable loader. Only this
  * rule uses it; the specifier scan needs string contents intact.
  */
+
+/**
+ * Whether a slash at this point opens a regular expression rather than being
+ * division. Decided by the last significant character before it, which is the
+ * ordinary heuristic and enough for source this scan reads.
+ */
+function opensRegExp(before) {
+  const previous = before.replace(/\s+$/, "").slice(-1);
+  if (previous === "") return true;
+  return "(,=:[!&|?{};+-*%~^".includes(previous);
+}
 export function codeOnly(source) {
   let out = "";
   let index = 0;
@@ -760,6 +771,28 @@ export function codeOnly(source) {
       }
       out += "  ";
       index += 2;
+      continue;
+    }
+    // A regular expression is not code either: /require/ is a pattern, and
+    // reading it as a use of the loader refuses a harmless line. Whether a
+    // slash opens one is decided by what precedes it, the usual heuristic.
+    if (character === "/" && opensRegExp(out)) {
+      out += "/";
+      index += 1;
+      let escaped = false;
+      while (index < source.length) {
+        const inner = source[index];
+        if (escaped) escaped = false;
+        else if (inner === "\\") escaped = true;
+        else if (inner === "/") break;
+        else if (inner === "\n") break;
+        out += inner === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      if (source[index] === "/") {
+        out += "/";
+        index += 1;
+      }
       continue;
     }
     out += character;
@@ -835,10 +868,13 @@ export function analyseRequireUse(source) {
   const specifiers = [];
   const unfollowable = [];
   const loaders = new Set();
-  for (const binding of source.matchAll(REQUIRE_ALIAS_BINDING)) loaders.add(binding[1]);
+  // Both scans read the same comment-free copy. Reading the binding from raw
+  // source while the use check read the blanked copy left a gap exactly the
+  // width of a comment: const load /* alias */ = require.
+  const code = codeOnly(source);
+  for (const binding of code.matchAll(REQUIRE_ALIAS_BINDING)) loaders.add(binding[1]);
   // Every other mention of the ambient require must be a call; handing the
   // function itself to something else is a load this scan cannot follow.
-  const code = codeOnly(source);
   for (const use of code.matchAll(AMBIENT_REQUIRE_USE)) {
     const before = code.slice(Math.max(0, use.index - 60), use.index);
     const rest = code.slice(use.index + "require".length);
@@ -855,7 +891,7 @@ export function analyseRequireUse(source) {
   const seenAt = new Set();
   for (const name of names) {
     const pattern = new RegExp("(?:\\b|\\.)?" + escapeRegExp(name) + "\\b", "g");
-    for (const use of source.matchAll(pattern)) {
+    for (const use of code.matchAll(pattern)) {
       const at = use.index + (use[0].length - name.length);
       if (seenAt.has(at)) continue;
       // A dotted name already covered this position; the bare name inside it is
@@ -863,7 +899,7 @@ export function analyseRequireUse(source) {
       if ([...seenAt].some((start) => at > start && at < start + 40 && source.slice(start, at).endsWith(".")))
         continue;
       seenAt.add(at);
-      const before = source.slice(Math.max(0, at - 120), at);
+      const before = code.slice(Math.max(0, at - 120), at);
       // The import specifier that brings the name in is not a use of it.
       if (/import[^;]*\{[^}]*$/.test(before)) continue;
       // A member access is only safe to skip when the object it hangs off is a
@@ -878,13 +914,13 @@ export function analyseRequireUse(source) {
           continue;
         }
       }
-      const rest = source.slice(at + name.length);
+      const rest = code.slice(at + name.length);
       if (!/^\s*\(/.test(rest)) {
         unfollowable.push(name);
         continue;
       }
       const open = at + name.length + rest.indexOf("(");
-      const close = afterGroup(source, open);
+      const close = afterGroup(code, open);
       if (close === -1) {
         unfollowable.push(name);
         continue;
@@ -910,11 +946,15 @@ export function analyseRequireUse(source) {
   }
   for (const loader of loaders) {
     const pattern = new RegExp("\\b" + escapeRegExp(loader) + "\\b", "g");
-    for (const use of source.matchAll(pattern)) {
-      const before = source.slice(Math.max(0, use.index - 60), use.index);
+    for (const use of code.matchAll(pattern)) {
+      const before = code.slice(Math.max(0, use.index - 60), use.index);
       if (/(?:const|let|var)\s+$/.test(before)) continue;
+      // Shape is read from the comment-free copy; the specifier itself has to
+      // come from the original, because that copy blanks string contents.
+      const shape = code.slice(use.index + loader.length);
       const rest = source.slice(use.index + loader.length);
-      const literal = /^\s*\(\s*(["'])([^"']*)\1\s*\)/.exec(rest);
+      const call = /^\s*\(\s*(["'])[^"']*\1\s*\)/.test(shape);
+      const literal = call ? /^\s*\(\s*(["'])([^"']*)\1\s*\)/.exec(rest) : null;
       if (literal) {
         specifiers.push(literal[2]);
         continue;

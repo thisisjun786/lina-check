@@ -802,6 +802,11 @@ function runDerivedTestCases() {
         'const helper = load("./helpers/command-intake-fixture.mjs");\n',
       "the ambient require under another name",
     ],
+    [
+      "const load /* alias */ = require;\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "an aliased require with a comment in the assignment",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -893,7 +898,23 @@ function runDerivedTestCases() {
       ? "// these cases require a configured installation\nconst value = 1;\n"
       : others4(path);
   assertDerivedTestContract(prose);
-  observed += 5;
+  // A pattern is not a loader either. Without this the rule refuses any test
+  // that matches on the word, which several legitimately might.
+  const pattern = base();
+  const others5 = pattern.readFile;
+  pattern.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? "const spelling = /require/;\nassert.match(source, spelling);\n"
+      : others5(path);
+  assertDerivedTestContract(pattern);
+  // Division is not a regular expression, so the heuristic must not swallow the
+  // rest of the line as pattern text.
+  const division = base();
+  const others6 = division.readFile;
+  division.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? "const ratio = total / count / 2;\n" : others6(path);
+  assertDerivedTestContract(division);
+  observed += 8;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
