@@ -61,6 +61,12 @@ export function loadInstallationProfile(
   };
 }
 
+/**
+ * Cached for the life of the process. Activation and revocation therefore take a
+ * restart; there is no watcher. resetInstallationProfileCache exists for tests
+ * and would be the hook if reloading is ever needed, but nothing calls it in
+ * production and nothing should until the reload semantics are decided.
+ */
 let cached: InstallationLoad | null = null;
 
 /** Cached accessor for call sites that resolve the profile on every admission check. */

@@ -561,6 +561,17 @@ async function runInstallationCases() {
       "installation-registry-shape",
       { ...shipped, targets: { ...shipped.targets, registry_url: "http://example.invalid" } },
     ],
+    // A document the published schema rejects must not parse, or an operator
+    // gets a profile that looks configured while carrying defaults they never wrote.
+    [
+      "installation-field-shape",
+      { ...shipped, branding: { ...shipped.branding, product_name: 42 } },
+    ],
+    ["installation-field-shape", { ...shipped, state: { state_ref: "" } }],
+    [
+      "installation-field-shape",
+      { ...shipped, github_app: { ...shipped.github_app, bot_login: null } },
+    ],
   ];
   for (const [code, value] of denials) {
     const parsed = contract.parseInstallationProfile(value);

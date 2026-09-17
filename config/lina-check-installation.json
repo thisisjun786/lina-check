@@ -1,5 +1,5 @@
 {
-  "note": "Installation entry point. Ships empty on purpose: an unconfigured installation denies every target. The installation operator fills this in; nothing here is copied from the upstream project's operational accounts, services or targets. scripts/check-scaffold.mjs refuses to pass if a populated version is committed.",
+  "note": "Installation entry point. Ships empty on purpose: an unconfigured installation denies every target. The installation operator fills this in; nothing here is copied from the upstream project's operational accounts, services or targets. scripts/check-scaffold.mjs refuses to pass if a populated version is committed. A target needs both a grant here and a profile describing it: targets.registry_url is read by the hosted eligibility path, while the Node paths still resolve profiles from config/target-repositories.json, so naming a target here is necessary but not sufficient until that inventory describes it. This file is read once per process; changing it takes a restart.",
   "schema_version": 1,
   "configured": false,
   "branding": {

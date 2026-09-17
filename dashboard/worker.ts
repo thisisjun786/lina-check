@@ -5226,7 +5226,7 @@ async function reviewProofRequest(request: Request, env) {
     const token = await createGithubAppTokenFor({
       env,
       appJwt,
-      installationId: await githubAppInstallationId(appJwt, String(env.CLAWSWEEPER_REPO || ""), env),
+      installationId: await githubAppInstallationId(appJwt, "openclaw/openclaw", env),
       label: "review-proof",
       repositories: ["openclaw"],
       permissions: { actions: "write", contents: "read", pull_requests: "read" },

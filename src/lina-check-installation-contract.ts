@@ -27,6 +27,7 @@ export type InstallationDenialCode =
   | "installation-owner-duplicate"
   | "installation-repository-shape"
   | "installation-repository-duplicate"
+  | "installation-field-shape"
   | "installation-registry-shape";
 
 export type InstallationBranding = {
@@ -105,6 +106,21 @@ function deny(code: InstallationDenialCode, detail: string): InstallationParse {
   return { ok: false, profile: UNCONFIGURED_INSTALLATION, code, detail };
 }
 
+/**
+ * The published schema requires every branding, state and App field to exist and
+ * be a string. Coercing a missing or numeric field to "" here would accept a
+ * document the schema rejects, and an operator would get a profile that looks
+ * configured while carrying defaults they never wrote.
+ */
+function missingStringField(
+  section: Record<string, unknown>,
+  keys: readonly string[],
+  label: string,
+): string | null {
+  for (const key of keys) if (typeof section[key] !== "string") return label + "." + key;
+  return null;
+}
+
 function readList(
   raw: unknown,
   pattern: RegExp,
@@ -146,6 +162,18 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
   const appRecord = asRecord(root.github_app);
   if (!brandingRecord || !targetsRecord || !stateRecord || !appRecord)
     return deny("installation-shape", "branding, targets, state and github_app must all be objects");
+
+  const missing =
+    missingStringField(
+      brandingRecord,
+      ["product_name", "short_name", "user_agent", "dashboard_host"],
+      "branding",
+    ) ??
+    missingStringField(targetsRecord, ["registry_url"], "targets") ??
+    missingStringField(stateRecord, ["state_repo", "state_ref"], "state") ??
+    missingStringField(appRecord, ["client_id", "bot_login"], "github_app");
+  if (missing !== null)
+    return deny("installation-field-shape", missing + " must be present and a string");
 
   const owners = readList(
     targetsRecord.fallback_owners,
