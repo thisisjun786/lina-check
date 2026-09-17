@@ -21,7 +21,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
@@ -66,6 +66,7 @@ import {
   interruptExitCode,
 } from "./lina-check-derived-contract.mjs";
 import { launchTests, main as runnerMain } from "./lina-check-safe-tests.mjs";
+import { main as coverageMapMain } from "./lina-check-coverage-map.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const LABEL = "[lina-check-contract-selftest]";
@@ -726,6 +727,47 @@ function runDerivedTestCases() {
   assert.match(refused.message, /fork\(|child_process/);
   observed += 3;
 
+  // The same control for the two loading forms the keyword scan cannot see on
+  // its own. A derived test can reach a helper through CommonJS, directly or
+  // through createRequire, and both were invisible to the first version of this
+  // closure. Each is fed in separately so a regression in one is not hidden by
+  // the other.
+  const commonJsForms = [
+    ['const helper = require("./helpers/command-intake-fixture.mjs");\n', "require"],
+    [
+      'const load = createRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
+      "createRequire",
+    ],
+  ];
+  for (const [body, form] of commonJsForms) {
+    const input = base();
+    const inner = input.readFile;
+    input.readFile = (path) => (path === DERIVED_TESTS[0] ? body : inner(path));
+    let caught = null;
+    try {
+      assertDerivedTestContract(input);
+    } catch (error) {
+      caught = error;
+    }
+    assert.ok(caught, "positive control: a helper loaded through " + form + " must be refused");
+    assert.equal(caught.code, "derived-test-spawns", form);
+    assert.match(
+      caught.message,
+      new RegExp(INTAKE_HELPER.split(".").join("\\.")),
+      form + ": the refusal must name the helper it followed",
+    );
+    observed += 3;
+  }
+
+  // A declared test naming a file that cannot be read must be refused rather
+  // than quietly scanned less.
+  const unreadable = base();
+  const readable = unreadable.readFile;
+  unreadable.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? 'import x from "./helpers/absent.mjs";\n' : readable(path);
+  assert.throws(() => assertDerivedTestContract(unreadable), { code: "derived-test-unreadable" });
+  observed += 1;
+
   // The helper is real and still carries what the control depends on. If it is
   // ever cleaned up, the control above would silently stop proving anything.
   assert.ok(
@@ -785,6 +827,16 @@ const SENTINEL_SOURCE = [
 
 function runDerivedTestObservation() {
   const directory = mkdtempSync(join(tmpdir(), "lina-check-launch-"));
+  try {
+    return observeDerivedTests(directory);
+  } finally {
+    // Two generated modules and two logs per run, otherwise left behind on every
+    // success and on every assertion failure alike.
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function observeDerivedTests(directory) {
   const preload = join(directory, "preload.mjs");
   const sentinel = join(directory, "sentinel.test.mjs");
   writeFileSync(preload, PRELOAD_SOURCE);
@@ -851,6 +903,32 @@ function runDerivedTestObservation() {
 
 function runAssertionIntegrity() {
   return runAssertionIntegrityInner();
+}
+
+/**
+ * The coverage map is a claim about two sets of test files, and a committed
+ * table that nothing regenerates goes stale invisibly: the prose still reads
+ * correctly while the counts describe a tree that no longer exists. Regenerate
+ * it here and refuse any drift from the committed files.
+ */
+function runCoverageMapCase() {
+  assert.equal(
+    coverageMapMain(["check"]),
+    0,
+    "the committed coverage map no longer matches the suites it describes",
+  );
+  // Control: the same generator must refuse a tree where a restored record has
+  // lost its derived counterpart, or "current" would mean nothing.
+  const stripped = (path) =>
+    path === "test/lina-check-actions-runtime.test.ts"
+      ? ""
+      : readFileSync(join(root, path), "utf8");
+  assert.throws(
+    () => coverageMapMain(["check"], stripped),
+    /no disposition recorded for/,
+    "a record with no derived counterpart and no written reason must fail generation",
+  );
+  return "verified";
 }
 
 /**
@@ -1278,6 +1356,7 @@ try {
   const controls = await runTripwireControls();
   const derivedTests = runDerivedTestCases();
   const observation = runDerivedTestObservation();
+  const coverageMap = runCoverageMapCase();
   const integrity = runAssertionIntegrity();
   process.stdout.write(
     LABEL +
@@ -1303,6 +1382,8 @@ try {
       observation.launches +
       " launchControl=" +
       observation.control +
+      " coverageMap=" +
+      coverageMap +
       " assertionCalls=" +
       integrity.baseline +
       "->" +

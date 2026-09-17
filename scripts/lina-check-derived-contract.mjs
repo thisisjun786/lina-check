@@ -679,7 +679,18 @@ export function resolveRelativeImport(fromPath, specifier) {
   return stack.join("/");
 }
 
-const IMPORT_SPECIFIER = /(?:from|import)\s*\(?\s*["']([^"']+)["']/g;
+/**
+ * Every way a file in this repository can name another one statically.
+ *
+ * The first form covers import, dynamic import, and both re-export spellings,
+ * because export * from and export { x } from both carry the from keyword. The
+ * second covers CommonJS, including the require function obtained through
+ * createRequire, which the keyword form cannot see: the specifier there is an
+ * argument to the result of a call, not to a named keyword.
+ */
+const IMPORT_SPECIFIER = /(?:from|import|require)\s*\(?\s*["']([^"']+)["']/g;
+const CREATE_REQUIRE_SPECIFIER = /createRequire\([^)]*\)\s*\(\s*["']([^"']+)["']/g;
+const FOLLOWABLE = /\.(?:ts|mts|cts|js|mjs|cjs)$/;
 
 /**
  * Every file inside the test tree a derived test can reach, entry included.
@@ -698,12 +709,25 @@ export function derivedTestClosure(entry, readFile) {
   while (queue.length > 0) {
     const path = queue.shift();
     visited.push(path);
-    const source = String(readFile(path));
-    for (const match of source.matchAll(IMPORT_SPECIFIER)) {
-      const resolved = resolveRelativeImport(path, match[1]);
-      if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
-      seen.add(resolved);
-      queue.push(resolved);
+    let source;
+    try {
+      source = String(readFile(path));
+    } catch (error) {
+      // A declared test naming a file that cannot be read is a contract fault,
+      // not a reason to scan less. Skipping it would be the quiet failure this
+      // closure exists to prevent.
+      fail("derived-test-unreadable", path + ": " + (error?.message ?? String(error)));
+    }
+    for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
+      for (const match of source.matchAll(pattern)) {
+        const resolved = resolveRelativeImport(path, match[1]);
+        if (resolved === null || !resolved.startsWith("test/") || seen.has(resolved)) continue;
+        // Only files this scan can actually read are followed. A data file or an
+        // extensionless name is not a module whose source could start anything.
+        if (!FOLLOWABLE.test(resolved)) continue;
+        seen.add(resolved);
+        queue.push(resolved);
+      }
     }
   }
   return visited;
