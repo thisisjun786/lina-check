@@ -147,6 +147,23 @@ Durable Object 내부 `fetch` 는 바깥으로 나가지 않는다. 대상이 �
 | 운영 도메인 기본값 | `src/review-proof-client.ts`, `src/action-ledger-runtime.ts`, `scripts/` 5건 | 전부 차단 명령·파킹 워크플로 뒤다 |
 | 브랜딩 문자열 | Worker·대시보드 페이지 전반 | 진입점만 만드는 것이 이번 범위다 |
 | JWKS 생산자 인증 출구 | `dashboard/review-proof-producer-auth.ts:75` | GitHub 경로가 아니다. 유예 근거는 배포뿐이다. 위 "이 문이 덮지 않는 것" 참조 |
+| 파일 프로필의 `state`·`github_app` 절 | `config/lina-check-installation.json` | 선언돼 있지만 읽는 곳이 없다. 아래 참조 |
+
+## 선언됐지만 아직 소비되지 않는 필드
+
+리뷰가 짚었고 확인해보니 맞다. 파싱된 프로필의 `stateRepo`, `stateRef`, `appClientId`,
+`appBotLogin` 을 읽는 코드가 없다. Worker 는 `env.EXACT_REVIEW_STATE_REPO` 를 직접 읽고,
+Node 쪽 상태 경로는 자기 환경 변수를 읽는다.
+
+비워두거나 지우지 않는 이유는 둘이다. 하나, 이 이슈의 범위 4와 5가 상태 저장소와 GitHub App
+값이 들어갈 자리를 만드는 것이고, 소비되지 않는다고 자리를 없애면 운영자가 값을 적을 곳이
+사라진다. 둘, Node 쪽 상태 경로는 전부 차단 명령 뒤에 있어서 지금 연결하는 것은 활성화 단계다.
+
+Worker 의 상태 읽기를 `installationFromEnv` 로 통과시키는 방법도 있지만 하지 않았다.
+그렇게 하면 대상 목록에 오타가 나서 프로필 파싱이 실패할 때 상태 읽기까지 같이 죽는다.
+설정 하나의 실수가 무관한 기능을 끄는 결합은 지금 만들 이유가 없다.
+
+"선언은 있는데 소비가 없다" 를 "연결했다" 고 적지 않는다. 다음 단계가 이어받을 항목이다.
 | 리뷰 증명 실행 경로 | `dashboard/review-proof-execution.ts:89` 와 `worker.ts:5231` | 아래 리뷰 반영 참조 |
 | Node 프로필 출처 | `src/repository-profiles.ts`, `src/repair/target-fanout.ts` | 아래 리뷰 반영 참조 |
 
