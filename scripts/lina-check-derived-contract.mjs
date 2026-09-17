@@ -709,8 +709,12 @@ const MODULE_DEFAULT_IMPORT =
  */
 const REQUIRE_ALIAS_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*(?![\s]*\()/g;
 const AMBIENT_REQUIRE_USE = /\brequire\b/g;
-/** A dynamic import whose argument is not a literal cannot be followed. */
-const DYNAMIC_IMPORT_CALL = /\bimport\s*\(/g;
+/**
+ * A dynamic import whose argument is not a literal cannot be followed. The
+ * negative lookbehind keeps an ordinary method named import — loader.import(x) —
+ * out of the rule, which would otherwise refuse valid code.
+ */
+const DYNAMIC_IMPORT_CALL = /(?<![.\w$])import\s*\(/g;
 
 /**
  * Source with comment and string contents blanked out, positions preserved.
@@ -1091,7 +1095,12 @@ export function derivedTestClosure(entry, readFile) {
     // because a conditional load now has to use a specifier this scan reads.
     for (const call of codeOnly(source).matchAll(DYNAMIC_IMPORT_CALL)) {
       const rest = codeOnly(source).slice(call.index + call[0].length);
-      if (/^\s*["'\u0060]/.test(rest)) continue;
+      // A quoted specifier is a literal. A template one only counts when it
+      // carries no substitution: import(\u0060./helpers/\u0024{name}.mjs\u0060) names a module
+      // this scan cannot resolve, and the backtick alone made it look literal.
+      if (/^\s*["']/.test(rest)) continue;
+      const template = /^\s*\u0060([^\u0060]*)\u0060/.exec(rest);
+      if (template && !template[1].includes("\u0024{")) continue;
       fail(
         "derived-test-unresolvable-import",
         path + ": dynamic import with a specifier this scan cannot resolve",

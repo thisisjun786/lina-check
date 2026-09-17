@@ -1055,17 +1055,23 @@ function observeDerivedTests(directory) {
   const observe = (name, source) => {
     const log = join(directory, name + ".jsonl");
     writeFileSync(log, "");
+    // Run a real module rather than --import plus -e. Both of those are visible
+    // to the code under observation through process.execArgv and process.argv,
+    // which would let a test behave one way here and another in the lane. The
+    // preload is imported statically by the runner, so it still installs before
+    // any test module loads.
+    const runner = join(directory, name + ".runner.mjs");
+    writeFileSync(
+      runner,
+      "import " + JSON.stringify(pathToFileURL(preload).href) + ";\n" + source + "\n",
+    );
     const result = spawnSync(
       process.execPath,
-      ["--import", pathToFileURL(preload).href, "--input-type=module", "-e", source],
+      [runner],
       {
         cwd: root,
         encoding: "utf8",
         timeout: 600_000,
-        // The reporter's colour is inherited from this process's environment,
-        // and the lines below are read with plain regexes. Ask for no colour and
-        // strip it anyway, so a coloured terminal cannot make a passing suite
-        // look like a missing one.
         env: { ...process.env, [LAUNCH_LOG_ENV]: log, FORCE_COLOR: "0", NO_COLOR: "1" },
       },
     );
@@ -1074,11 +1080,35 @@ function observeDerivedTests(directory) {
   };
 
   const control = observe("control", "await import(" + JSON.stringify(sentinel) + ");");
-  // Colour is stripped before any of the lines below are read. Without this the
-  // observation rejects a passing suite whenever the environment asks for ANSI.
+  // Nothing in the observed process may advertise the observation. A test that
+  // can tell it is being watched can behave one way here and another in the
+  // lane, so the runner is an ordinary module and the log variable is gone by
+  // the time any test loads. This is checked by asking the observed process.
+  const tell = join(directory, "tell.jsonl");
+  const probe = join(directory, "tell.runner.mjs");
+  writeFileSync(
+    probe,
+    "import " +
+      JSON.stringify(pathToFileURL(preload).href) +
+      ";\n" +
+      "process.stdout.write(JSON.stringify({ execArgv: process.execArgv, argv: process.argv.slice(1), log: process.env." +
+      LAUNCH_LOG_ENV +
+      " ?? null }));\n",
+  );
+  writeFileSync(tell, "");
+  const told = spawnSync(process.execPath, [probe], {
+    cwd: root,
+    encoding: "utf8",
+    env: { ...process.env, [LAUNCH_LOG_ENV]: tell },
+  });
+  assert.equal(told.status, 0, "the observation probe must run: " + String(told.stderr).slice(-300));
+  const seen = JSON.parse(told.stdout);
+  assert.deepEqual(seen.execArgv, [], "the observed process must carry no preload flag");
+  assert.equal(seen.log, null, "the log variable must be gone before any test loads");
   assert.equal(
-    stripAnsi(String.fromCharCode(27) + "[32m\u2714 a coloured case (1.2ms)" + String.fromCharCode(27) + "[39m"),
-    "\u2714 a coloured case (1.2ms)",
+    seen.argv.some((entry) => entry.includes("--import") || entry === "-e"),
+    false,
+    "the observed process must not advertise how it was started",
   );
   assert.equal(
     control.result.status,
@@ -1291,10 +1321,13 @@ function runFailureControlCases() {
   const now = 1_000_000_000;
   assert.equal(lockIsStale({ pid: 4242, at: now }, now, () => true), false);
   assert.equal(lockIsStale({ pid: 4242, at: now }, now, () => false), true);
-  assert.equal(lockIsStale({ pid: 4242, at: now - 2 * 60 * 60 * 1000 }, now, () => true), true);
+  assert.equal(lockIsStale({ pid: 4242, at: now - 60 * 60 * 1000 }, now, () => true), true);
+  // The record is refreshed between controls, so a run longer than the bound
+  // keeps its lock as long as it is still making progress.
+  assert.equal(lockIsStale({ pid: 4242, at: now - 60_000 }, now, () => true), false);
   assert.equal(lockIsStale({ pid: 4242 }, now, () => true), true, "no timestamp reads as stale");
   assert.equal(lockIsStale(null, now, () => true), true);
-  observed += 5;
+  observed += 6;
   // The observation must not leave its own signal in the environment, or a test
   // could behave one way under observation and another in the lane.
   assert.match(

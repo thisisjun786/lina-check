@@ -154,13 +154,13 @@ export function lockPrefixFor(repositoryRoot) {
 /**
  * The exclusive record for this checkout, held for the length of a run.
  *
- * A lock older than this bound is treated as abandoned even when its recorded
- * pid reads as alive, because pids are reused: without it a recycled number
- * would refuse every later run and leave an interrupted mutation unrepaired.
- * The bound is far longer than a control run, which takes seconds.
+ * The record is refreshed between controls, so the bound measures silence
+ * rather than total duration: a long run keeps its lock, while an abandoned one
+ * ages out. Without ageing at all, a recycled pid would refuse every later run
+ * and leave an interrupted mutation unrepaired.
  */
 const RUN_LOCK = join(tmpdir(), LOCK_PREFIX + "run.lock");
-const RUN_LOCK_STALE_MS = 60 * 60 * 1000;
+const RUN_LOCK_STALE_MS = 10 * 60 * 1000;
 
 /** Whether a process id is still running, treating a permission error as alive. */
 export function processAlive(pid, kill = process.kill.bind(process)) {
@@ -189,26 +189,45 @@ export function lockIsStale(record, now = Date.now(), alive = processAlive) {
 }
 
 function acquireCheckout() {
-  const mine = JSON.stringify({ pid: process.pid, at: Date.now() });
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  const record = () => JSON.stringify({ pid: process.pid, at: Date.now() });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       // Exclusive creation: the check and the write are one step, so two runs
       // starting together cannot both believe they hold the checkout.
-      writeFileSync(RUN_LOCK, mine, { flag: "wx" });
-      return () => {
-        if (!existsSync(RUN_LOCK)) return;
-        try {
-          const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
-          if (held.pid === process.pid) rmSync(RUN_LOCK, { force: true });
-        } catch {
-          rmSync(RUN_LOCK, { force: true });
-        }
+      writeFileSync(RUN_LOCK, record(), { flag: "wx" });
+      return {
+        // Refreshed between controls so the bound measures silence, not length.
+        beat: () => {
+          if (!existsSync(RUN_LOCK)) return;
+          try {
+            const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+            if (held.pid !== process.pid) return;
+          } catch {
+            return;
+          }
+          writeFileSync(RUN_LOCK, record());
+        },
+        release: () => {
+          if (!existsSync(RUN_LOCK)) return;
+          try {
+            const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+            if (held.pid === process.pid) rmSync(RUN_LOCK, { force: true });
+          } catch {
+            rmSync(RUN_LOCK, { force: true });
+          }
+        },
       };
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
+      let raw = null;
+      try {
+        raw = readFileSync(RUN_LOCK, "utf8");
+      } catch {
+        raw = null;
+      }
       let held = null;
       try {
-        held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+        held = raw === null ? null : JSON.parse(raw);
       } catch {
         held = null;
       }
@@ -219,7 +238,16 @@ function acquireCheckout() {
             "); wait for it rather than interleaving mutations",
           { cause: error },
         );
-      rmSync(RUN_LOCK, { force: true });
+      // Remove it only while it is still the record judged stale. Deleting
+      // unconditionally is how two runs that both saw one stale lock could each
+      // clear the other's fresh one and proceed together.
+      let current = null;
+      try {
+        current = readFileSync(RUN_LOCK, "utf8");
+      } catch {
+        current = null;
+      }
+      if (current === raw) rmSync(RUN_LOCK, { force: true });
     }
   }
   throw new Error("could not take the checkout lock at " + RUN_LOCK);
@@ -309,12 +337,13 @@ export function judge(baseline, mutated) {
 }
 
 export function runControls(controls = CONTROLS) {
-  const releaseCheckout = acquireCheckout();
+  const checkout = acquireCheckout();
   const recovered = recoverInterrupted();
   if (recovered) process.stderr.write(LABEL + " restored an interrupted mutation in " + recovered + "\n");
   const results = [];
   try {
   for (const control of controls) {
+    checkout.beat();
     const path = join(root, control.file);
     const before = digest(path);
     const source = readFileSync(path, "utf8");
@@ -353,7 +382,7 @@ export function runControls(controls = CONTROLS) {
   }
   return results;
   } finally {
-    releaseCheckout();
+    checkout.release();
   }
 }
 
