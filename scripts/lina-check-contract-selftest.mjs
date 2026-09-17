@@ -79,6 +79,7 @@ import {
   CONTROLS as FAILURE_CONTROLS,
   controlFingerprint,
   judge as judgeFailureControl,
+  lockPrefixFor,
 } from "./lina-check-failure-controls.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -1225,6 +1226,14 @@ function runFailureControlCases() {
     controlFingerprint(sampleControl),
     controlFingerprint({ ...sampleControl, file: "test/other.test.ts" }),
   );
+  observed += 2;
+  // The recovery record is scoped to a checkout. A single shared name would let
+  // one checkout restore or delete another's in-progress mutation.
+  assert.notEqual(
+    lockPrefixFor("/home/example/checkout-a"),
+    lockPrefixFor("/home/example/checkout-b"),
+  );
+  assert.equal(lockPrefixFor(root), lockPrefixFor(root), "the same root must map to one prefix");
   observed += 2;
   const pass = { status: 0, signal: null, error: null, failing: 0 };
   assert.equal(judgeFailureControl(pass, { status: 1, signal: null, error: null, failing: 1 }).detected, true);

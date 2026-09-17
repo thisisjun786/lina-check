@@ -20,7 +20,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -128,7 +128,28 @@ export function controlFingerprint(control) {
  * bytes are parked outside the repository first, and any run starts by putting
  * back what a previous run failed to restore.
  */
-const LOCK = join(tmpdir(), "lina-check-failure-control.lock.json");
+/**
+ * One lock per checkout and per process.
+ *
+ * A single fixed path in the system temporary directory is shared by every
+ * checkout on the host, so one run could restore another's in-progress mutation
+ * or delete its recovery record. The name carries a digest of this repository
+ * root and this process id; recovery only reads records belonging to this root.
+ *
+ * Two concurrent runs in the same checkout are still not supported: they would
+ * mutate the same test files. The lock makes that visible rather than safe.
+ */
+const ROOT_KEY = createHash("sha256").update(root).digest("hex").slice(0, 12);
+const LOCK_PREFIX = "lina-check-failure-control." + ROOT_KEY + ".";
+const LOCK = join(tmpdir(), LOCK_PREFIX + process.pid + ".lock.json");
+
+export function lockPrefixFor(repositoryRoot) {
+  return (
+    "lina-check-failure-control." +
+    createHash("sha256").update(repositoryRoot).digest("hex").slice(0, 12) +
+    "."
+  );
+}
 const pending = new Map();
 
 function park(path, source) {
@@ -142,11 +163,21 @@ function unpark(path) {
 }
 
 export function recoverInterrupted() {
-  if (!existsSync(LOCK)) return null;
-  const parked = JSON.parse(readFileSync(LOCK, "utf8"));
-  writeFileSync(parked.path, parked.source);
-  rmSync(LOCK, { force: true });
-  return parked.path;
+  const restored = [];
+  for (const name of readdirSync(tmpdir())) {
+    if (!name.startsWith(LOCK_PREFIX) || !name.endsWith(".lock.json")) continue;
+    const lock = join(tmpdir(), name);
+    try {
+      const parked = JSON.parse(readFileSync(lock, "utf8"));
+      writeFileSync(parked.path, parked.source);
+      restored.push(parked.path);
+    } catch {
+      // A truncated record cannot be restored from; removing it is still right,
+      // because leaving it would make every later run report the same failure.
+    }
+    rmSync(lock, { force: true });
+  }
+  return restored.length > 0 ? restored.join(", ") : null;
 }
 
 function restoreAll() {

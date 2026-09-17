@@ -725,9 +725,15 @@ const AMBIENT_REQUIRE_USE = /\brequire\b/g;
  * ordinary heuristic and enough for source this scan reads.
  */
 function opensRegExp(before) {
-  const previous = before.replace(/\s+$/, "").slice(-1);
+  const trimmed = before.replace(/\s+$/, "");
+  const previous = trimmed.slice(-1);
   if (previous === "") return true;
-  return "(,=:[!&|?{};+-*%~^".includes(previous);
+  // ++ and -- are postfix here, so the slash after them divides.
+  if (trimmed.endsWith("++") || trimmed.endsWith("--")) return false;
+  // A closing brace, parenthesis or bracket commonly precedes division, and
+  // claiming a pattern there erases the rest of the expression, which is how a
+  // loader call would disappear. Ambiguity resolves toward division.
+  return "(,=:!&|?;+*%~^<>".includes(previous);
 }
 export function codeOnly(source) {
   let out = "";
@@ -740,6 +746,20 @@ export function codeOnly(source) {
       if (character === "\\") {
         out += "  ";
         index += 2;
+        continue;
+      }
+      // A template interpolation is code, not text. Blanking it would hide a
+      // loader call written inside one.
+      if (quote === "\u0060" && two === "${") {
+        out += "${";
+        index += 2;
+        let depth = 1;
+        while (index < source.length && depth > 0) {
+          if (source[index] === "{") depth += 1;
+          if (source[index] === "}") depth -= 1;
+          out += source[index];
+          index += 1;
+        }
         continue;
       }
       if (character === quote) {
@@ -818,6 +838,59 @@ const EXTENSION_CANDIDATES = Object.freeze([
 ]);
 const escapeRegExp = (value) => value.replace(/[.*+?^=!:!{}()|[\]/\\$]/g, "\\$&");
 
+
+/**
+ * Source with comments blanked and string contents kept, positions preserved.
+ *
+ * The specifier scans need the literal intact, so they cannot use codeOnly;
+ * they still must not be defeated by a comment sitting between a keyword and
+ * its argument, which is valid and was invisible.
+ */
+export function withoutComments(source) {
+  let out = "";
+  let index = 0;
+  let quote = null;
+  while (index < source.length) {
+    const two = source.slice(index, index + 2);
+    const character = source[index];
+    if (quote) {
+      if (character === "\\") {
+        out += source.slice(index, index + 2);
+        index += 2;
+        continue;
+      }
+      if (character === quote) quote = null;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "\u0060") {
+      quote = character;
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (two === "//") {
+      while (index < source.length && source[index] !== "\n") {
+        out += " ";
+        index += 1;
+      }
+      continue;
+    }
+    if (two === "/*") {
+      while (index < source.length && source.slice(index, index + 2) !== "*/") {
+        out += source[index] === "\n" ? "\n" : " ";
+        index += 1;
+      }
+      out += "  ";
+      index += 2;
+      continue;
+    }
+    out += character;
+    index += 1;
+  }
+  return out;
+}
 /** Index just past the parenthesis group that starts at open. */
 function afterGroup(source, open) {
   let depth = 0;
@@ -864,7 +937,10 @@ export function createRequireNames(source) {
  * specifier, reassigned — is reported as unfollowable rather than counted as
  * nothing found. A scan that cannot see a load must not read as a clean one.
  */
-export function analyseRequireUse(source) {
+export function analyseRequireUse(rawSource) {
+  // Literals come from a copy with comments blanked and strings intact, so a
+  // comment between a loader and its argument cannot hide the call.
+  const source = withoutComments(rawSource);
   const specifiers = [];
   const unfollowable = [];
   const loaders = new Set();
@@ -991,8 +1067,11 @@ export function derivedTestClosure(entry, readFile) {
       // closure exists to prevent.
       fail("derived-test-unreadable", path + ": " + (error?.message ?? String(error)));
     }
+    // Comments are blanked for the specifier scan too: an import with a
+    // comment between the keyword and its argument is valid and was invisible.
+    const scannable = withoutComments(source);
     for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
-      for (const match of source.matchAll(pattern)) {
+      for (const match of scannable.matchAll(pattern)) {
         // A template literal carries its specifier in the second group.
         follow(path, match[1] ?? match[2], readFile, seen, queue);
       }
