@@ -1018,7 +1018,7 @@ function runDerivedTestCases() {
   execPath.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
   assertDerivedTestContract(execPath);
-  observed += 21;
+  observed += 23;
   // A name the scan can read is one thing, a name computed at run time
   // another. process["arg" + "v"] reaches the argument vector and spells
   // neither half of it, so every form this scan cannot read is refused.
@@ -1030,6 +1030,10 @@ function runDerivedTestCases() {
     'const k = "proc" + "ess";\nconst p = globalThis[k];\nconst x = p;\n',
     'import proc from "node:process";\nconst x = proc;\n',
     "const { env } = process;\nconst x = env;\n",
+    // The bracket rule watched globalThis itself, so a binding moved the
+    // computed read one name further along, where it was no longer watched.
+    'const root = globalThis;\nconst proc = root["pro" + "cess"];\nconst args = proc["arg" + "v"];\nconst x = args;\n',
+    "const { process: captured } = globalThis;\nconst x = captured;\n",
     // A dotted property can name the invocation without spelling argv, which
     // is why the permitted properties are a list rather than the leftovers.
     "const how = process.report.getReport().header.commandLine;\n",

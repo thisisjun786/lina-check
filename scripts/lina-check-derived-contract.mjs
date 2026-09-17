@@ -1151,9 +1151,18 @@ export function observationAccessFault(rawSource) {
     if (!IMPORT_META_PROPERTY.includes(match[1]))
       return "import.meta." + match[1] + " is not one of the permitted properties";
   }
-  for (const match of code.matchAll(GLOBAL_ROOT))
-    if (/^\s*\[/.test(code.slice(match.index + match[0].length)))
-      return "computed member access on " + match[0];
+  for (const match of code.matchAll(GLOBAL_ROOT)) {
+    const rest = code.slice(match.index + match[0].length);
+    if (/^\s*\[/.test(rest)) return "computed member access on " + match[0];
+    if (/^\s*\./.test(rest)) continue;
+    // Not a member access, so the value itself is in play. An argument is the
+    // one place this repository needs it - t.mock.method(globalThis, "fetch",
+    // ...) - and a binding is where a computed read would continue under a name
+    // this rule no longer watches.
+    const before = code.slice(0, match.index).replace(/\s+$/, "");
+    if (/[(,]$/.test(before)) continue;
+    return match[0] + " bound to a name rather than read through a property";
+  }
   for (const match of code.matchAll(PROCESS_ROOT)) {
     const start = match.index + match[0].length;
     const rest = code.slice(start);
