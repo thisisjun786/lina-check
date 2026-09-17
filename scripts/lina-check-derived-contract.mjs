@@ -699,6 +699,9 @@ const MODULE_NAMED_IMPORT = /import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?module[
 /** import * as x from "node:module" puts the factory behind a member access. */
 const MODULE_NAMESPACE_IMPORT =
   /import\s*\*\s*as\s+([A-Za-z_$][\w$]*)\s*from\s*["'](?:node:)?module["']/g;
+/** The default import reaches the same factory through the same member access. */
+const MODULE_DEFAULT_IMPORT =
+  /import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*["'](?:node:)?module["']/g;
 /**
  * Candidates CommonJS resolution would try for a specifier with no extension.
  * Dropping such a specifier silently is how an extensionless helper escapes.
@@ -748,6 +751,8 @@ export function createRequireNames(source) {
   // this scan looks for is the whole dotted form.
   for (const statement of source.matchAll(MODULE_NAMESPACE_IMPORT))
     names.add(statement[1] + ".createRequire");
+  for (const statement of source.matchAll(MODULE_DEFAULT_IMPORT))
+    names.add(statement[1] + ".createRequire");
   return names;
 }
 
@@ -783,9 +788,18 @@ export function analyseRequireUse(source) {
       const before = source.slice(Math.max(0, at - 120), at);
       // The import specifier that brings the name in is not a use of it.
       if (/import[^;]*\{[^}]*$/.test(before)) continue;
-      // A member access on a namespace this scan does track is not an untracked
-      // use either; the dotted name was matched on its own pass.
-      if (!name.includes(".") && /\.\s*$/.test(before)) continue;
+      // A member access is only safe to skip when the object it hangs off is a
+      // name this scan already tracks, because that dotted form was matched on
+      // its own pass. Any other object is a loader this scan cannot follow, and
+      // skipping it silently is the bypass this rule exists to prevent.
+      if (!name.includes(".")) {
+        const member = /([A-Za-z_$][\w$]*)\s*\.\s*$/.exec(before);
+        if (member) {
+          if (names.includes(member[1] + "." + name)) continue;
+          unfollowable.push(member[1] + "." + name);
+          continue;
+        }
+      }
       const rest = source.slice(at + name.length);
       if (!/^\s*\(/.test(rest)) {
         unfollowable.push(name);

@@ -21,6 +21,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -790,6 +791,12 @@ function runDerivedTestCases() {
         'const helper = nodeModule.createRequire(import.meta.url)("./helpers/command-intake-fixture.mjs");\n',
       "a namespace immediate call",
     ],
+    [
+      'import nodeModule from "node:module";\n' +
+        "const load = nodeModule.createRequire(import.meta.url);\n" +
+        'const helper = load("./helpers/command-intake-fixture.mjs");\n',
+      "createRequire reached through a default import",
+    ],
   ];
   for (const [body, form] of commonJsForms) {
     const input = base();
@@ -851,7 +858,19 @@ function runDerivedTestCases() {
   assert.throws(() => assertDerivedTestContract(computed), {
     code: "derived-test-unresolvable-require",
   });
-  observed += 2;
+  // A member access whose object is not a tracked module binding. Skipping it
+  // silently is how the default-import form escaped before: the bare name looked
+  // like somebody else's property.
+  const untracked = base();
+  const others2 = untracked.readFile;
+  untracked.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'const helper = something.createRequire(import.meta.url)("./helpers/x.mjs");\n'
+      : others2(path);
+  assert.throws(() => assertDerivedTestContract(untracked), {
+    code: "derived-test-unresolvable-require",
+  });
+  observed += 3;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
@@ -1205,6 +1224,21 @@ function runFailureControlCases() {
     assert.ok(
       source.includes(control.from),
       "control anchor is gone, so the receipt is stale: " + control.file + " :: " + control.what,
+    );
+    observed += 1;
+  }
+  // The suite bytes each result was produced against. An intact anchor does not
+  // mean an unchanged suite: a recovered case can gain an unrelated failure or
+  // lose the path the mutation sits on, and the recorded baseline would still
+  // read as current.
+  for (const entry of receipt.results) {
+    const current = createHash("sha256")
+      .update(readFileSync(join(root, entry.file)))
+      .digest("hex");
+    assert.equal(
+      entry.suite_digest,
+      current,
+      entry.file + " changed since its control ran; rerun: node scripts/lina-check-failure-controls.mjs --write",
     );
     observed += 1;
   }

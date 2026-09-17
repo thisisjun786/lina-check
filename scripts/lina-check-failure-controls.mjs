@@ -225,6 +225,11 @@ export function runControls(controls = CONTROLS) {
       file: control.file,
       mutation: control.what,
       fingerprint: controlFingerprint(control),
+      // The bytes this result was produced against. A control identity says the
+      // mutation is the same one; this says the suite it ran on is too. Without
+      // it a suite can change around an intact anchor and the recorded baseline
+      // and detection stop describing anything current.
+      suite_digest: before,
       baseline_exit: baseline.status,
       mutated_exit: mutated.status,
       mutated_signal: mutated.signal,
