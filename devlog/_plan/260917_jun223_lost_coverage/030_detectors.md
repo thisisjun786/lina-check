@@ -136,6 +136,23 @@ backslash-u 는 이스케이프된 식별자일 수밖에 없고, closure 에는
 **호출**하는 형태다. 그 형태는 closure 에 하나도 없고, 허용된 객체를 다시 위험하게 만드는 것도
 그 형태다. 리터럴 키로 하는 호출은 그대로 통과한다.
 
+메서드를 먼저 꺼내는 형태도 같이 막는다. `const { ["run" + "InThisContext"]: go } = script` 는
+대괄호 뒤에 괄호가 없어서 위 규칙에 걸리지 않는다. 구조 분해 패턴과 객체 리터럴은 뒤따르는 대입으로
+구분한다. 리터럴은 값을 만들고 패턴은 값을 읽으며, 하네스가 `{ [item.key]: item }` 을 만든다.
+
+호출 스택도 관측 신호다. `new Error().stack` 에는 관측이 만든 러너 경로가, 레인에는 그쪽 진입
+프레임이 들어간다. 인자 벡터와 같은 답을 준다. `.stack`·`captureStackTrace`·
+`prepareStackTrace` 를 막는다.
+
+### codeOnly 의 보간 처리
+
+`codeOnly` 가 ``${...}`` 의 깊이를 원시 중괄호로 셌다. 보간 안의 문자열이나 주석에 들어 있는
+`}` 가 깊이를 먼저 0으로 만들고, 그 뒤의 코드는 템플릿 텍스트로 비워졌다. 즉 스캐너가 읽어야 할
+코드를 스스로 지웠다. 이제 구조별 프레임을 쌓는다. 보간은 코드 프레임을 밀고, 문자열·템플릿·주석·
+정규식은 각자의 프레임에서 처리되므로 그 안의 중괄호는 보간을 끝내지 못한다. 중첩 템플릿도 같이
+처리된다. 대조는 ``${"}" + process.report.getReport()}`` 를 먹여서 거부되는지 본다. 옛 계산법에서는
+통과한다.
+
 속성을 허용 목록으로 둔 것은 금지 목록이 틀린 모양이기 때문이다.
 `process.report.getReport().header.commandLine` 은 `argv` 라는 철자 없이 호출 방식을 말해 준다.
 그런 속성을 하나씩 막으면 목록이 끝나지 않는다. 뒤집으면 끝난다. 파생 테스트에 필요한 것은 대역
@@ -163,20 +180,22 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
 그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
 
-양성 대조는 거부 서른두 개와 허용 열한 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 서른일곱 개와 허용 열두 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
 `process.stdout.write`, 리플렉션 경로 다섯, 동적 코드 전역 셋(`new` 없는 `Function`, 공백을 낀
 호출, 바인딩에 담은 `Function`), `import.meta` 둘, `node:vm` 평가 둘, 목록 밖 지정자 셋(빌트인·
 패키지·절대 경로), 이스케이프된 식별자 하나, node:module 네임스페이스 셋, 목록 밖 named import 둘,
-계산된 이름으로 하는 메서드 호출 둘이다.
+계산된 이름으로 하는 메서드 호출 둘, 계산된 키 구조 분해 하나, 호출 스택 둘, 보간 안에 숨긴 접근
+하나다.
 `process.stdout` 을 막는 것은 덤이
 아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
 대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 아홉 형태다. 계산된 키로 하는 환경 변수
 복원(쓰기와 삭제), 리터럴 키 읽기, `t.mock.method(globalThis, "fetch", ...)`,
 `process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`,
 `import.meta.url`, `node:vm` 의 `Script`·`createContext`, 목록에 있는 `node:assert/strict`,
-네임스페이스로 부르는 `syncBuiltinESMExports`, 리터럴 키로 하는 메서드 호출.
+네임스페이스로 부르는 `syncBuiltinESMExports`, 리터럴 키로 하는 메서드 호출, 계산된 키로 만드는
+객체 리터럴.
 허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부

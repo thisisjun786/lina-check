@@ -1002,6 +1002,72 @@ function computedMemberCall(code) {
   return null;
 }
 
+/**
+ * A computed property key in a destructuring pattern, as in
+ * const { ["run" + "InThisContext"]: go } = script.
+ *
+ * The call rule above asks whether the bracket is followed by a parenthesis,
+ * which this form answers no to: the method is pulled out first and called
+ * through a plain name afterwards. The pattern is told from an object literal
+ * by the assignment that follows it, because a literal builds a value and a
+ * pattern reads one, and the worker harness builds { [item.key]: item }.
+ */
+function computedPatternKey(code) {
+  for (const key of code.matchAll(/\]\s*:/g)) {
+    let open = -1;
+    let depth = 0;
+    for (let index = key.index; index >= 0; index -= 1) {
+      if (code[index] === "]") depth += 1;
+      else if (code[index] === "[") {
+        depth -= 1;
+        if (depth === 0) {
+          open = index;
+          break;
+        }
+      }
+    }
+    if (open === -1) continue;
+    if (literalKey(code.slice(open + 1, key.index).trim())) continue;
+    let brace = -1;
+    let braces = 0;
+    for (let index = open; index >= 0; index -= 1) {
+      if (code[index] === "}") braces += 1;
+      else if (code[index] === "{") {
+        braces -= 1;
+        if (braces < 0) {
+          brace = index;
+          break;
+        }
+      }
+    }
+    if (brace === -1) continue;
+    let close = -1;
+    braces = 0;
+    for (let index = brace; index < code.length; index += 1) {
+      if (code[index] === "{") braces += 1;
+      else if (code[index] === "}") {
+        braces -= 1;
+        if (braces === 0) {
+          close = index;
+          break;
+        }
+      }
+    }
+    if (close === -1) continue;
+    if (/^\s*=[^=>]/.test(code.slice(close + 1))) return code.slice(open, key.index + 1).trim();
+  }
+  return null;
+}
+
+/**
+ * The call stack names the file that started the run.
+ *
+ * new Error().stack carries the observation's generated runner path and the
+ * lane's entry frames, which differ, so reading it is reading the invocation.
+ * Same answer as for the argument vector: permission to look is denied.
+ */
+const STACK_SURFACE = /\.\s*stack\b|\b(?:captureStackTrace|prepareStackTrace)\b/;
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -1049,6 +1115,10 @@ export function observationAccessFault(rawSource) {
   const computedCall = computedMemberCall(code);
   if (computedCall !== null)
     return "a member call through the constructed name " + computedCall;
+  const patternKey = computedPatternKey(code);
+  if (patternKey !== null) return "a destructured property through the constructed name " + patternKey;
+  const stackRead = STACK_SURFACE.exec(code);
+  if (stackRead) return "the call stack through " + stackRead[0].trim() + ", which names the file that started the run";
   for (const match of code.matchAll(IMPORT_META)) {
     if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
     if (!IMPORT_META_PROPERTY.includes(match[1]))
@@ -1167,41 +1237,47 @@ function opensRegExp(before) {
 export function codeOnly(source) {
   let out = "";
   let index = 0;
-  let quote = null;
+  // One frame per nested construct, innermost last. An interpolation pushes a
+  // code frame, so a brace inside a string inside an interpolation is read as
+  // text rather than as the end of the interpolation. Counting raw braces was
+  // the bug: `${"}" + launch()}` ended the interpolation at the string's brace
+  // and blanked the call after it.
+  const stack = [{ kind: "code", braces: 0 }];
+  const top = () => stack[stack.length - 1];
   while (index < source.length) {
-    const two = source.slice(index, index + 2);
+    const frame = top();
     const character = source[index];
-    if (quote) {
+    const two = source.slice(index, index + 2);
+    if (frame.kind === "string" || frame.kind === "template") {
       if (character === "\\") {
         out += "  ";
         index += 2;
         continue;
       }
-      // A template interpolation is code, not text. Blanking it would hide a
-      // loader call written inside one.
-      if (quote === "\u0060" && two === "${") {
+      if (frame.kind === "template" && two === "${") {
         out += "${";
+        stack.push({ kind: "code", braces: 0 });
         index += 2;
-        let depth = 1;
-        while (index < source.length && depth > 0) {
-          if (source[index] === "{") depth += 1;
-          if (source[index] === "}") depth -= 1;
-          out += source[index];
-          index += 1;
-        }
         continue;
       }
-      if (character === quote) {
-        quote = null;
+      if (character === frame.quote) {
+        stack.pop();
         out += character;
-      } else {
-        out += character === "\n" ? "\n" : " ";
+        index += 1;
+        continue;
       }
+      out += character === "\n" ? "\n" : " ";
       index += 1;
       continue;
     }
-    if (character === '"' || character === "'" || character === "\u0060") {
-      quote = character;
+    if (character === '"' || character === "'") {
+      stack.push({ kind: "string", quote: character });
+      out += character;
+      index += 1;
+      continue;
+    }
+    if (character === "`") {
+      stack.push({ kind: "template", quote: "`" });
       out += character;
       index += 1;
       continue;
@@ -1243,6 +1319,13 @@ export function codeOnly(source) {
         index += 1;
       }
       continue;
+    }
+    if (character === "{") frame.braces += 1;
+    else if (character === "}") {
+      // The brace that closes an interpolation belongs to the template, not to
+      // the code inside it.
+      if (frame.braces > 0) frame.braces -= 1;
+      else if (stack.length > 1) stack.pop();
     }
     out += character;
     index += 1;

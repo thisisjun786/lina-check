@@ -1060,7 +1060,19 @@ function runDerivedTestCases() {
     // assembled: new Script(...)["run" + "InThisContext"]() names neither.
     'const S = Script;\nnew S("1")["run" + "InThisContext"]();\n',
     'const method = "runIn" + "NewContext";\nvmApi[method]("1");\n',
-  ]) {
+    // Pulled out first, called through a plain name afterwards, so the call
+    // rule above never sees a parenthesis behind the bracket.
+    'const { ["run" + "InThisContext"]: go } = new Script(source);\ngo();\n',
+    // The call stack names the file that started the run: the observation's
+    // generated runner in one case and the lane's entry frames in the other.
+    'if (!new Error().stack.includes(".runner.mjs")) startLane();\n',
+   "Error.captureStackTrace(holder);\nconst x = holder;\n",
+    // A brace inside a string inside an interpolation used to end the
+    // interpolation, and everything after it was blanked as template text.
+    // process.report is only visible to the rules that read the blanked copy,
+    // so this control fails against the old brace counting and passes now.
+    'const label = `${"}" + process.report.getReport()}`;\nconst x = label;\n',
+ ]) {
     const computed = base();
     const rest4 = computed.readFile;
     computed.readFile = (path) => (path === DERIVED_TESTS[0] ? unreadable : rest4(path));
@@ -1093,6 +1105,9 @@ function runDerivedTestCases() {
     // A literal key is readable, and refusing every computed access would stop
     // ordinary lookups the closure makes.
     'const table = { run: () => 1 };\nconst value = table["run"]();\nconst x = value;\n',
+    // An object literal builds a value rather than reading one, and the worker
+    // harness in the closure builds exactly this.
+    "const merged = { [item.key]: item };\nconst x = merged;\n",
   ]) {
   // An unclassified builtin used to pass as safely as a listed one, which is
   // how node:vm reached the closure without anything deciding about it.
@@ -1192,7 +1207,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 47;
+  observed += 52;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
