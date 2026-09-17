@@ -134,6 +134,99 @@ export const BOUNDARY_PROBES = Object.freeze([
 
 export const BOUNDARY_PROBE_SCRIPTS = Object.freeze(BOUNDARY_PROBES.map(({ script }) => script));
 
+/** The installation entry point that ships with the fork. */
+export const INSTALLATION_CONFIG_PATH = "config/lina-check-installation.json";
+export const INSTALLATION_SCHEMA_PATH = "schema/lina-check-installation.schema.json";
+
+/**
+ * Values that must not reappear in code or configuration this fork owns: the
+ * upstream maintainer account, the upstream Cloudflare account, the upstream
+ * App client, the two upstream operational hosts, and the upstream profile
+ * registry.
+ *
+ * Each value is assembled from fragments rather than written out. A scanner that
+ * spelled its own needles would match the file that defines them, so a literal
+ * table would fail the check it exists to perform. The fragments also keep the
+ * upstream maintainer's account name out of this fork's source.
+ */
+export const FORBIDDEN_INSTALLATION_LITERALS = Object.freeze([
+  Object.freeze({ label: "upstream maintainer account", value: ["stei", "pete"].join("") }),
+  Object.freeze({
+    label: "upstream Cloudflare account",
+    value: ["91b59577", "e757131d68d55a471fe32aca"].join(""),
+  }),
+  Object.freeze({ label: "upstream App client", value: ["Iv23li", "OECG0slfuhz093"].join("") }),
+  Object.freeze({ label: "upstream dashboard host", value: ["clawsweeper.", "openclaw.ai"].join("") }),
+  Object.freeze({ label: "upstream fleet host", value: ["crabfleet.", "openclaw.ai"].join("") }),
+  Object.freeze({
+    label: "upstream profile registry",
+    value: ["raw.githubusercontent.com/", "openclaw/clawsweeper"].join(""),
+  }),
+]);
+
+/**
+ * Where the forbidden-literal scan applies: files whose bytes this fork owns and
+ * that carry behaviour. Prose under devlog/ and docs/ is excluded on purpose,
+ * because a record of what was removed has to be able to name it. Untouched
+ * upstream files are excluded because the byte assertion already fixes them and
+ * preserving them is this repository's contract.
+ */
+const SCANNED_PREFIXES = Object.freeze(["src/", "dashboard/", "config/", "schema/", "scripts/"]);
+
+export function scannedForForbiddenLiterals(paths) {
+  return [...paths].filter((path) => SCANNED_PREFIXES.some((prefix) => path.startsWith(prefix)));
+}
+
+export function assertNoForbiddenInstallationLiterals(paths, readFile) {
+  for (const path of scannedForForbiddenLiterals(paths)) {
+    const source = readFile(path);
+    for (const { label, value } of FORBIDDEN_INSTALLATION_LITERALS)
+      if (source.includes(value)) fail("installation-forbidden-literal", path + " -> " + label);
+  }
+}
+
+const EMPTY_INSTALLATION_STRINGS = Object.freeze([
+  ["branding", "product_name"],
+  ["branding", "short_name"],
+  ["branding", "user_agent"],
+  ["branding", "dashboard_host"],
+  ["targets", "registry_url"],
+  ["state", "state_repo"],
+  ["state", "state_ref"],
+  ["github_app", "client_id"],
+  ["github_app", "bot_login"],
+]);
+
+/**
+ * The shipped entry point must stay empty. This is a different question from
+ * whether the loader rejects an empty profile at runtime: this one keeps a
+ * populated installation from being committed, which would hand every clone of
+ * this fork somebody else's targets.
+ */
+export function assertShippedInstallationEmpty(profile) {
+  if (typeof profile !== "object" || profile === null)
+    fail("installation-shipped-shape", "installation profile must be an object");
+  if (profile.schema_version !== 1)
+    fail("installation-shipped-shape", "schema_version must be 1");
+  if (profile.configured !== false)
+    fail("installation-shipped-configured", "shipped installation must be unconfigured");
+  for (const key of ["branding", "targets", "state", "github_app"])
+    if (typeof profile[key] !== "object" || profile[key] === null)
+      fail("installation-shipped-shape", "missing section: " + key);
+  for (const key of ["fallback_owners", "repositories"]) {
+    const list = profile.targets[key];
+    if (!Array.isArray(list)) fail("installation-shipped-shape", "targets." + key + " must be an array");
+    if (list.length !== 0) fail("installation-shipped-nonempty", "targets." + key);
+  }
+  for (const [section, key] of EMPTY_INSTALLATION_STRINGS) {
+    const value = profile[section][key];
+    if (typeof value !== "string")
+      fail("installation-shipped-shape", section + "." + key + " must be a string");
+    if (value !== "") fail("installation-shipped-nonempty", section + "." + key);
+  }
+  return { sections: 4, emptyStrings: EMPTY_INSTALLATION_STRINGS.length };
+}
+
 /** Parked workflows whose triggers would reach one of the four automatic actions. */
 export const BOUNDARY_WORKFLOWS = Object.freeze([
   "automerge-e2e",
@@ -150,6 +243,10 @@ const DERIVED_FILE_PATTERNS = Object.freeze([
       PLAN_UNITS.map((unit) => unit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") +
       ")\\/(evidence\\/)?[0-9a-z_-]+\\.(md|json)$",
   ),
+  /^src\/lina-check-[a-z-]+\.ts$/,
+  /^config\/lina-check-[a-z-]+\.json$/,
+  /^schema\/lina-check-[a-z-]+\.schema\.json$/,
+  /^docs\/lina-check\/[a-z0-9-]+\.md$/,
 ]);
 const DERIVED_SCRIPT_COMMAND = /^node (scripts\/lina-check-[a-z-]+\.mjs)(?: [a-z-]+)*$/;
 const BLOCKED_NODE_TARGET = /\bnode ([\w./-]+\.(?:js|mjs|cjs|ts|mts))\b/g;

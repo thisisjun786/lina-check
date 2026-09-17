@@ -6,8 +6,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  INSTALLATION_CONFIG_PATH,
+  INSTALLATION_SCHEMA_PATH,
   SAFE_TESTS,
   TRIPWIRE_ENV,
+  assertNoForbiddenInstallationLiterals,
+  assertShippedInstallationEmpty,
   assertDerivedContract,
 } from "./lina-check-derived-contract.mjs";
 
@@ -157,6 +161,22 @@ const derivedSummary = assertDerivedContract({
   isRegularFile: (path) => lstatSync(join(root, path)).isFile(),
 });
 
+// The installation entry point ships empty. This is not the same question as
+// whether the loader rejects an empty profile at runtime: it keeps a populated
+// installation from reaching main, which would hand every clone somebody else's
+// targets. The runtime denial paths are covered by lina:contract-selftest.
+const installationSummary = assertShippedInstallationEmpty(json(INSTALLATION_CONFIG_PATH));
+assert(
+  existsSync(join(root, INSTALLATION_SCHEMA_PATH)),
+  "Missing installation schema: " + INSTALLATION_SCHEMA_PATH,
+);
+
+// Values this fork removed must not reappear in the files it owns. Scoped to
+// behaviour-carrying paths; the reasoning is in the contract module.
+assertNoForbiddenInstallationLiterals(Object.keys(config.derived.files), (path) =>
+  read(path).toString(),
+);
+
 // Observe the preview at the test-launch boundary rather than trusting its own
 // report: the tripwire makes any spawn from the runner fail loudly, so a
 // successful preview means the boundary was never reached.
@@ -195,4 +215,7 @@ console.log(
 );
 console.log(
   `Derived declarations validated: ${derivedSummary.files} files; ${derivedSummary.scripts} scripts; ${derivedSummary.safeTests} restored upstream tests; ${derivedSummary.probes} boundary-probe targets; preview observed non-executing under ${TRIPWIRE_ENV}.`,
+);
+console.log(
+  `Installation entry point ships unconfigured: ${installationSummary.sections} sections; ${installationSummary.emptyStrings} empty settings; no forbidden upstream literal in fork-owned code or configuration.`,
 );

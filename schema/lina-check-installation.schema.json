@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thisisjun786/lina-check/schema/lina-check-installation.schema.json",
+  "title": "LINA Check installation profile",
+  "description": "Per-installation target, branding, state and GitHub App settings. Empty lists are not a permissive default: they deny. The registry supplies profiles; this file grants permission.",
+  "type": "object",
+  "required": ["schema_version", "configured", "branding", "targets", "state", "github_app"],
+  "additionalProperties": false,
+  "properties": {
+    "note": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "configured": {
+      "type": "boolean",
+      "description": "False means the installation is not set up and every admission decision denies."
+    },
+    "branding": {
+      "type": "object",
+      "required": ["product_name", "short_name", "user_agent", "dashboard_host"],
+      "additionalProperties": false,
+      "properties": {
+        "product_name": { "type": "string" },
+        "short_name": { "type": "string" },
+        "user_agent": { "type": "string" },
+        "dashboard_host": { "type": "string" }
+      }
+    },
+    "targets": {
+      "type": "object",
+      "required": ["fallback_owners", "repositories", "registry_url"],
+      "additionalProperties": false,
+      "properties": {
+        "fallback_owners": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+$" },
+          "description": "Owners whose repositories may be admitted through a generic registry fallback."
+        },
+        "repositories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$" },
+          "description": "Explicitly admitted target repositories."
+        },
+        "registry_url": {
+          "type": "string",
+          "description": "Profile registry to read. Empty means no registry request is made at all."
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["state_repo", "state_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "state_repo": { "type": "string" },
+        "state_ref": { "type": "string" }
+      }
+    },
+    "github_app": {
+      "type": "object",
+      "required": ["client_id", "bot_login"],
+      "additionalProperties": false,
+      "properties": {
+        "client_id": { "type": "string" },
+        "bot_login": { "type": "string" }
+      }
+    }
+  }
+}

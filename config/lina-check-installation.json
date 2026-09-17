@@ -1,0 +1,24 @@
+{
+  "note": "Installation entry point. Ships empty on purpose: an unconfigured installation denies every target. The installation operator fills this in; nothing here is copied from the upstream project's operational accounts, services or targets. scripts/check-scaffold.mjs refuses to pass if a populated version is committed.",
+  "schema_version": 1,
+  "configured": false,
+  "branding": {
+    "product_name": "",
+    "short_name": "",
+    "user_agent": "",
+    "dashboard_host": ""
+  },
+  "targets": {
+    "fallback_owners": [],
+    "repositories": [],
+    "registry_url": ""
+  },
+  "state": {
+    "state_repo": "",
+    "state_ref": ""
+  },
+  "github_app": {
+    "client_id": "",
+    "bot_login": ""
+  }
+}

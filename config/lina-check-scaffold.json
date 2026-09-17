@@ -196,6 +196,11 @@
       "devlog/_plan/260917_jun198_install_profile/050_github_app_permissions.md": { "reason": "Method for deriving App permission scope from real source calls instead of copying the upstream manifest." },
       "devlog/_plan/260917_jun198_install_profile/060_restored_test_compatibility.md": { "reason": "Why one restored test runs against pinned upstream bytes, and what that run does and does not prove." },
       "devlog/_plan/260917_jun198_install_profile/070_delivery_gates.md": { "reason": "Delivery gate results, boundary observations, commit identity rule, and per-finding review receipts." }
+      ,
+      "config/lina-check-installation.json": { "reason": "Installation entry point. Ships unconfigured with every list empty so an unconfigured fork admits nothing." },
+      "schema/lina-check-installation.schema.json": { "reason": "Schema for the installation entry point, including the owner and target-repository shapes." },
+      "src/lina-check-installation-contract.ts": { "reason": "Pure installation contract: parsing, denial codes, admission helpers and branding. Safe inside the Worker import graph." },
+      "src/lina-check-installation.ts": { "reason": "Node-side loader for the installation profile. Kept out of the Worker import graph because it reads the filesystem." }
     },
     "scripts": {
       "lina:test-safe": { "command": "node scripts/lina-check-safe-tests.mjs run", "reason": "Execute the declared restored upstream tests." },
