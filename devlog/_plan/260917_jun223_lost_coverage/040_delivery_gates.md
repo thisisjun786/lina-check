@@ -290,3 +290,24 @@ lint 가 exit 1 이었는데 마지막 줄만 보고 커밋했다. 앞의 것은
 | 변조 상태 `check:scaffold` | exit 1, `Upstream bytes changed: src/clawsweeper-text.ts` |
 | 복원 후 sha256 | 변조 전과 동일 |
 | 복원 후 `check:scaffold` | exit 0 |
+
+## 리뷰 최종 상태
+
+리뷰어 라운드는 다섯 번 돌았다. 앞의 세 번이 지적을 냈고(합계 11건), 네 번째와 다섯 번째는
+지적 없이 지나갔다. Devin 은 자기 지적 여섯 건을 이름을 붙여 Resolved 로 닫았다.
+
+| 라운드 | head | 결과 |
+| -- | -- | -- |
+| 1 | `dd97f6fe` | Codex 1건, Devin 3건. closure 의 CommonJS 누락, 임시 디렉터리 누수, 검사되지 않는 생성기 |
+| 2 | `1e3b8c0e` | Codex 2건, Devin 2건. 변수에 담은 로더, 줄 단위 스캔, skip 레코드, 낡은 수치 |
+| 3 | `46e30a74` | Codex 1건, Devin 3건. 별칭 import, 이름 기반 인증(반박), PR 본문 수치, 끝줄 공백 |
+| 4 | `fab3835d` · `3673678f` | Devin SUCCESS, 신규 지적 없음 |
+| 5 | `9fdc12c9` | Devin SUCCESS, 신규 지적 없음 |
+
+11건 중 10건은 수정 커밋으로 처리했고 1건은 반박했다. 반박한 것은 회복 인증이 이름 기반이라는
+지적인데, 케이스 안의 단언 강도는 어떤 정적 검사로도 알 수 없어서 실패 대조를 표본 증거로 두고
+경계를 문서에 적는 쪽을 골랐다. 그 답을 하면서 표본을 다섯 스위트에서 열 스위트로 넓혔다.
+
+인도 시점의 PR 상태는 OPEN·non-draft·MERGEABLE 이고 `Devin Review=SUCCESS` 다. 머지는
+부모가 한다. 이 저장소의 정책상 upstream 전체 `test`·`check` 는 파킹된 워크플로 경로를
+전제하므로 여기서 돌리지 않았고 통과로 보고하지 않는다.
