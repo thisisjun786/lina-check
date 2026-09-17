@@ -386,7 +386,11 @@ export function main(argv, deps = {}) {
   const failures = [];
   const settle = (outcome) => {
     const verdict = describeLaunchOutcome(outcome, LANE_TIMEOUT_MS);
-    if (verdict.kind === "timeout") {
+    // Any signalled end leaves the same mess, not only the bound: an operator
+    // interrupt or an out-of-memory kill stops the runner while the processes
+    // its tests started keep their ports. The cleanup rule is the launch group,
+    // so it applies wherever the group can still be alive.
+    if (verdict.kind === "timeout" || verdict.kind === "signal") {
       const reaped = reap(outcome);
       process.stderr.write(
         LABEL +

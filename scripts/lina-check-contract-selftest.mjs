@@ -435,6 +435,37 @@ function runLaneShapeCases() {
   for (const directory of directories)
     assert.equal(existsSync(directory), false, "every fixture directory must be removed");
   observed += 6;
+
+  // A signalled end is not a timeout, but it leaves the same group behind. An
+  // operator interrupt or an out-of-memory kill stops the runner while the
+  // processes its tests started keep running, so this path reaps too.
+  const signalled2 = { pid: 6260, status: null, signal: "SIGKILL" };
+  const signalReaped = [];
+  const signalExit = runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => signalled2,
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      signalReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(signalExit, 1, "a signalled launch exits 1");
+  assert.equal(signalReaped.length, 24, "every signalled launch must be reaped");
+  // An ordinary failure has no group left to reap and must not be signalled.
+  const quietReaped = [];
+  const quietExit = runnerMain(["run"], {
+    distState: () => ({ present: true, disposition: "fresh", detail: null, pairs: 1 }),
+    launchTests: () => ({ pid: 6261, status: 2 }),
+    makeFixture: () => mkdtempSync(join(tmpdir(), "lina-check-selftest-")),
+    reap: (outcome) => {
+      quietReaped.push(outcome);
+      return { reaped: true, group: -outcome.pid };
+    },
+  });
+  assert.equal(quietExit, 2, "an ordinary failure keeps its exit code");
+  assert.deepEqual(quietReaped, [], "an ordinary failure must not reap anything");
+  observed += 4;
   return observed;
 }
 
