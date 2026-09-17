@@ -903,6 +903,45 @@ const REFLECTIVE_ROUTE = Object.freeze([
 const DYNAMIC_CODE_GLOBAL = /\b(?:eval|Function|AsyncFunction|GeneratorFunction)\b/;
 
 /**
+ * node:vm's evaluation surface, denied by name.
+ *
+ * Script and createContext are not on this list, and the omission is the point.
+ * test/dashboard-worker-harness.ts imports both from node:vm and re-exports
+ * them without ever evaluating anything; those bytes are upstream-pinned, so
+ * check:scaffold proves they have not changed. Every way to actually run a
+ * compiled script goes through one of the names below, and none of them appears
+ * anywhere in the closure. Denying the two names the harness needs would cost a
+ * recovered suite for nothing.
+ */
+const DYNAMIC_EVALUATION = /\b(?:runInThisContext|runInNewContext|runInContext|compileFunction|createScript|SourceTextModule|SyntheticModule)\b/;
+
+/**
+ * The bare specifiers a derived test's closure may name.
+ *
+ * Treating every unclassified builtin as safe was the last silent pass in this
+ * scan: node:vm compiles strings, node:repl and node:inspector evaluate them,
+ * and denying them one at a time repeats the sequence this file has already run
+ * three times. These are the thirteen the closure actually uses. A package or
+ * an unlisted builtin is refused, which also covers an absolute specifier,
+ * since neither resolves inside this repository.
+ */
+const PERMITTED_MODULE = Object.freeze([
+  "node:assert/strict",
+  "node:crypto",
+  "node:events",
+  "node:fs",
+  "node:module",
+  "node:os",
+  "node:path",
+  "node:sqlite",
+  "node:test",
+  "node:timers/promises",
+  "node:util",
+  "node:vm",
+  "node:zlib",
+]);
+
+/**
  * The only properties of import.meta a derived test may name.
  *
  * Same shape as the process rule, for the same reason. import.meta.main is true
@@ -954,6 +993,8 @@ export function observationAccessFault(rawSource) {
     if (pattern.test(needsLiterals ? source : code)) return reason;
   const dynamicCode = DYNAMIC_CODE_GLOBAL.exec(code);
   if (dynamicCode) return "the global " + dynamicCode[0] + " runs constructed code";
+  const evaluation = DYNAMIC_EVALUATION.exec(code);
+  if (evaluation) return evaluation[0] + " evaluates a string as code";
   for (const match of code.matchAll(IMPORT_META)) {
     if (match[1] === undefined) return "import.meta reached in a form this scan cannot read";
     if (!IMPORT_META_PROPERTY.includes(match[1]))
@@ -1390,6 +1431,7 @@ function walkDerivedTest(entry, readFile) {
   const queue = [entry];
   const visited = [];
   const external = new Set();
+  const bare = new Set();
   while (queue.length > 0) {
     const path = queue.shift();
     visited.push(path);
@@ -1408,7 +1450,7 @@ function walkDerivedTest(entry, readFile) {
     for (const pattern of [IMPORT_SPECIFIER, CREATE_REQUIRE_SPECIFIER]) {
       for (const match of scannable.matchAll(pattern)) {
         // A template literal carries its specifier in the second group.
-        follow(path, match[1] ?? match[2], readFile, seen, queue, external);
+        follow(path, match[1] ?? match[2], readFile, seen, queue, external, bare);
       }
     }
     const required = analyseRequireUse(source);
@@ -1436,9 +1478,9 @@ function walkDerivedTest(entry, readFile) {
       );
     }
     for (const specifier of required.specifiers)
-      follow(path, specifier, readFile, seen, queue, external);
+      follow(path, specifier, readFile, seen, queue, external, bare);
   }
-  return { visited, external: [...external].sort() };
+  return { visited, external: [...external].sort(), bare: [...bare].sort() };
 }
 
 /** Every file inside the test tree a derived test can reach, entry first. */
@@ -1478,11 +1520,15 @@ function readable(path, readFile) {
  * cannot resolve to a readable module is refused rather than dropped, because a
  * dropped edge cannot be told apart from a clean one.
  */
-function follow(from, specifier, readFile, seen, queue, external) {
+function follow(from, specifier, readFile, seen, queue, external, bare) {
   const resolved = resolveRelativeImport(from, specifierPath(specifier));
-  // A bare or absolute specifier is a package or a builtin, and the dangerous
-  // builtins are denied by name already.
-  if (resolved === null) return;
+  // A bare or absolute specifier names something outside this repository. It is
+  // collected rather than dropped: the permitted list decides it after the
+  // token scans have had their say, so a denied surface still reports itself.
+  if (resolved === null) {
+    bare.add(specifierPath(specifier));
+    return;
+  }
   // Outside the test tree the scan stops reading and starts declaring: product
   // modules carry the spawn surface by design, so the edge is recorded for the
   // declaration check rather than dropped.
@@ -1557,6 +1603,9 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
     for (const target of walk.external)
       if (!DERIVED_TEST_EXTERNAL_IMPORTS[path].includes(externalImportDigest(target)))
         fail("derived-test-undeclared-import", path + " -> " + target);
+    for (const specifier of walk.bare)
+      if (!PERMITTED_MODULE.includes(specifier))
+        fail("derived-test-unlisted-module", path + " -> " + specifier);
   }
   return { tests: names.length, scanned };
 }

@@ -612,7 +612,30 @@ Codex 의 세 번째 건은 `import.meta.main` 이다. 레인이 `node --test` �
 
 거부 대조 다섯과 허용 대조 하나를 더해 파생 계약 대조가 105에서 111이 됐다.
 
-## 현재 값 — 20~23라운드 head 기준
+### 24라운드 — 맨 지정자를 목록으로 돌렸다
+
+한 건. Codex 가 `follow()` 가 맨 지정자마다 그냥 돌아온다는 것을 짚었다. `node:vm` 은 따라가지도
+않고 막지도 않는다. 별칭으로 들여온 `runInThisContext` 가 `"pro" + "cess"` 를 평가하면 앞의
+모든 규칙을 지나간다.
+
+지적의 마지막 문장이 정확했다. "분류되지 않은 빌트인을 자동으로 안전하다고 보는 것을 그만두라."
+`node:vm` 만 막으면 `node:repl` 과 `node:inspector` 가 남고, 이 파일이 이미 세 번 돈 순서를 또
+돈다. 그래서 허용 목록으로 뒤집었다. closure 가 실제로 쓰는 열세 개만 통과하고 나머지는
+`derived-test-unlisted-module` 로 거부된다. 패키지도 절대 경로도 같이 걸린다.
+
+`node:vm` 은 목록에 있다. `test/dashboard-worker-harness.ts` 가 `Script` 와 `createContext`
+를 들여와 재수출하기 때문이고, 그 파일은 업스트림 핀이 걸려 있어 바이트가 바뀌지 않았다는 것을
+`check:scaffold` 가 증명한다. 대신 평가 표면을 이름으로 막았다.
+`runInThisContext`·`runInNewContext`·`runInContext`·`compileFunction`·`createScript`·
+`SourceTextModule`·`SyntheticModule` 일곱이고 closure 어디에도 없다. 컴파일된 스크립트를 실제로
+돌리려면 그중 하나가 필요하다. `Script` 와 `createContext` 까지 막으면 회복 스위트 하나를 아무
+대가 없이 잃는다.
+
+지정자 검사는 토큰 검사 뒤에 둔다. 금지 표면을 들여오는 지정자는 목록 밖이라는 이유보다 그 표면
+때문에 거부되는 편이 더 강한 진술이다. 거부 대조 다섯과 허용 대조 둘을 더해 파생 계약 대조가
+111에서 118이 됐다.
+
+## 현재 값 — 20~24라운드 head 기준
 
 20라운드 head `aeaf4a40` 에서 여덟 게이트 전부 exit 0, 레인 133초다.
 
@@ -624,10 +647,11 @@ Codex 의 세 번째 건은 `import.meta.main` 이다. 레인이 `node --test` �
 21라운드 head `6011ffca` 에서도 여덟 게이트 전부 exit 0, 레인 133초이고 값은
 `derivedTestContract=98`, 나머지는 같다. 22라운드 head `f4673bc2` 에서도 여덟 게이트 전부
 exit 0, 레인 133초이고 값은 `derivedTestContract=105` 다. 23라운드 수정 뒤 값은
-`derivedTestContract=111` 이고 나머지는 같다. 그 head 에서도 여덟 게이트를 다시 돌린다. 문서가
-자기 커밋의 SHA 를 담을 수는 없으므로 마지막 head 번호는 PR 본문과 인도 보고에 적는다.
+`derivedTestContract=111` 이다(head `fd0f59ed`, 여덟 게이트 exit 0, 레인 133초). 24라운드 수정
+뒤 값은 `derivedTestContract=118` 이고 나머지는 같다. 그 head 에서도 여덟 게이트를 다시 돌린다.
+문서가 자기 커밋의 SHA 를 담을 수는 없으므로 마지막 head 번호는 PR 본문과 인도 보고에 적는다.
 
-대응표는 그대로다. 네 라운드 모두 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
+대응표는 그대로다. 다섯 라운드 모두 탐지기만 건드렸고 회복 범위는 바뀌지 않았다.
 
 레인은 133초다. 가드 유발도 이 head 에서 다시 쟀고 복원은 `trap restore EXIT INT TERM` 으로
 걸었다.

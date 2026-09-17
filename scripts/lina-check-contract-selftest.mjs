@@ -1048,6 +1048,11 @@ function runDerivedTestCases() {
     // observation imports the file, which tells a test which run it is in.
     "if (import.meta.main) startLane();\n",
     "const meta = import.meta;\nconst x = meta;\n",
+    // node:vm compiles a string. The names that run one are denied; the two the
+    // pinned worker harness re-exports are not, and the controls below show
+    // both halves of that split.
+    'import { runInThisContext } from "node:vm";\nrunInThisContext("1");\n',
+    'import * as vm from "node:vm";\nconst run = vm.runInNewContext;\nconst x = run;\n',
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1076,7 +1081,29 @@ function runDerivedTestCases() {
     // The module URL is what createRequire needs, and every file in the closure
     // that reaches import.meta reaches only this property.
     "const here = import.meta.url;\nconst x = here;\n",
+    // The harness names both of these and evaluates nothing with them.
+    'import { Script, createContext } from "node:vm";\nconst x = [Script, createContext];\n',
   ]) {
+  // An unclassified builtin used to pass as safely as a listed one, which is
+  // how node:vm reached the closure without anything deciding about it.
+  for (const specifier of ["node:http", "lodash", "/etc/passwd"]) {
+    const unlisted = base();
+    const rest8 = unlisted.readFile;
+    unlisted.readFile = (path) =>
+      path === DERIVED_TESTS[0]
+        ? 'import thing from "' + specifier + '";\nconst x = thing;\n'
+        : rest8(path);
+    assert.throws(() => assertDerivedTestContract(unlisted), {
+      code: "derived-test-unlisted-module",
+    });
+  }
+  const listed = base();
+  const rest9 = listed.readFile;
+  listed.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'import assert2 from "node:assert/strict";\nassert2.ok(true);\n'
+      : rest9(path);
+  assertDerivedTestContract(listed);
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
     permittedAccess.readFile = (path) => (path === DERIVED_TESTS[0] ? readable : rest5(path));
@@ -1113,7 +1140,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 30;
+  observed += 37;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

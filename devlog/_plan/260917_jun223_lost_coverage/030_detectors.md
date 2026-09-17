@@ -37,7 +37,7 @@
 부르면 정적 스캔은 따라갈 수 없다. 그 경우를 "못 찾았다" 로 읽지 않고 거부한다. 따라가거나 거부하거나
 둘 중 하나이고, 조용한 통과는 없다.
 
-거부 코드는 일곱이다. 앞의 넷이 적재와 표면, 뒤의 셋이 관측과 경계다.
+거부 코드는 여덟이다. 앞의 넷이 적재와 표면, 뒤의 넷이 관측과 경계다.
 
 | 코드 | 언제 |
 | -- | -- |
@@ -48,6 +48,7 @@
 | `derived-test-observation-signal` | 관측 신호 이름이 소스에 있을 때 |
 | `derived-test-computed-observation` | process 객체에 이 스캔이 읽을 수 없는 형태로 닿을 때 |
 | `derived-test-undeclared-import` | 테스트 트리 밖 적재가 선언된 천장에 없을 때 |
+| `derived-test-unlisted-module` | 맨 지정자가 허용 목록에 없을 때 |
 
 ## 관측 신호 — 이름을 읽을 수 없으면 거부
 
@@ -82,6 +83,29 @@
 둘 다 바인딩에 먼저 담을 수 있다. 호출 철자에 묶인 검사는 공백 하나로 전부 놓친다. closure 에는
 두 이름이 한 번도 나오지 않는다.
 
+`node:vm` 의 평가 표면도 이름으로 막는다. `runInThisContext`·`runInNewContext`·
+`runInContext`·`compileFunction`·`createScript`·`SourceTextModule`·`SyntheticModule` 이고,
+`Script` 와 `createContext` 는 여기 없다. 빠진 것이 핵심이다. 업스트림 핀이 걸린
+`test/dashboard-worker-harness.ts` 가 그 둘을 node:vm 에서 들여와 재수출만 하고 아무것도 평가하지
+않는다. 컴파일된 스크립트를 실제로 돌리려면 위 이름 중 하나를 써야 하고, 그 일곱은 closure 어디에도
+없다. 핀 덕분에 그 파일의 바이트가 바뀌지 않았다는 것은 `check:scaffold` 가 증명한다. 두 이름까지
+막으면 회복 스위트 하나를 아무 대가 없이 잃는다.
+
+### 맨 지정자도 목록이다
+
+테스트 트리 밖 상대 경로는 선언으로 묶었지만, 맨 지정자(`node:*` 와 패키지)는 그냥 통과하고
+있었다. 그게 이 스캔에 마지막으로 남아 있던 조용한 통과다. `node:vm` 은 문자열을 컴파일하고
+`node:repl`·`node:inspector` 는 그것을 실행한다. 하나씩 막으면 이 파일이 이미 세 번 돈 순서를
+또 돈다. 그래서 허용 목록으로 뒤집었다. closure 가 실제로 쓰는 열세 개다.
+
+`node:assert/strict`, `node:crypto`, `node:events`, `node:fs`, `node:module`, `node:os`,
+`node:path`, `node:sqlite`, `node:test`, `node:timers/promises`, `node:util`, `node:vm`,
+`node:zlib`.
+
+목록에 없는 빌트인, 패키지, 절대 경로는 `derived-test-unlisted-module` 로 거부된다. 이 검사는
+토큰 검사 뒤에 돈다. 금지 표면을 들여오는 지정자는 목록 밖이라는 이유보다 그 표면 때문에 거부되는
+편이 더 강한 진술이고, selftest 의 기존 대조들도 그 순서를 전제한다.
+
 속성을 허용 목록으로 둔 것은 금지 목록이 틀린 모양이기 때문이다.
 `process.report.getReport().header.commandLine` 은 `argv` 라는 철자 없이 호출 방식을 말해 준다.
 그런 속성을 하나씩 막으면 목록이 끝나지 않는다. 뒤집으면 끝난다. 파생 테스트에 필요한 것은 대역
@@ -109,16 +133,18 @@ JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자
 조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
 그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
 
-양성 대조는 거부 열아홉 개와 허용 일곱 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+양성 대조는 거부 스물네 개와 허용 아홉 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
 `process.stdout.write`, 리플렉션 경로 다섯, 동적 코드 전역 셋(`new` 없는 `Function`, 공백을 낀
-호출, 바인딩에 담은 `Function`), 그리고 `import.meta` 둘이다. `process.stdout` 을 막는 것은 덤이
+호출, 바인딩에 담은 `Function`), `import.meta` 둘, `node:vm` 평가 둘, 목록 밖 지정자 셋(빌트인·
+패키지·절대 경로)이다. `process.stdout` 을 막는 것은 덤이
 아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
-대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 일곱 형태다. 계산된 키로 하는 환경 변수
+대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 아홉 형태다. 계산된 키로 하는 환경 변수
 복원(쓰기와 삭제), 리터럴 키 읽기, `t.mock.method(globalThis, "fetch", ...)`,
 `process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`,
-`import.meta.url`. 허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
+`import.meta.url`, `node:vm` 의 `Script`·`createContext`, 목록에 있는 `node:assert/strict`.
+허용 대조가 없으면 위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부
 
