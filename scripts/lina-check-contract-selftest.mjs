@@ -408,16 +408,33 @@ function runLaneShapeCases() {
       return directory;
     },
     reap: (outcome) => {
-      reaped.push(outcome);
+      // Record where in the sequence the reap happened, not just that it did.
+      // "Reaped eventually" is exactly the property the broken version also had.
+      reaped.push({
+        outcome,
+        launchesSoFar: launched.length,
+        fixtureStillPresent: existsSync(directories[directories.length - 1]),
+      });
       return { reaped: true, group: -outcome.pid };
     },
   });
   assert.equal(exitCode, 3, "the first failure still decides the exit code");
-  assert.deepEqual(reaped, [boundedOut], "a timeout after an earlier failure must still be reaped");
+  assert.equal(reaped.length, 1, "a timeout after an earlier failure must still be reaped");
+  assert.equal(reaped[0].outcome, boundedOut, "the reaped outcome must be the timed-out launch");
+  assert.equal(
+    reaped[0].launchesSoFar,
+    2,
+    "the reap must happen before the next launch, not after the run",
+  );
+  assert.equal(
+    reaped[0].fixtureStillPresent,
+    true,
+    "the reap must happen before that launch's fixture directory is removed",
+  );
   assert.ok(launched.length > 2, "an earlier failure must not stop the remaining launches");
   for (const directory of directories)
     assert.equal(existsSync(directory), false, "every fixture directory must be removed");
-  observed += 4;
+  observed += 6;
   return observed;
 }
 

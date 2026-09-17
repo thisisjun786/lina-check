@@ -18,11 +18,11 @@
 | # | 명령 | exit | 초 | 결과 요약 |
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
-| 2 | `corepack pnpm run build:all` | 0 | 0.97 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.18 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.42 | oxlint 4개 스크립트 전부 Done |
-| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.25 | `rejected=30 helpers=18 laneShape=26 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 134.97 | 통과 2579건, fail 0, skip 0 |
+| 2 | `corepack pnpm run build:all` | 0 | 1.14 | tsc 3개 프로젝트 무오류 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.39 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.56 | oxlint 4개 스크립트 전부 Done |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.27 | `rejected=30 helpers=18 laneShape=28 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 139.33 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,7 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 135.0초 |
+| 게이트 6 전체 | 207 | | 139.3초 |
 
 구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
 실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
@@ -124,6 +124,16 @@ PR 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다. 둘 다 `95dd
 | # | 출처 | 지적 | 처리 | 확인 |
 | -- | -- | -- | -- | -- |
 | 14 | 4라운드 (blocker) | 러너가 모든 실행을 마친 뒤에 판정하고 첫 실패에서 반환한다. 그래서 앞에서 실패가 나면 뒤에서 시간 초과로 멈춘 실행은 수확되지 않고 자손이 레인보다 오래 산다. 픽스처 정리가 예외를 내도 같은 자리를 건너뛴다 | 판정을 실행 직후로 옮겼다. 시간 초과면 그 자리에서 그룹을 수확하고, 다음 실행과 정리보다 먼저 한다. 첫 실패가 종료 코드를 정하는 동작은 그대로다 | `laneShape` 22 → 26. 자기시험이 실제 순서를 주입 실행으로 몰아 본다. 앞선 실패 뒤의 시간 초과가 수확되고, 남은 실행이 계속되고, 픽스처 디렉터리가 전부 지워지는지 확인한다 |
+
+5라운드는 PASS 였다. 차단 없음, nit 2건.
+
+| # | 출처 | 지적 | 처리 | 확인 |
+| -- | -- | -- | -- | -- |
+| 15 | 5라운드 (nit) | 회귀 테스트가 "언젠가 수확됐다" 만 확인한다. 순서를 강제하지 않으므로 수확을 맨 뒤로 미뤄도 통과한다 | 수확 시점의 실행 횟수와 해당 픽스처 디렉터리의 존재 여부를 같이 기록해, 다음 실행 전이고 정리 전임을 단정한다 | `laneShape` 26 → 28 |
+| 16 | 5라운드 (nit) | "exit 0 이니 계측이 결과를 바꾸지 않았다" 는 과장이다. 통과·실패가 같다는 것이지 실행이 동일하다는 뜻은 아니다 | 문장을 그 구분대로 고쳤다 | `020_fixture_lane.md` |
+
+4라운드 이후의 세 커밋은 PR #3 머지 시점 뒤에 생겼다. 같은 이슈의 후속 PR #4 로 올렸고,
+머지 판단은 조정자에게 남긴다.
 
 감사가 통과로 확인한 것도 적는다. 가드 완화 없음(`allowedScripts` 동일, 제품 코드·워크플로·가드
 바이트 불변), 기존 거부 경로 약화 없음, 실패하는 레인이 exit 0 으로 새는 경로 없음, 변경한 네
