@@ -150,6 +150,45 @@ export function lockPrefixFor(repositoryRoot) {
     "."
   );
 }
+
+/** The exclusive record for this checkout, held for the length of a run. */
+const RUN_LOCK = join(tmpdir(), LOCK_PREFIX + "run.lock");
+
+/** Whether a process id is still running, treating a permission error as alive. */
+export function processAlive(pid, kill = process.kill.bind(process)) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+
+/**
+ * Take the checkout for this run, or refuse.
+ *
+ * Two runs in the same checkout mutate the same test files, so the second one
+ * must not start rather than interleave. A record whose owner is gone is stale
+ * and may be taken over; one whose owner is alive is not.
+ */
+function acquireCheckout() {
+  if (existsSync(RUN_LOCK)) {
+    const owner = Number(readFileSync(RUN_LOCK, "utf8").trim());
+    if (owner !== process.pid && processAlive(owner))
+      throw new Error(
+        "another failure-control run holds this checkout (pid " +
+          owner +
+          "); wait for it rather than interleaving mutations",
+      );
+  }
+  writeFileSync(RUN_LOCK, String(process.pid));
+  return () => {
+    if (!existsSync(RUN_LOCK)) return;
+    const owner = Number(readFileSync(RUN_LOCK, "utf8").trim());
+    if (owner === process.pid) rmSync(RUN_LOCK, { force: true });
+  };
+}
 const pending = new Map();
 
 function park(path, source) {
@@ -166,6 +205,10 @@ export function recoverInterrupted() {
   const restored = [];
   for (const name of readdirSync(tmpdir())) {
     if (!name.startsWith(LOCK_PREFIX) || !name.endsWith(".lock.json")) continue;
+    // A record whose owner is still running belongs to that run. Restoring from
+    // it would undo a mutation mid-flight and drop the only way to repair it.
+    const owner = Number(name.slice(LOCK_PREFIX.length).replace(".lock.json", ""));
+    if (owner !== process.pid && processAlive(owner)) continue;
     const lock = join(tmpdir(), name);
     try {
       const parked = JSON.parse(readFileSync(lock, "utf8"));
@@ -231,9 +274,11 @@ export function judge(baseline, mutated) {
 }
 
 export function runControls(controls = CONTROLS) {
+  const releaseCheckout = acquireCheckout();
   const recovered = recoverInterrupted();
   if (recovered) process.stderr.write(LABEL + " restored an interrupted mutation in " + recovered + "\n");
   const results = [];
+  try {
   for (const control of controls) {
     const path = join(root, control.file);
     const before = digest(path);
@@ -272,6 +317,9 @@ export function runControls(controls = CONTROLS) {
     });
   }
   return results;
+  } finally {
+    releaseCheckout();
+  }
 }
 
 export function main(argv) {

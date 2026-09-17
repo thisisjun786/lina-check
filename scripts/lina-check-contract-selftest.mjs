@@ -80,6 +80,7 @@ import {
   controlFingerprint,
   judge as judgeFailureControl,
   lockPrefixFor,
+  processAlive,
 } from "./lina-check-failure-controls.mjs";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -983,6 +984,10 @@ const PRELOAD_SOURCE = [
   "",
   "const log = process.env." + LAUNCH_LOG_ENV + ";",
   'if (!log) throw new Error("' + LAUNCH_LOG_ENV + ' must name the observation file");',
+  "// Taken out of the environment once it is read. Left in place it is a signal",
+  "// the tests under observation can branch on, which would let a derived test",
+  "// behave one way here and another in the ordinary lane.",
+  "delete process.env." + LAUNCH_LOG_ENV + ";",
   'const started = createRequire(import.meta.url)("node:child_process");',
   'for (const name of ["spawn", "spawnSync", "exec", "execFile", "execFileSync", "execSync", "fork"]) {',
   "  const original = started[name];",
@@ -1235,6 +1240,33 @@ function runFailureControlCases() {
   );
   assert.equal(lockPrefixFor(root), lockPrefixFor(root), "the same root must map to one prefix");
   observed += 2;
+  // Liveness decides whether a recovery record is stale. Treating a live run's
+  // record as stale is how two runs would interleave and lose the repair path.
+  assert.equal(processAlive(process.pid), true, "this process must read as alive");
+  assert.equal(processAlive(0), false);
+  assert.equal(processAlive(-1), false);
+  assert.equal(
+    processAlive(4242, () => {
+      throw Object.assign(new Error("no such process"), { code: "ESRCH" });
+    }),
+    false,
+  );
+  assert.equal(
+    processAlive(4242, () => {
+      throw Object.assign(new Error("not permitted"), { code: "EPERM" });
+    }),
+    true,
+    "a process owned by somebody else is still running",
+  );
+  observed += 5;
+  // The observation must not leave its own signal in the environment, or a test
+  // could behave one way under observation and another in the lane.
+  assert.match(
+    PRELOAD_SOURCE,
+    new RegExp("delete process\\.env\\." + LAUNCH_LOG_ENV),
+    "the preload must remove its log variable before the tests load",
+  );
+  observed += 1;
   const pass = { status: 0, signal: null, error: null, failing: 0 };
   assert.equal(judgeFailureControl(pass, { status: 1, signal: null, error: null, failing: 1 }).detected, true);
   const rejected = [
