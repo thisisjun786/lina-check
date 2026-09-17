@@ -8,23 +8,37 @@
 
 | 항목 | 값 |
 | -- | -- |
-| 측정 SHA | wp5 에서 채운다 |
+| 측정 SHA | `d501d364116015acafdb2cb832a3e66d2910ce1c` |
 | 브랜치 | `codex/jun-198-install-profile` |
-| base | `main` |
+| base | `main` (`54ee404d`) |
 | 런타임 | Node 24.20.0, pnpm 12.4.1 (Corepack) |
+| 작업물 | 측정 시 `git status --porcelain` 0줄 |
+
+이 문서를 커밋하면 head 가 한 번 더 움직인다. 그 diff 는 이 markdown 뿐이고 아래 수치는
+`d501d364` 에서 나온 것이다. 감추지 않고 여기 적는다.
 
 ## 필수 게이트 8항목
 
 | # | 명령 | exit | 결과 요약 |
 | -- | -- | -- | -- |
-| 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | | |
-| 2 | `corepack pnpm run build:all` | | |
-| 3 | `corepack pnpm run check:scaffold` | | |
-| 4 | `corepack pnpm run lint` | | |
-| 5 | `corepack pnpm run lina:contract-selftest` | | |
-| 6 | `corepack pnpm run lina:test-safe` | | |
-| 7 | `corepack pnpm run lina:test-safe:preview` | | |
-| 8 | `corepack pnpm run lina:boundary-probe` | | |
+| 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | lockfile 고정 설치 |
+| 2 | `corepack pnpm run build:all` | 0 | tsc 3개 프로젝트 무오류 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | upstream 1646 항목, 파생 26, 수정 선언 7(전부 pin 과 다름 확인), Worker 변수 12개 비움·upstream 소유 키 3개 부재, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | lint 스크립트 4개, oxlint 5회 |
+| 5 | `corepack pnpm run lina:contract-selftest` | 0 | `rejected=30 helpers=18 installation=31 modifiedUpstream=16 tripwireControls=3 routing=verified assertionCalls=23->29` |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 통과 333건. 13개 중 1개는 pin `1ed7bd4e` 픽스처 작업 디렉터리에서 실행 |
+| 7 | `corepack pnpm run lina:test-safe:preview` | 0 | `13 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
+| 8 | `corepack pnpm run lina:boundary-probe` | 0 | 입구 8개 exit 1 + `is disabled`, 워크플로 5개 활성 YAML 부재, 가드 digest 일치, 트리 변동 없음 |
+
+게이트 6 을 "13개 통과" 로만 읽지 않는다. 13번째는 pin 된 upstream 바이트를 읽었고, 그것이
+증명하는 것은 원본 해석기가 원본 입력에서 여전히 맞다는 것뿐이다. 우리 설정에 대한 단정은
+게이트 3 이 실제 파일에 대해 따로 한다. 두 사실을 한 줄로 합치지 않는다.
+
+## 이 인도가 주장하지 않는 것
+
+- 미설정 Worker 의 실제 바깥 요청이 0건이다. Worker 런타임이 이 게이트에 없다
+- `040` 의 Node 전송 7개와 `010` 의 독립 진입점 2개가 설치 게이트 뒤에 있다. 유예했다
+- 원본 전체 `test`/`check` 가 통과한다. parked 이고 돌리지 않았다
 
 원본 전체 `test`/`check` 는 parked 다. 돌리지 않았고 통과했다고 보고하지 않는다.
 
