@@ -151,8 +151,16 @@ export function lockPrefixFor(repositoryRoot) {
   );
 }
 
-/** The exclusive record for this checkout, held for the length of a run. */
+/**
+ * The exclusive record for this checkout, held for the length of a run.
+ *
+ * A lock older than this bound is treated as abandoned even when its recorded
+ * pid reads as alive, because pids are reused: without it a recycled number
+ * would refuse every later run and leave an interrupted mutation unrepaired.
+ * The bound is far longer than a control run, which takes seconds.
+ */
 const RUN_LOCK = join(tmpdir(), LOCK_PREFIX + "run.lock");
+const RUN_LOCK_STALE_MS = 60 * 60 * 1000;
 
 /** Whether a process id is still running, treating a permission error as alive. */
 export function processAlive(pid, kill = process.kill.bind(process)) {
@@ -172,22 +180,49 @@ export function processAlive(pid, kill = process.kill.bind(process)) {
  * must not start rather than interleave. A record whose owner is gone is stale
  * and may be taken over; one whose owner is alive is not.
  */
+export function lockIsStale(record, now = Date.now(), alive = processAlive) {
+  if (!record || !Number.isInteger(record.pid)) return true;
+  if (record.pid === process.pid) return true;
+  if (!alive(record.pid)) return true;
+  // Alive, but the number may have been recycled since it was written.
+  return !Number.isInteger(record.at) || now - record.at > RUN_LOCK_STALE_MS;
+}
+
 function acquireCheckout() {
-  if (existsSync(RUN_LOCK)) {
-    const owner = Number(readFileSync(RUN_LOCK, "utf8").trim());
-    if (owner !== process.pid && processAlive(owner))
-      throw new Error(
-        "another failure-control run holds this checkout (pid " +
-          owner +
-          "); wait for it rather than interleaving mutations",
-      );
+  const mine = JSON.stringify({ pid: process.pid, at: Date.now() });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      // Exclusive creation: the check and the write are one step, so two runs
+      // starting together cannot both believe they hold the checkout.
+      writeFileSync(RUN_LOCK, mine, { flag: "wx" });
+      return () => {
+        if (!existsSync(RUN_LOCK)) return;
+        try {
+          const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+          if (held.pid === process.pid) rmSync(RUN_LOCK, { force: true });
+        } catch {
+          rmSync(RUN_LOCK, { force: true });
+        }
+      };
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      let held = null;
+      try {
+        held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+      } catch {
+        held = null;
+      }
+      if (!lockIsStale(held))
+        throw new Error(
+          "another failure-control run holds this checkout (pid " +
+            String(held?.pid) +
+            "); wait for it rather than interleaving mutations",
+          { cause: error },
+        );
+      rmSync(RUN_LOCK, { force: true });
+    }
   }
-  writeFileSync(RUN_LOCK, String(process.pid));
-  return () => {
-    if (!existsSync(RUN_LOCK)) return;
-    const owner = Number(readFileSync(RUN_LOCK, "utf8").trim());
-    if (owner === process.pid) rmSync(RUN_LOCK, { force: true });
-  };
+  throw new Error("could not take the checkout lock at " + RUN_LOCK);
 }
 const pending = new Map();
 

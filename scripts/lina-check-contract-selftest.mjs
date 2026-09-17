@@ -79,6 +79,7 @@ import {
   CONTROLS as FAILURE_CONTROLS,
   controlFingerprint,
   judge as judgeFailureControl,
+  lockIsStale,
   lockPrefixFor,
   processAlive,
 } from "./lina-check-failure-controls.mjs";
@@ -916,7 +917,32 @@ function runDerivedTestCases() {
   division.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const ratio = total / count / 2;\n" : others6(path);
   assertDerivedTestContract(division);
-  observed += 8;
+  // A dynamic import whose specifier is computed names a module without naming
+  // it, which is the last way to make a load invisible to this scan.
+  const computedImport = base();
+  const others7 = computedImport.readFile;
+  computedImport.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'const target = "./helpers/command-intake-fixture.mjs";\nawait import(target);\n'
+      : others7(path);
+  assert.throws(() => assertDerivedTestContract(computedImport), {
+    code: "derived-test-unresolvable-import",
+  });
+  // A literal one is followed, so the rule is not a ban on dynamic import.
+  const literalImport = base();
+  const others8 = literalImport.readFile;
+  literalImport.readFile = (path) =>
+    path === DERIVED_TESTS[0]
+      ? 'await import("./helpers/command-intake-fixture.mjs");\n'
+      : others8(path);
+  assert.throws(() => assertDerivedTestContract(literalImport), { code: "derived-test-spawns" });
+  // import.meta is not a call and must not be refused as one.
+  const importMeta = base();
+  const others9 = importMeta.readFile;
+  importMeta.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? "const url = import.meta.url;\nconst x = url;\n" : others9(path);
+  assertDerivedTestContract(importMeta);
+  observed += 11;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();
@@ -1258,6 +1284,16 @@ function runFailureControlCases() {
     true,
     "a process owned by somebody else is still running",
   );
+  observed += 5;
+  // Staleness of the checkout lock. A live owner holds it; a dead one does not;
+  // and a recorded pid that is alive but old is treated as recycled, or a reused
+  // number would refuse every later run and leave a mutation unrepaired.
+  const now = 1_000_000_000;
+  assert.equal(lockIsStale({ pid: 4242, at: now }, now, () => true), false);
+  assert.equal(lockIsStale({ pid: 4242, at: now }, now, () => false), true);
+  assert.equal(lockIsStale({ pid: 4242, at: now - 2 * 60 * 60 * 1000 }, now, () => true), true);
+  assert.equal(lockIsStale({ pid: 4242 }, now, () => true), true, "no timestamp reads as stale");
+  assert.equal(lockIsStale(null, now, () => true), true);
   observed += 5;
   // The observation must not leave its own signal in the environment, or a test
   // could behave one way under observation and another in the lane.

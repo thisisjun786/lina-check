@@ -709,6 +709,8 @@ const MODULE_DEFAULT_IMPORT =
  */
 const REQUIRE_ALIAS_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*require\s*(?![\s]*\()/g;
 const AMBIENT_REQUIRE_USE = /\brequire\b/g;
+/** A dynamic import whose argument is not a literal cannot be followed. */
+const DYNAMIC_IMPORT_CALL = /\bimport\s*\(/g;
 
 /**
  * Source with comment and string contents blanked out, positions preserved.
@@ -1082,6 +1084,19 @@ export function derivedTestClosure(entry, readFile) {
         "derived-test-unresolvable-require",
         path + ": " + [...new Set(required.unfollowable)].join(", ") + " used in an unfollowable form",
       );
+    // A computed dynamic import is the last way to name a module without
+    // naming it. Refusing it keeps the rule the rest of this scan follows: a
+    // load is either followed or refused, never silently skipped. It also
+    // removes the value of any signal that tells a test it is being observed,
+    // because a conditional load now has to use a specifier this scan reads.
+    for (const call of codeOnly(source).matchAll(DYNAMIC_IMPORT_CALL)) {
+      const rest = codeOnly(source).slice(call.index + call[0].length);
+      if (/^\s*["'\u0060]/.test(rest)) continue;
+      fail(
+        "derived-test-unresolvable-import",
+        path + ": dynamic import with a specifier this scan cannot resolve",
+      );
+    }
     for (const specifier of required.specifiers) follow(path, specifier, readFile, seen, queue);
   }
   return visited;
