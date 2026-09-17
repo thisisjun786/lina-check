@@ -179,6 +179,7 @@
       "scripts/lina-check-boundary-probe.mjs": { "reason": "Invokes the guarded automatic-action entrances to show they are closed; writes nothing to the tree." },
       "scripts/lina-check-contract-selftest.mjs": { "reason": "Negative verification for every contract rejection path plus the two preview tripwire controls." },
       "scripts/lina-check-coverage-map.mjs": { "reason": "Generates and verifies the record-by-record coverage map for the excluded suites; lina:contract-selftest runs it in check mode so the committed table cannot go stale." },
+      "scripts/lina-check-failure-controls.mjs": { "reason": "Runs one failure control per recovered suite: replaces a recovered expectation with a wrong one, requires the suite to fail, and restores the file byte-identically. Operator-run rather than a gate, because it edits test files while it runs." },
       "devlog/_plan/260917_jun135_part_a/000_plan.md": { "reason": "JUN-135 Part A plan of record: contract, acceptance criteria, consultation and audit history." },
       "devlog/_plan/260917_jun135_part_a/010_validator_contract.md": { "reason": "Validator and declaration contract for this change." },
       "devlog/_plan/260917_jun135_part_a/020_test_restoration.md": { "reason": "Safety determination that precedes restoring any upstream test." },

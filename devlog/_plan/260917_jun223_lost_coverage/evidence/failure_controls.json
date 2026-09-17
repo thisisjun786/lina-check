@@ -1,7 +1,8 @@
 {
-  "purpose": "Each recovered expectation is replaced with a wrong one; a suite that cannot detect it is not carrying coverage.",
-  "mutations": 7,
-  "detected": 7,
+  "purpose": "One control per recovered suite. Each replaces a recovered expectation with a wrong one; a suite that cannot detect it is not carrying coverage. Sampled evidence, not a proof that every assertion inside a recovered case still bites.",
+  "suites_covered": 10,
+  "mutations": 11,
+  "detected": 11,
   "undetected": [],
   "results": [
     {
@@ -21,8 +22,24 @@
       "restored_identical": true
     },
     {
-      "file": "test/lina-check-failure-telemetry.test.ts",
-      "mutation": "unpin the clock reading again",
+      "file": "test/lina-check-github-api.test.ts",
+      "mutation": "accept a remote override the validator refuses",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-response-deadlines.test.ts",
+      "mutation": "claim the refused path attempted a request",
+      "exit_code": 1,
+      "failing_cases": 2,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-hosted-admission.test.ts",
+      "mutation": "claim a registry-denied repository is eligible",
       "exit_code": 1,
       "failing_cases": 1,
       "detected": true,
@@ -31,14 +48,6 @@
     {
       "file": "test/lina-check-webhook-admission.test.ts",
       "mutation": "claim an unconfigured installation admits the command",
-      "exit_code": 1,
-      "failing_cases": 1,
-      "detected": true,
-      "restored_identical": true
-    },
-    {
-      "file": "test/lina-check-github-api.test.ts",
-      "mutation": "accept a remote override the validator refuses",
       "exit_code": 1,
       "failing_cases": 1,
       "detected": true,
@@ -55,6 +64,30 @@
     {
       "file": "test/lina-check-action-ledger.test.ts",
       "mutation": "read the unparked workflow spelling again",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-failure-telemetry.test.ts",
+      "mutation": "unpin the clock reading again",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-scheduled-review.test.ts",
+      "mutation": "move the settling boundary so an unchanged item reads as changed",
+      "exit_code": 1,
+      "failing_cases": 1,
+      "detected": true,
+      "restored_identical": true
+    },
+    {
+      "file": "test/lina-check-node-test-runner.test.ts",
+      "mutation": "expect the concurrency cap not to apply",
       "exit_code": 1,
       "failing_cases": 1,
       "detected": true,
