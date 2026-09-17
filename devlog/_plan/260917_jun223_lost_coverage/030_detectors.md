@@ -83,18 +83,32 @@
 `globalThis` 의 대괄호 접근을 거부하는 이유도 같다. 이름을 적지 않고 process 객체를 가리킬 수
 있는 유일한 형태다.
 
-경계는 적어 둔다. 이건 임의 객체에 대한 리플렉션이 없다는 증명이 아니다. 그럴 필요도 없다.
-프로세스가 어떻게 시작됐는지 알려 주는 것은 process 객체뿐이고, 파생 테스트가 그 객체에서 닿을 수
-있는 것은 이제 두 속성뿐이다.
+허용 목록은 process 객체에서 처음 읽는 속성만 묶는다. 그 값이 무엇을 할 수 있는지는 묶지 않는다.
+JavaScript 의 모든 값은 프로토타입 체인을 타고 Function 생성자에 닿으므로
+`process.execPath.constructor.constructor` 로 코드를 만들어 process 객체를 이 스캔이 보지 못하는
+이름으로 되돌려 받을 수 있다. 이 경로는 process 가 없어도 된다. `[].constructor.constructor` 가
+같은 것이다. 그래서 process 규칙이 아니라 따로 막는다. 이름이 적히는 형태는 전부 거부한다.
+`.constructor`, `["constructor"]`, `__proto__`, `Reflect.` 다. 클래스 본문의
+`constructor(` 는 선언이지 접근이 아니라서 통과하고(하네스가 여럿 갖고 있다),
+`Object.getPrototypeOf` 도 통과한다. 위의 constructor 접근이 막힌 뒤의 프로토타입은 아무것도
+하지 못한다.
 
-양성 대조는 거부 아홉 개와 허용 네 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
+여기까지가 텍스트 스캔이 결정할 수 있는 범위다. 남는 것은 임의 객체에 대한 계산된 키 접근이다.
+`new Map(Object.entries(x)).get("proc" + "ess")` 같은 형태는 문법만으로는 이름 있는 접근과
+구분되지 않고, 인덱스 접근을 전부 금지하면 평범한 테스트 코드가 못 돌아간다. 그 자리는 스캔이
+아니라 리뷰가 받는다. 계약과 파생 테스트는 같은 커밋에 있고 같이 리뷰된다. 파생 테스트에 그런
+조립 코드를 넣을 수 있는 사람은 계약 자체를 지울 수도 있다. 이 탐지기들이 잡는 것은 사고와 표류,
+그리고 리뷰에서 눈에 띄지 않는 형태이지, 커밋 권한을 가진 적대적 작성자가 아니다.
+
+양성 대조는 거부 열네 개와 허용 여섯 개다. 거부 쪽은 `process["arg" + "v"]`, process 를 담은
 바인딩, `process.env` 를 담은 바인딩, 계산된 키로 하는 `process.env` 읽기, `globalThis` 의
 계산된 접근, `node:process` import, `process` 구조 분해, `process.report` 를 통한 명령줄 읽기,
-`process.stdout.write` 다. 마지막 것은 관측이 리포터 출력을 읽기 때문에 더 막을 값어치가 있다.
-테스트가 통과 줄을 위조할 수 있으면 대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는
-네 형태다. 계산된 키로 하는 환경 변수 복원(쓰기와 삭제), 리터럴 키 읽기,
-`t.mock.method(globalThis, "fetch", ...)`, `process.execPath`. 허용 대조가 없으면 위 규칙은
-process 금지와 구분되지 않는다.
+`process.stdout.write`, 그리고 리플렉션 경로 다섯이다. `process.stdout` 을 막는 것은 덤이
+아니다. 관측이 리포터 출력을 읽어 통과 케이스 이름을 뽑으므로, 테스트가 통과 줄을 위조할 수 있으면
+대응표 인증이 흔들린다. 허용 쪽은 이 저장소가 실제로 쓰는 여섯 형태다. 계산된 키로 하는 환경 변수
+복원(쓰기와 삭제), 리터럴 키 읽기, `t.mock.method(globalThis, "fetch", ...)`,
+`process.execPath`, 클래스 본문의 `constructor(`, `Object.getPrototypeOf`. 허용 대조가 없으면
+위 규칙은 process 금지와 구분되지 않는다.
 
 ## 테스트 트리 밖 적재 — 선언하거나 거부
 

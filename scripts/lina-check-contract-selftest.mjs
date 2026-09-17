@@ -1030,6 +1030,14 @@ function runDerivedTestCases() {
     // is why the permitted properties are a list rather than the leftovers.
     "const how = process.report.getReport().header.commandLine;\n",
     'process.stdout.write("ok 1 - forged\\n");\n',
+    // Every value reaches the Function constructor through its prototype
+    // chain, so an allowlist on the first property is not a bound on what the
+    // value can do. The second of these needs no process object at all.
+    'const F = process.execPath.constructor.constructor;\nconst p = F("return pro" + "cess")();\n',
+    'const F = [].constructor.constructor;\nconst x = F;\n',
+    'const C = ({})["constructor"];\nconst x = C;\n',
+    "const proto = target.__proto__;\nconst x = proto;\n",
+    "const value = Reflect.get(target, key);\nconst x = value;\n",
   ]) {
     const computed = base();
     const rest4 = computed.readFile;
@@ -1049,6 +1057,12 @@ function runDerivedTestCases() {
     'const home = process.env["LINA_CHECK_HOME"];\nconst x = home;\n',
     'mock.method(globalThis, "fetch", () => {});\n',
     "const command = [process.execPath];\nconst x = command;\n",
+    // A class body declares a constructor rather than reading one, and the
+    // worker harness the closure reaches defines several.
+    "class Harness {\n  constructor(rows) {\n    this.rows = rows;\n  }\n}\n",
+    // A prototype is inert without the constructor access refused above, and
+    // the same harness reads one.
+    "const proto = Object.getPrototypeOf(env);\nconst x = proto;\n",
   ]) {
     const permittedAccess = base();
     const rest5 = permittedAccess.readFile;
@@ -1086,7 +1100,7 @@ function runDerivedTestCases() {
     DERIVED_TEST_EXTERNAL_IMPORTS[API_TEST].includes(externalImportDigest(API_MODULE)),
     "the ceiling must pin the edge the collector reads",
   );
-  observed += 17;
+  observed += 24;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

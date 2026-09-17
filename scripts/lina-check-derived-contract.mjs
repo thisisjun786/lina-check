@@ -866,6 +866,31 @@ const PROCESS_ROOT = /\bprocess\b/g;
  */
 const PROCESS_PROPERTY = Object.freeze(["env", "execPath"]);
 
+/**
+ * Named routes from any value back to dynamic code or to a property whose name
+ * is never written down.
+ *
+ * The allowlist above bounds the first property read off the process object. It
+ * does not bound what that value can do: every JavaScript value reaches the
+ * Function constructor through its prototype chain, so
+ * process.execPath.constructor.constructor builds code that returns the process
+ * object under a name this scan never sees. That route does not need process at
+ * all - [].constructor.constructor is the same thing - so it is closed here
+ * rather than in the process rule.
+ *
+ * A class body's constructor is a declaration, not a member access, and the
+ * worker harness defines several. Only the access forms are refused.
+ *
+ * Object.getPrototypeOf stays allowed: the harness uses it, and a prototype is
+ * inert without the constructor access this now refuses.
+ */
+const REFLECTIVE_ROUTE = Object.freeze([
+  [/\.\s*constructor\b/, "a member access named constructor", false],
+  [/\[\s*["'`]\s*constructor/, "constructor reached through a bracket", true],
+  [/\b__proto__\b/, "__proto__", false],
+  [/\bReflect\s*\./, "Reflect", false],
+]);
+
 /** Index of the bracket closing the one that opens at open, or -1. */
 function closingBracket(code, open) {
   let depth = 0;
@@ -900,6 +925,10 @@ export function observationAccessFault(rawSource) {
   if (OBSERVATION_ROOT_MODULE.test(source))
     return "the process module is imported, which puts the process object behind a name this scan cannot read";
   const code = codeOnly(source);
+  // The bracket form carries its name inside a string, which codeOnly blanks,
+  // so that one rule reads the copy where string contents survive.
+  for (const [pattern, reason, needsLiterals] of REFLECTIVE_ROUTE)
+    if (pattern.test(needsLiterals ? source : code)) return reason;
   for (const match of code.matchAll(GLOBAL_ROOT))
     if (/^\s*\[/.test(code.slice(match.index + match[0].length)))
       return "computed member access on " + match[0];
