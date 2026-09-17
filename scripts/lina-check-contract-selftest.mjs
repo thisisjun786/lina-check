@@ -593,6 +593,23 @@ async function runInstallationCases() {
       "installation-repository-shape",
       { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\t"] } },
     ],
+    // A bare $ would accept these: JavaScript lets it match before a final line
+    // terminator, and the entry would then be stored with a suffix no normalised
+    // admission query can ever match.
+    [
+      "installation-owner-shape",
+      { ...shipped, targets: { ...shipped.targets, fallback_owners: ["acme\n"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\n"] } },
+    ],
+    [
+      "installation-repository-shape",
+      { ...shipped, targets: { ...shipped.targets, repositories: ["acme/granted\r\n"] } },
+    ],
+    // note is optional but typed by the schema.
+    ["installation-field-shape", { ...shipped, note: 1 }],
     // additionalProperties:false in every schema object. The dangerous direction
     // is a dropped restriction: a deny list written under a name this build does
     // not know would be ignored while the grant beside it stood.

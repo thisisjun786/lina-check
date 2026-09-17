@@ -148,6 +148,8 @@ Durable Object 내부 `fetch` 는 바깥으로 나가지 않는다. 대상이 �
 | 브랜딩 문자열 | Worker·대시보드 페이지 전반 | 진입점만 만드는 것이 이번 범위다 |
 | JWKS 생산자 인증 출구 | `dashboard/review-proof-producer-auth.ts:75` | GitHub 경로가 아니다. 유예 근거는 배포뿐이다. 위 "이 문이 덮지 않는 것" 참조 |
 | 파일 프로필의 `state`·`github_app` 절 | `config/lina-check-installation.json` | 선언돼 있지만 읽는 곳이 없다. 아래 참조 |
+| 리뷰 증명 실행 경로 | `dashboard/review-proof-execution.ts:89` 와 `worker.ts:5231` | 아래 리뷰 반영 참조 |
+| Node 프로필 출처 | `src/repository-profiles.ts`, `src/repair/target-fanout.ts` | 아래 리뷰 반영 참조 |
 
 ## 선언됐지만 아직 소비되지 않는 필드
 
@@ -164,8 +166,6 @@ Worker 의 상태 읽기를 `installationFromEnv` 로 통과시키는 방법도 
 설정 하나의 실수가 무관한 기능을 끄는 결합은 지금 만들 이유가 없다.
 
 "선언은 있는데 소비가 없다" 를 "연결했다" 고 적지 않는다. 다음 단계가 이어받을 항목이다.
-| 리뷰 증명 실행 경로 | `dashboard/review-proof-execution.ts:89` 와 `worker.ts:5231` | 아래 리뷰 반영 참조 |
-| Node 프로필 출처 | `src/repository-profiles.ts`, `src/repair/target-fanout.ts` | 아래 리뷰 반영 참조 |
 
 ## PR 리뷰 반영
 

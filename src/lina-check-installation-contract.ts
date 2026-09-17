@@ -66,8 +66,13 @@ export type InstallationParse = {
   detail: string;
 };
 
-const OWNER = /^[a-z0-9_.-]+$/;
-const TARGET_REPO = /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/;
+// The trailing lookahead, not a bare $, is what makes these whole-string tests.
+// JavaScript lets $ match immediately before a final line terminator, so
+// /^[a-z0-9_.-]+$/ accepts "acme\n". Since entries are now stored exactly as
+// written, such a value would be kept with its suffix while every admission
+// query arrives normalised, and the grant could never match anything.
+const OWNER = /^[a-z0-9_.-]+(?![\s\S])/;
+const TARGET_REPO = /^[a-z0-9_.-]+\/[a-z0-9_.-]+(?![\s\S])/;
 
 /**
  * The keys the published schema declares, per section. Every object in
@@ -191,6 +196,10 @@ export function parseInstallationProfile(value: unknown): InstallationParse {
   const unknownRoot = unknownKey(root, ROOT_KEYS, "");
   if (unknownRoot !== null)
     return deny("installation-unknown-field", "undeclared field: " + unknownRoot);
+  // note is optional, but the schema types it. Allowing the key without checking
+  // the value would accept a document the published contract rejects.
+  if (root.note !== undefined && typeof root.note !== "string")
+    return deny("installation-field-shape", "note must be a string when present");
   if (root.schema_version !== LINA_CHECK_INSTALLATION_SCHEMA_VERSION)
     return deny("installation-schema", "unsupported schema_version: " + String(root.schema_version));
   if (typeof root.configured !== "boolean")

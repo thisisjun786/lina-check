@@ -32,13 +32,13 @@
         "fallback_owners": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+$" },
+          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+(?![\\s\\S])" },
           "description": "Owners whose repositories may be admitted through a generic registry fallback."
         },
         "repositories": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$" },
+          "items": { "type": "string", "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+(?![\\s\\S])" },
           "description": "Explicitly admitted target repositories."
         },
         "registry_url": {
