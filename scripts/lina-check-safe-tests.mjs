@@ -437,8 +437,11 @@ export async function main(argv, deps = {}) {
       process.stderr.write(LABEL + " upstream-fixture: " + name + " at " + declaration.pin.slice(0, 8) + "\n");
       try {
         // Building the fixture is the longest gap between the check above and
-        // the launch below, so the stop is read again rather than acted on
-        // stale. Breaking here still runs the cleanup in finally.
+        // the launch below, and it is synchronous, so a signal delivered during
+        // it is still queued. Turn the loop first, then read: checking without
+        // the turn reads a flag the handler has not been allowed to set.
+        // Breaking here still runs the cleanup in finally.
+        await yieldToLoop();
         if (interruptedBy()) break;
         // Absolute path: the test resolves imports relative to its own file, while
         // its declared reads follow the working directory into the fixture.

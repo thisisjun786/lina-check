@@ -18,11 +18,11 @@
 | # | 명령 | exit | 초 | 결과 요약 |
 | -- | -- | -- | -- | -- |
 | 1 | `corepack pnpm install --frozen-lockfile --ignore-scripts` | 0 | 0.07 | lockfile 고정 설치 |
-| 2 | `corepack pnpm run build:all` | 0 | 0.99 | tsc 3개 프로젝트 무오류 |
-| 3 | `corepack pnpm run check:scaffold` | 0 | 2.18 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
-| 4 | `corepack pnpm run lint` | 0 | 0.48 | oxlint 4개 스크립트 전부 Done |
+| 2 | `corepack pnpm run build:all` | 0 | 0.95 | tsc 3개 프로젝트 무오류 |
+| 3 | `corepack pnpm run check:scaffold` | 0 | 2.30 | upstream 1646 항목, 파생 32, 복원 테스트 206, 픽스처 23, 수정 선언 7, 워크플로 35 parked, 차단 104 |
+| 4 | `corepack pnpm run lint` | 0 | 0.53 | oxlint 4개 스크립트 전부 Done |
 | 5 | `corepack pnpm run lina:contract-selftest` | 0 | 0.30 | `rejected=30 helpers=18 laneShape=45 installation=48 modifiedUpstream=22 tripwireControls=3 routing=verified assertionCalls=23->29` |
-| 6 | `corepack pnpm run lina:test-safe` | 0 | 142.03 | 통과 2579건, fail 0, skip 0 |
+| 6 | `corepack pnpm run lina:test-safe` | 0 | 137.28 | 통과 2579건, fail 0, skip 0 |
 | 7 | `corepack pnpm run lina:test-safe:preview` | 0 | 0.10 | `206 declared tests, nothing executed`. 자식 프로세스 미기동, 픽스처 미생성 |
 | 8 | `corepack pnpm run lina:boundary-probe` | 0 | 0.75 | `entrancesClosed`·`workflowsParked`·`guardVerified`·`worktreeUnchanged` 전부 true |
 
@@ -45,7 +45,7 @@
 | -- | -- | -- | -- |
 | 저장소 root 배치 | 184 (복원 183 + 파생 1) | 8 | 131.7초 |
 | pin 픽스처 배치 | 23 | 1 (파일당 별도 기동) | 4.0초 |
-| 게이트 6 전체 | 207 | | 142.0초 |
+| 게이트 6 전체 | 207 | | 137.3초 |
 
 구간별 수치는 `evidence/lane_run.json` 을 만든 관측 실행의 것이고, 게이트 6 은 그와 별개의
 실행이다. 둘 다 같은 207개를 같은 구성으로 돌린다.
@@ -144,6 +144,7 @@ PR #4 에 붙은 Devin Review 와 Codex 코드리뷰의 지적이다.
 | 22 | Devin(bug) | 시그널이 픽스처를 만드는 동안 오면 그 픽스처의 테스트를 그래도 띄운다. 루프 앞의 검사와 실행 사이에서 가장 긴 구간이 픽스처 생성이다 | 실행 직전에 한 번 더 읽는다. 거기서 빠져나가도 `finally` 가 디렉터리를 지운다 | `laneShape` 43 → 45. 픽스처 생성 중에 멈춤이 들어오면 그 테스트가 기동되지 않고 143 으로 끝나는지 확인한다 |
 | 23 | Devin(bug) | 한 번 처리한 인터럽트 플래그가 모듈 수준에 남아 같은 프로세스의 다음 `main` 호출을 오염시킨다 | 실행 시퀀스를 시작할 때 초기화한다 | 같은 자기시험 안에서 `main` 을 여섯 번 부르는데, 앞선 멈춤이 뒤의 호출을 끝내지 않는다 |
 | 24 | Devin(analysis) | 인터럽트 응답이 최악의 경우 15분 걸린다 | 사실이다. 자손을 남기지 않는 쪽을 골랐고 그 대가를 `020` 에 숫자로 적었다 | `020_fixture_lane.md` 의 "레인을 멈출 때" |
+| 25 | Codex(P2) | 픽스처 생성도 동기라서, 그 도중에 온 시그널은 아직 큐에 있다. 생성 직후의 검사는 핸들러가 세우지도 못한 플래그를 읽는다 | 검사 전에 루프를 한 번 더 넘겨준다 | 22번 회귀가 그대로 통과하고, 실제 시그널 회귀도 통과한다 |
 
 4라운드 이후의 세 커밋은 PR #3 머지 시점 뒤에 생겼다. 같은 이슈의 후속 PR #4 로 올렸고,
 머지 판단은 조정자에게 남긴다.
