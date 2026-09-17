@@ -659,6 +659,23 @@ const SPAWN_SURFACE = Object.freeze([
 ]);
 
 /**
+ * Surfaces that tell a derived test how it was started.
+ *
+ * Chasing indistinguishability between the observed run and the lane is an arms
+ * race: two different invocations always differ somewhere. What can be settled
+ * is whether a derived test is allowed to look. Reading the argument vector is
+ * denied by name, so a load or a call cannot be made conditional on being
+ * watched. process.execPath is not on this list: it names the interpreter, not
+ * the invocation, and a restored runner case needs it.
+ */
+const OBSERVATION_SIGNAL = Object.freeze([
+  "process.argv",
+  "process.execArgv",
+  "NODE_OPTIONS",
+  "LINA_CHECK_LAUNCH_LOG",
+]);
+
+/**
  * Resolve a relative import the way the loader would, without node:path, so the
  * self-test can drive it on invented paths. A bare or absolute specifier returns
  * null: those are packages and built output, not files this repository owns
@@ -1181,6 +1198,12 @@ export function assertDerivedTestContract({ declared, baselinePaths, presentPath
         if (source.includes(token))
           fail(
             "derived-test-spawns",
+            (member === path ? path : path + " -> " + member) + " -> " + token,
+          );
+      for (const token of OBSERVATION_SIGNAL)
+        if (source.includes(token))
+          fail(
+            "derived-test-observation-signal",
             (member === path ? path : path + " -> " + member) + " -> " + token,
           );
     }

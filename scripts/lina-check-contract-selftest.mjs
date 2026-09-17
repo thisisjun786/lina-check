@@ -942,7 +942,29 @@ function runDerivedTestCases() {
   importMeta.readFile = (path) =>
     path === DERIVED_TESTS[0] ? "const url = import.meta.url;\nconst x = url;\n" : others9(path);
   assertDerivedTestContract(importMeta);
-  observed += 11;
+  // Reading the argument vector is how a test tells the observed run from the
+  // lane. Two invocations always differ somewhere, so the settled question is
+  // whether a derived test may look, and it may not.
+  for (const signal of [
+    "if (!process.execArgv.includes('--import')) start();\n",
+    "const how = process.argv[1];\n",
+    "const options = process.env.NODE_OPTIONS;\n",
+  ]) {
+    const looking = base();
+    const rest2 = looking.readFile;
+    looking.readFile = (path) => (path === DERIVED_TESTS[0] ? signal : rest2(path));
+    assert.throws(() => assertDerivedTestContract(looking), {
+      code: "derived-test-observation-signal",
+    });
+  }
+  // The interpreter path is not the invocation, and a restored runner case needs
+  // it, so it must stay allowed.
+  const execPath = base();
+  const rest3 = execPath.readFile;
+  execPath.readFile = (path) =>
+    path === DERIVED_TESTS[0] ? "const node = process.execPath;\nconst x = node;\n" : rest3(path);
+  assertDerivedTestContract(execPath);
+  observed += 15;
   // The spelling this repository actually uses must still be accepted, or the
   // rule above would just be a ban on createRequire.
   const permitted = base();

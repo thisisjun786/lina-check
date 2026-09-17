@@ -20,7 +20,15 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -159,7 +167,8 @@ export function lockPrefixFor(repositoryRoot) {
  * ages out. Without ageing at all, a recycled pid would refuse every later run
  * and leave an interrupted mutation unrepaired.
  */
-const RUN_LOCK = join(tmpdir(), LOCK_PREFIX + "run.lock");
+const RUN_LOCK = join(tmpdir(), LOCK_PREFIX + "run.lock.d");
+const RUN_OWNER = join(RUN_LOCK, "owner.json");
 const RUN_LOCK_STALE_MS = 10 * 60 * 1000;
 
 /** Whether a process id is still running, treating a permission error as alive. */
@@ -192,42 +201,38 @@ function acquireCheckout() {
   const record = () => JSON.stringify({ pid: process.pid, at: Date.now() });
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      // Exclusive creation: the check and the write are one step, so two runs
-      // starting together cannot both believe they hold the checkout.
-      writeFileSync(RUN_LOCK, record(), { flag: "wx" });
+      // A directory is the mutex: mkdir either creates it or fails, in one step,
+      // so two runs starting together cannot both believe they hold the
+      // checkout. The owner record lives inside it.
+      mkdirSync(RUN_LOCK);
+      writeFileSync(RUN_OWNER, record());
       return {
         // Refreshed between controls so the bound measures silence, not length.
         beat: () => {
-          if (!existsSync(RUN_LOCK)) return;
+          if (!existsSync(RUN_OWNER)) return;
           try {
-            const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
+            const held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
             if (held.pid !== process.pid) return;
           } catch {
             return;
           }
-          writeFileSync(RUN_LOCK, record());
+          writeFileSync(RUN_OWNER, record());
         },
         release: () => {
           if (!existsSync(RUN_LOCK)) return;
           try {
-            const held = JSON.parse(readFileSync(RUN_LOCK, "utf8"));
-            if (held.pid === process.pid) rmSync(RUN_LOCK, { force: true });
+            const held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
+            if (held.pid === process.pid) rmSync(RUN_LOCK, { recursive: true, force: true });
           } catch {
-            rmSync(RUN_LOCK, { force: true });
+            rmSync(RUN_LOCK, { recursive: true, force: true });
           }
         },
       };
     } catch (error) {
       if (error?.code !== "EEXIST") throw error;
-      let raw = null;
-      try {
-        raw = readFileSync(RUN_LOCK, "utf8");
-      } catch {
-        raw = null;
-      }
       let held = null;
       try {
-        held = raw === null ? null : JSON.parse(raw);
+        held = JSON.parse(readFileSync(RUN_OWNER, "utf8"));
       } catch {
         held = null;
       }
@@ -238,16 +243,18 @@ function acquireCheckout() {
             "); wait for it rather than interleaving mutations",
           { cause: error },
         );
-      // Remove it only while it is still the record judged stale. Deleting
-      // unconditionally is how two runs that both saw one stale lock could each
-      // clear the other's fresh one and proceed together.
-      let current = null;
+      // Takeover has to be atomic too, or two contenders that both judged the
+      // same lock stale can each delete the other's fresh one. Moving the
+      // directory aside is a single step: exactly one contender succeeds, and
+      // the loser sees ENOENT and re-reads what is there now.
+      const aside = RUN_LOCK + "." + process.pid + "." + Date.now() + ".stale";
       try {
-        current = readFileSync(RUN_LOCK, "utf8");
-      } catch {
-        current = null;
+        renameSync(RUN_LOCK, aside);
+      } catch (moveError) {
+        if (moveError?.code !== "ENOENT") throw moveError;
+        continue;
       }
-      if (current === raw) rmSync(RUN_LOCK, { force: true });
+      rmSync(aside, { recursive: true, force: true });
     }
   }
   throw new Error("could not take the checkout lock at " + RUN_LOCK);
@@ -350,6 +357,9 @@ export function runControls(controls = CONTROLS) {
     if (!source.includes(control.from))
       throw new Error("anchor not found in " + control.file + ": " + control.what);
     const baseline = runSuite(control.file);
+    // Each suite run can take the whole per-run timeout, so the lease is
+    // refreshed between them as well as before them.
+    checkout.beat();
     let mutated;
     try {
       park(path, source);
@@ -359,6 +369,7 @@ export function runControls(controls = CONTROLS) {
       writeFileSync(path, source);
       unpark(path);
     }
+    checkout.beat();
     if (digest(path) !== before) throw new Error("restore left " + control.file + " changed");
     const verdict = judge(baseline, mutated);
     results.push({
